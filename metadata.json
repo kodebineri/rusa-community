@@ -1,0 +1,8 @@
+{
+  "name": "Remix MongoDB Compass Web Client Flutter",
+  "description": "Professional MongoDB client inspired by MongoDB Compass with interactive query bar, aggregation pipelines, schema analyzer, index manager, explain plan, and mongosh shell.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
