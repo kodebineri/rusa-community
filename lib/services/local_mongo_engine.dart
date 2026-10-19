@@ -12,7 +12,7 @@ import '../models/mongo_models.dart';
 /// an actual MongoDB server.
 class LocalMongoEngine {
   /// The default engine, preloaded with the bundled sample datasets
-  /// (`sample_mflix`, `sample_analytics`, `sample_supplies`).
+  /// (`library`, `social_networks`).
   static final LocalMongoEngine instance = LocalMongoEngine.seeded();
 
   static final Random _random = Random();
@@ -25,127 +25,188 @@ class LocalMongoEngine {
   /// Creates an engine preloaded with the bundled sample data.
   factory LocalMongoEngine.seeded() => LocalMongoEngine()..seedSampleData();
 
+  /// Seeds the bundled sample datasets from `sample_library.json` and
+  /// `sample_social_network.json` in the repo root.
+  ///
+  /// The JSON files use MongoDB extended JSON (`{ "$oid": ... }`,
+  /// `{ "$date": ... }`); here ObjectIds are stored as their 24-char hex
+  /// string and dates as ISO-8601 strings — the same normalisation
+  /// [RealMongoService] applies to real server documents.
   void seedSampleData() {
-    final movies = [
+    final books = [
       MongoDocument.fromMap({
-        '_id': '573a1390f29313caabcd42e8',
-        'title': 'The Shawshank Redemption',
-        'year': 1994,
-        'rated': 'R',
-        'runtime': 142,
-        'genres': ['Drama', 'Crime'],
-        'directors': ['Frank Darabont'],
-        'imdb': {'rating': 9.3, 'votes': 2345890, 'id': 111161},
-        'plot': 'Two imprisoned men bond over a number of years, finding solace and eventual redemption through acts of common decency.',
+        '_id': '60c72b2f9b1d8b0015f8a001',
+        'title': 'The Silent Horizon',
+        'author': 'Elena Rostova',
+        'isbn': '978-3-16-148410-0',
+        'published_year': 2019,
+        'publisher_id': '60c72b2f9b1d8b0015f8a010',
+        'genre_ids': ['60c72b2f9b1d8b0015f8a020', '60c72b2f9b1d8b0015f8a021'],
+        'copies_available': 4,
+        'rating': 4.5,
       }),
       MongoDocument.fromMap({
-        '_id': '573a1390f29313caabcd43f1',
-        'title': 'The Godfather',
-        'year': 1972,
-        'rated': 'R',
-        'runtime': 175,
-        'genres': ['Crime', 'Drama'],
-        'directors': ['Francis Ford Coppola'],
-        'imdb': {'rating': 9.2, 'votes': 1620384, 'id': 68646},
-        'plot': 'The aging patriarch of an organized crime dynasty transfers control of his clandestine empire to his reluctant son.',
-      }),
-      MongoDocument.fromMap({
-        '_id': '573a1390f29313caabcd44a2',
-        'title': 'The Dark Knight',
-        'year': 2008,
-        'rated': 'PG-13',
-        'runtime': 152,
-        'genres': ['Action', 'Crime', 'Drama'],
-        'directors': ['Christopher Nolan'],
-        'imdb': {'rating': 9.0, 'votes': 2303232, 'id': 468569},
-        'plot': 'When the menace known as the Joker wreaks havoc and chaos on the people of Gotham, Batman must accept one of the greatest psychological and physical tests of his ability to fight injustice.',
-      }),
-      MongoDocument.fromMap({
-        '_id': '573a1390f29313caabcd45b9',
-        'title': 'Pulp Fiction',
-        'year': 1994,
-        'rated': 'R',
-        'runtime': 154,
-        'genres': ['Crime', 'Drama'],
-        'directors': ['Quentin Tarantino'],
-        'imdb': {'rating': 8.9, 'votes': 1826188, 'id': 110912},
-        'plot': 'The lives of two mob hitmen, a boxer, a gangster and his wife, and a pair of diner bandits intertwine in four tales of violence and redemption.',
-      }),
-      MongoDocument.fromMap({
-        '_id': '573a1390f29313caabcd46cc',
-        'title': 'Inception',
-        'year': 2010,
-        'rated': 'PG-13',
-        'runtime': 148,
-        'genres': ['Action', 'Adventure', 'Sci-Fi'],
-        'directors': ['Christopher Nolan'],
-        'imdb': {'rating': 8.8, 'votes': 2067042, 'id': 1375666},
-        'plot': 'A thief who steals corporate secrets through the use of dream-sharing technology is given the inverse task of planting an idea into the mind of a C.E.O.',
+        '_id': '60c72b2f9b1d8b0015f8a002',
+        'title': 'Algorithms of the Mind',
+        'author': 'Dr. Marcus Vance',
+        'isbn': '978-1-23-456789-7',
+        'published_year': 2022,
+        'publisher_id': '60c72b2f9b1d8b0015f8a011',
+        'genre_ids': ['60c72b2f9b1d8b0015f8a022'],
+        'copies_available': 2,
+        'rating': 4.8,
       }),
     ];
 
-    final comments = [
+    final publishers = [
       MongoDocument.fromMap({
-        '_id': '5a8d8c6b79da1eee4204d88a',
-        'name': 'Mercedes Tyler',
-        'email': 'mercedes_tyler@fakegmail.com',
-        'movie_id': '573a1390f29313caabcd42e8',
-        'text': 'One of the best cinematic experiences of all time!',
-        'date': '2012-03-26T23:20:16.000Z',
+        '_id': '60c72b2f9b1d8b0015f8a010',
+        'name': 'Apex Academic Press',
+        'city': 'Boston',
+        'country': 'USA',
+        'founded_year': 1985,
       }),
       MongoDocument.fromMap({
-        '_id': '5a8d8c6b79da1eee4204d88b',
-        'name': 'John Doe',
-        'email': 'john_doe@fakegmail.com',
-        'movie_id': '573a1390f29313caabcd43f1',
-        'text': 'A masterpiece of Italian-American cinema.',
-        'date': '2015-08-14T11:05:42.000Z',
+        '_id': '60c72b2f9b1d8b0015f8a011',
+        'name': 'Vanguard Publishing House',
+        'city': 'London',
+        'country': 'UK',
+        'founded_year': 2001,
+      }),
+    ];
+
+    final genres = [
+      MongoDocument.fromMap({
+        '_id': '60c72b2f9b1d8b0015f8a020',
+        'name': 'Science Fiction',
+        'description': 'Speculative fiction dealing with imaginative and futuristic concepts.',
+      }),
+      MongoDocument.fromMap({
+        '_id': '60c72b2f9b1d8b0015f8a021',
+        'name': 'Mystery',
+        'description': 'Fiction revolving around the solution of a crime or secrets.',
+      }),
+      MongoDocument.fromMap({
+        '_id': '60c72b2f9b1d8b0015f8a022',
+        'name': 'Technology',
+        'description': 'Non-fiction works discussing computing, artificial intelligence, and software.',
       }),
     ];
 
     final users = [
       MongoDocument.fromMap({
-        '_id': '60b8d295f1d2c20015f8e001',
-        'username': 'alex_smith',
-        'email': 'alex@example.com',
-        'role': 'admin',
-        'active': true,
-        'loginCount': 142,
+        '_id': '60c72b2f9b1d8b0015f8a030',
+        'username': 'coder_sam',
+        'email': 'samuel.dev@example.com',
+        'profile': {
+          'display_name': 'Sam Thorne',
+          'bio': 'Building scalable systems and drinking espresso.',
+          'location': 'Seattle, WA',
+        },
+        'followers_count': 342,
+        'created_at': '2023-01-15T08:30:00.000Z',
       }),
       MongoDocument.fromMap({
-        '_id': '60b8d295f1d2c20015f8e002',
-        'username': 'sarah_connor',
-        'email': 'sarah@example.com',
-        'role': 'user',
-        'active': true,
-        'loginCount': 35,
+        '_id': '60c72b2f9b1d8b0015f8a031',
+        'username': 'design_maya',
+        'email': 'maya.art@example.com',
+        'profile': {
+          'display_name': 'Maya Lin',
+          'bio': 'UI/UX enthusiast and digital illustrator.',
+          'location': 'Toronto, Canada',
+        },
+        'followers_count': 1280,
+        'created_at': '2023-03-22T14:15:00.000Z',
       }),
     ];
 
-    final supplies = [
+    final posts = [
       MongoDocument.fromMap({
-        '_id': '5bd761dcae323e45a93ccfe8',
-        'saleDate': '2015-03-23T21:06:49.506Z',
-        'items': [
-          {'name': 'binder', 'tags': ['school', 'general'], 'price': 14.15, 'quantity': 3},
-          {'name': 'notepad', 'tags': ['office', 'writing'], 'price': 8.99, 'quantity': 5},
-        ],
-        'storeLocation': 'Denver',
-        'customer': {'gender': 'M', 'age': 42, 'email': 'customer1@example.com', 'satisfaction': 4},
+        '_id': '60c72b2f9b1d8b0015f8a040',
+        'author_id': '60c72b2f9b1d8b0015f8a030',
+        'content': 'Just deployed my first custom MongoDB aggregation pipeline! Loving the flexibility.',
+        'tags': ['mongodb', 'database', 'backend'],
+        'likes_count': 42,
+        'created_at': '2023-10-01T10:00:00.000Z',
+      }),
+      MongoDocument.fromMap({
+        '_id': '60c72b2f9b1d8b0015f8a041',
+        'author_id': '60c72b2f9b1d8b0015f8a031',
+        'content': "Minimalist design isn't about removing features—it's about removing friction.",
+        'tags': ['design', 'ux', 'product'],
+        'likes_count': 115,
+        'created_at': '2023-10-02T16:45:00.000Z',
+      }),
+    ];
+
+    final comments = [
+      MongoDocument.fromMap({
+        '_id': '60c72b2f9b1d8b0015f8a050',
+        'post_id': '60c72b2f9b1d8b0015f8a040',
+        'author_id': '60c72b2f9b1d8b0015f8a031',
+        'text': 'Congrats Sam! Aggregation pipelines are a game changer once you get indexing right.',
+        'created_at': '2023-10-01T10:15:00.000Z',
+      }),
+      MongoDocument.fromMap({
+        '_id': '60c72b2f9b1d8b0015f8a051',
+        'post_id': '60c72b2f9b1d8b0015f8a041',
+        'author_id': '60c72b2f9b1d8b0015f8a030',
+        'text': '100% agree. Simple interfaces hide complex engineering.',
+        'created_at': '2023-10-02T17:05:00.000Z',
       }),
     ];
 
     databases = [
       MongoDatabase(
-        name: 'sample_mflix',
+        name: 'library',
         collections: {
-          'movies': MongoCollection(
-            name: 'movies',
-            documents: movies,
+          'books': MongoCollection(
+            name: 'books',
+            documents: books,
             indexes: [
               MongoIndex(name: '_id_', keys: {'_id': 1}, unique: true),
+              MongoIndex(name: 'isbn_1', keys: {'isbn': 1}, unique: true),
               MongoIndex(name: 'title_text', keys: {'title': 'text'}),
-              MongoIndex(name: 'year_1', keys: {'year': 1}),
+              MongoIndex(name: 'publisher_id_1', keys: {'publisher_id': 1}),
+            ],
+          ),
+          'publishers': MongoCollection(
+            name: 'publishers',
+            documents: publishers,
+            indexes: [
+              MongoIndex(name: '_id_', keys: {'_id': 1}, unique: true),
+              MongoIndex(name: 'name_1', keys: {'name': 1}),
+            ],
+          ),
+          'genres': MongoCollection(
+            name: 'genres',
+            documents: genres,
+            indexes: [
+              MongoIndex(name: '_id_', keys: {'_id': 1}, unique: true),
+              MongoIndex(name: 'name_1', keys: {'name': 1}),
+            ],
+          ),
+        },
+      ),
+      MongoDatabase(
+        name: 'social_networks',
+        collections: {
+          'users': MongoCollection(
+            name: 'users',
+            documents: users,
+            indexes: [
+              MongoIndex(name: '_id_', keys: {'_id': 1}, unique: true),
+              MongoIndex(name: 'username_1', keys: {'username': 1}, unique: true),
+              MongoIndex(name: 'email_1', keys: {'email': 1}, unique: true),
+            ],
+          ),
+          'posts': MongoCollection(
+            name: 'posts',
+            documents: posts,
+            indexes: [
+              MongoIndex(name: '_id_', keys: {'_id': 1}, unique: true),
+              MongoIndex(name: 'author_id_1', keys: {'author_id': 1}),
+              MongoIndex(name: 'tags_1', keys: {'tags': 1}),
             ],
           ),
           'comments': MongoCollection(
@@ -153,33 +214,8 @@ class LocalMongoEngine {
             documents: comments,
             indexes: [
               MongoIndex(name: '_id_', keys: {'_id': 1}, unique: true),
-              MongoIndex(name: 'movie_id_1', keys: {'movie_id': 1}),
-            ],
-          ),
-        },
-      ),
-      MongoDatabase(
-        name: 'sample_analytics',
-        collections: {
-          'users': MongoCollection(
-            name: 'users',
-            documents: users,
-            indexes: [
-              MongoIndex(name: '_id_', keys: {'_id': 1}, unique: true),
-              MongoIndex(name: 'email_1', keys: {'email': 1}, unique: true),
-            ],
-          ),
-        },
-      ),
-      MongoDatabase(
-        name: 'sample_supplies',
-        collections: {
-          'sales': MongoCollection(
-            name: 'sales',
-            documents: supplies,
-            indexes: [
-              MongoIndex(name: '_id_', keys: {'_id': 1}, unique: true),
-              MongoIndex(name: 'storeLocation_1', keys: {'storeLocation': 1}),
+              MongoIndex(name: 'post_id_1', keys: {'post_id': 1}),
+              MongoIndex(name: 'author_id_1', keys: {'author_id': 1}),
             ],
           ),
         },
@@ -260,55 +296,76 @@ class LocalMongoEngine {
     );
   }
 
+  /// Computes per-field schema statistics for [collName] by scanning the
+  /// in-memory documents (a generic stand-in for Compass's schema analysis,
+  /// which works for any of the bundled collections).
   List<SchemaFieldStat> analyzeSchema(String dbName, String collName) {
     final coll = getCollection(dbName, collName);
     if (coll == null || coll.documents.isEmpty) return [];
 
-    final result = <SchemaFieldStat>[
-      SchemaFieldStat(
-        name: '_id',
-        path: '_id',
-        types: [SchemaFieldTypeStat(type: 'ObjectId', count: coll.documents.length, percentage: 100)],
-        totalValues: coll.documents.length,
-        missingCount: 0,
-        missingPercentage: 0,
-        distinctCount: coll.documents.length,
-        sampleValues: coll.documents.take(3).map((d) => d.id).toList(),
-      ),
-      SchemaFieldStat(
-        name: 'title',
-        path: 'title',
-        types: [SchemaFieldTypeStat(type: 'String', count: coll.documents.length, percentage: 100)],
-        totalValues: coll.documents.length,
-        missingCount: 0,
-        missingPercentage: 0,
-        distinctCount: coll.documents.length,
-        sampleValues: coll.documents.take(3).map((d) => d['title']).toList(),
-      ),
-      SchemaFieldStat(
-        name: 'year',
-        path: 'year',
-        types: [SchemaFieldTypeStat(type: 'Int32', count: coll.documents.length, percentage: 100)],
-        totalValues: coll.documents.length,
-        missingCount: 0,
-        missingPercentage: 0,
-        distinctCount: 4,
-        sampleValues: [1972, 1994, 2008],
-        min: 1972,
-        max: 2010,
-      ),
-      SchemaFieldStat(
-        name: 'genres',
-        path: 'genres',
-        types: [SchemaFieldTypeStat(type: 'Array', count: coll.documents.length, percentage: 100)],
-        totalValues: coll.documents.length,
-        missingCount: 0,
-        missingPercentage: 0,
-        distinctCount: 5,
-        sampleValues: ['Drama', 'Crime', 'Action'],
-      ),
-    ];
+    final docs = coll.documents;
+    final total = docs.length;
+
+    // Preserve first-seen field order across all documents.
+    final fieldOrder = <String>[];
+    for (final d in docs) {
+      for (final key in d.data.keys) {
+        if (!fieldOrder.contains(key)) fieldOrder.add(key);
+      }
+    }
+
+    final result = <SchemaFieldStat>[];
+    for (final field in fieldOrder) {
+      final present = docs.map((d) => d.data[field]).where((v) => v != null).toList();
+      final missing = total - present.length;
+
+      final typeCounts = <String, int>{};
+      for (final v in present) {
+        final type = field == '_id' ? 'ObjectId' : _jsonTypeOf(v);
+        typeCounts[type] = (typeCounts[type] ?? 0) + 1;
+      }
+      final types = typeCounts.entries
+          .map((e) => SchemaFieldTypeStat(
+                type: e.key,
+                count: e.value,
+                percentage: (e.value * 100) ~/ total,
+              ))
+          .toList();
+
+      num? min;
+      num? max;
+      for (final v in present) {
+        if (v is num) {
+          if (min == null || v < min) min = v;
+          if (max == null || v > max) max = v;
+        }
+      }
+
+      result.add(SchemaFieldStat(
+        name: field,
+        path: field,
+        types: types,
+        totalValues: present.length,
+        missingCount: missing,
+        missingPercentage: (missing * 100) ~/ total,
+        distinctCount: present.map((v) => jsonEncode(v)).toSet().length,
+        sampleValues: present.take(3).toList(),
+        min: min,
+        max: max,
+      ));
+    }
     return result;
+  }
+
+  /// Maps a decoded JSON value to the BSON type name Compass would display.
+  String _jsonTypeOf(dynamic v) {
+    if (v is String) return 'String';
+    if (v is int) return 'Int32';
+    if (v is double) return 'Double';
+    if (v is bool) return 'Boolean';
+    if (v is List) return 'Array';
+    if (v is Map) return 'Object';
+    return 'Null';
   }
 
   // ---------------------------------------------------------------------------

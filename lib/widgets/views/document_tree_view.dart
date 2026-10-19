@@ -1,5 +1,6 @@
 import 'package:flutter/widgets.dart';
 import '../../theme/compass_colors.dart';
+import '../../theme/compass_theme.dart';
 import '../../theme/compass_typography.dart';
 import '../../icons/compass_svg_icons.dart';
 import '../../models/mongo_models.dart';
@@ -27,13 +28,14 @@ class DocumentTreeView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = CompassTheme.of(context);
     if (documents.isEmpty) {
       return Container(
         alignment: Alignment.center,
         padding: const EdgeInsets.symmetric(vertical: 48.0),
         child: Text(
           'No documents match the current query',
-          style: CompassTypography.caption(color: CompassColors.darkTextMuted),
+          style: CompassTypography.caption(color: theme.textMuted),
         ),
       );
     }
@@ -42,18 +44,18 @@ class DocumentTreeView extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         for (int i = 0; i < documents.length; i++)
-          _buildDocumentCard(documents[i], i),
+          _buildDocumentCard(documents[i], i, theme),
       ],
     );
   }
 
-  Widget _buildDocumentCard(MongoDocument doc, int index) {
+  Widget _buildDocumentCard(MongoDocument doc, int index, CompassTheme theme) {
     return Container(
       margin: const EdgeInsets.only(bottom: 12.0),
       decoration: BoxDecoration(
-        color: CompassColors.darkBgPanel,
+        color: theme.bgPanel,
         borderRadius: BorderRadius.circular(8.0),
-        border: Border.all(color: CompassColors.darkBorder, width: 1.0),
+        border: Border.all(color: theme.border, width: 1.0),
         boxShadow: const [
           BoxShadow(
             color: Color(0x1A000000),
@@ -70,9 +72,9 @@ class DocumentTreeView extends StatelessWidget {
           Container(
             padding: const EdgeInsets.only(bottom: 8.0),
             margin: const EdgeInsets.only(bottom: 8.0),
-            decoration: const BoxDecoration(
+            decoration: BoxDecoration(
               border: Border(
-                bottom: BorderSide(color: CompassColors.darkBorder, width: 1.0),
+                bottom: BorderSide(color: theme.border, width: 1.0),
               ),
             ),
             child: Row(
@@ -82,19 +84,19 @@ class DocumentTreeView extends StatelessWidget {
                   children: [
                     Text(
                       '#${index + 1}',
-                      style: CompassTypography.monoSmall(color: CompassColors.darkTextMuted),
+                      style: CompassTypography.monoSmall(color: theme.textMuted),
                     ),
                     const SizedBox(width: 8.0),
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 6.0, vertical: 2.0),
                       decoration: BoxDecoration(
-                        color: CompassColors.greenBadgeBg,
+                        color: theme.greenBadgeBg,
                         borderRadius: BorderRadius.circular(4.0),
-                        border: Border.all(color: CompassColors.greenBadgeBorder, width: 1.0),
+                        border: Border.all(color: theme.greenBadgeBorder, width: 1.0),
                       ),
                       child: Text(
                         'ObjectId("${doc.id}")',
-                        style: CompassTypography.monoBold(color: CompassColors.greenAccent, size: 11.0),
+                        style: CompassTypography.monoBold(color: theme.accent, size: 11.0),
                       ),
                     ),
                   ],
@@ -106,10 +108,10 @@ class DocumentTreeView extends StatelessWidget {
                       onTap: () => onCloneDocument(doc),
                       child: Container(
                         padding: const EdgeInsets.all(4.0),
-                        child: const CompassSvg(
+                        child: CompassSvg(
                           svgString: CompassSvgIcons.copy,
                           size: 13.0,
-                          color: CompassColors.darkTextMuted,
+                          color: theme.textMuted,
                         ),
                       ),
                     ),
@@ -174,6 +176,8 @@ class _TreeNodeWidget extends StatefulWidget {
 class _TreeNodeWidgetState extends State<_TreeNodeWidget> {
   late bool _isExpanded;
 
+  CompassTheme get _theme => CompassTheme.of(context);
+
   @override
   void initState() {
     super.initState();
@@ -195,22 +199,22 @@ class _TreeNodeWidgetState extends State<_TreeNodeWidget> {
     return 'unknown';
   }
 
-  Color _getTypeColor(String type) {
+  Color _getTypeColor(String type, CompassTheme theme) {
     switch (type) {
       case 'ObjectId':
-        return CompassColors.greenAccent;
+        return theme.accent;
       case 'String':
-        return CompassColors.bsonString;
+        return theme.bsonString;
       case 'number':
-        return CompassColors.bsonNumber;
+        return theme.bsonNumber;
       case 'Boolean':
-        return CompassColors.bsonBoolean;
+        return theme.bsonBoolean;
       case 'Date':
-        return CompassColors.bsonDate;
+        return theme.bsonDate;
       case 'null':
-        return CompassColors.bsonNull;
+        return theme.bsonNull;
       default:
-        return CompassColors.darkTextSecondary;
+        return theme.textSecondary;
     }
   }
 
@@ -241,7 +245,7 @@ class _TreeNodeWidgetState extends State<_TreeNodeWidget> {
                           ? CompassSvgIcons.chevronDown
                           : CompassSvgIcons.chevronRight,
                       size: 11.0,
-                      color: CompassColors.darkTextMuted,
+                      color: _theme.textMuted,
                     ),
                   ),
                 )
@@ -250,14 +254,14 @@ class _TreeNodeWidgetState extends State<_TreeNodeWidget> {
 
               Text(
                 '${widget.propKey}:',
-                style: CompassTypography.monoBold(color: CompassColors.darkTextPrimary, size: 12.0),
+                style: CompassTypography.monoBold(color: _theme.textPrimary, size: 12.0),
               ),
               const SizedBox(width: 6.0),
               Text(
                 type == 'Array'
                     ? 'Array (${(widget.value as List).length})'
                     : type,
-                style: CompassTypography.caption(color: CompassColors.darkTextMuted),
+                style: CompassTypography.caption(color: _theme.textMuted),
               ),
               const SizedBox(width: 6.0),
 
@@ -266,7 +270,7 @@ class _TreeNodeWidgetState extends State<_TreeNodeWidget> {
                   child: Text(
                     type == 'String' ? '"${widget.value}"' : '${widget.value}',
                     style: CompassTypography.monoRegular(
-                      color: _getTypeColor(type),
+                      color: _getTypeColor(type, _theme),
                       size: 12.0,
                     ),
                   ),
@@ -277,7 +281,7 @@ class _TreeNodeWidgetState extends State<_TreeNodeWidget> {
                       ? '[ ... ${(widget.value as List).length} items ]'
                       : '{ ... }',
                   style: CompassTypography.monoRegular(
-                    color: CompassColors.darkTextMuted,
+                    color: _theme.textMuted,
                     size: 12.0,
                   ),
                 ),
@@ -290,9 +294,9 @@ class _TreeNodeWidgetState extends State<_TreeNodeWidget> {
           Container(
             margin: const EdgeInsets.only(left: 14.0),
             padding: const EdgeInsets.only(left: 8.0),
-            decoration: const BoxDecoration(
+            decoration: BoxDecoration(
               border: Border(
-                left: BorderSide(color: CompassColors.darkBorder, width: 1.0),
+                left: BorderSide(color: _theme.border, width: 1.0),
               ),
             ),
             child: Column(

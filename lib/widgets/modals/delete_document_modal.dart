@@ -5,6 +5,7 @@ import 'package:flutter/widgets.dart';
 import '../../icons/compass_svg_icons.dart';
 import '../../models/mongo_models.dart';
 import '../../theme/compass_colors.dart';
+import '../../theme/compass_theme.dart';
 import '../../theme/compass_typography.dart';
 import 'compass_modal.dart';
 
@@ -34,6 +35,8 @@ class DeleteDocumentModal extends StatefulWidget {
 }
 
 class _DeleteDocumentModalState extends State<DeleteDocumentModal> {
+  CompassTheme get _theme => CompassTheme.of(context);
+
   bool _copied = false;
 
   @override
@@ -123,15 +126,15 @@ class _DeleteDocumentModalState extends State<DeleteDocumentModal> {
         // Document ID
         Text(
           'DOCUMENT TARGET ID',
-          style: CompassTypography.badge(color: CompassColors.darkTextSecondary),
+          style: CompassTypography.badge(color: _theme.textSecondary),
         ),
         const SizedBox(height: 6.0),
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 10.0, vertical: 8.0),
           decoration: BoxDecoration(
-            color: CompassColors.darkBgSubtle,
+            color: _theme.bgSubtle,
             borderRadius: BorderRadius.circular(8.0),
-            border: Border.all(color: CompassColors.darkBorder, width: 1.0),
+            border: Border.all(color: _theme.border, width: 1.0),
           ),
           child: Row(
             children: [
@@ -139,7 +142,7 @@ class _DeleteDocumentModalState extends State<DeleteDocumentModal> {
                 child: Text(
                   'ObjectId("${widget.documentId}")',
                   overflow: TextOverflow.ellipsis,
-                  style: CompassTypography.monoSmall(color: CompassColors.greenAccent),
+                  style: CompassTypography.monoSmall(color: _theme.accent),
                 ),
               ),
               const SizedBox(width: 8.0),
@@ -148,7 +151,7 @@ class _DeleteDocumentModalState extends State<DeleteDocumentModal> {
                 child: CompassSvg(
                   svgString: _copied ? CompassSvgIcons.check : CompassSvgIcons.copy,
                   size: 14.0,
-                  color: _copied ? CompassColors.greenAccent : CompassColors.darkTextMuted,
+                  color: _copied ? _theme.accent : _theme.textMuted,
                 ),
               ),
             ],
@@ -159,15 +162,15 @@ class _DeleteDocumentModalState extends State<DeleteDocumentModal> {
           const SizedBox(height: 12.0),
           Row(
             children: [
-              const CompassSvg(
+              CompassSvg(
                 svgString: CompassSvgIcons.layers,
                 size: 12.0,
-                color: CompassColors.darkTextMuted,
+                color: _theme.textMuted,
               ),
               const SizedBox(width: 6.0),
               Text(
                 'Document Preview',
-                style: CompassTypography.bodyMedium(color: CompassColors.darkTextSecondary),
+                style: CompassTypography.bodyMedium(color: _theme.textSecondary),
               ),
             ],
           ),
@@ -176,9 +179,9 @@ class _DeleteDocumentModalState extends State<DeleteDocumentModal> {
             constraints: const BoxConstraints(maxHeight: 150.0),
             padding: const EdgeInsets.all(10.0),
             decoration: BoxDecoration(
-              color: CompassColors.darkBgApp,
+              color: _theme.bgApp,
               borderRadius: BorderRadius.circular(8.0),
-              border: Border.all(color: CompassColors.darkBorder, width: 1.0),
+              border: Border.all(color: _theme.border, width: 1.0),
             ),
             child: SingleChildScrollView(
               child: Text(

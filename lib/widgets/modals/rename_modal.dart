@@ -2,6 +2,7 @@ import 'package:flutter/widgets.dart';
 import '../../icons/compass_svg_icons.dart';
 import '../../services/mongo_engine.dart';
 import '../../theme/compass_colors.dart';
+import '../../theme/compass_theme.dart';
 import '../../theme/compass_typography.dart';
 import 'compass_modal.dart';
 
@@ -33,6 +34,8 @@ class RenameModal extends StatefulWidget {
 }
 
 class _RenameModalState extends State<RenameModal> {
+  CompassTheme get _theme => CompassTheme.of(context);
+
   late final TextEditingController _nameController;
   String? _errorMsg;
 
@@ -109,9 +112,9 @@ class _RenameModalState extends State<RenameModal> {
           iconSvg: widget.type == RenameTarget.database
               ? CompassSvgIcons.database
               : (isView ? CompassSvgIcons.eye : CompassSvgIcons.table),
-          iconColor: isView ? CompassColors.warningAmber : CompassColors.greenAccent,
-          iconBg: isView ? CompassColors.warningAmberBg : CompassColors.greenBadgeBg,
-          iconBorder: isView ? CompassColors.warningAmberBorder : CompassColors.greenBadgeBorder,
+          iconColor: isView ? CompassColors.warningAmber : _theme.accent,
+          iconBg: isView ? CompassColors.warningAmberBg : _theme.greenBadgeBg,
+          iconBorder: isView ? CompassColors.warningAmberBorder : _theme.greenBadgeBorder,
           onClose: widget.onClose,
         ),
         const SizedBox(height: 14.0),
@@ -120,9 +123,9 @@ class _RenameModalState extends State<RenameModal> {
         Container(
           padding: const EdgeInsets.all(10.0),
           decoration: BoxDecoration(
-            color: CompassColors.darkBgSubtle,
+            color: _theme.bgSubtle,
             borderRadius: BorderRadius.circular(6.0),
-            border: Border.all(color: CompassColors.darkBorder, width: 1.0),
+            border: Border.all(color: _theme.border, width: 1.0),
           ),
           child: Row(
             children: [
@@ -131,14 +134,14 @@ class _RenameModalState extends State<RenameModal> {
                     ? CompassSvgIcons.database
                     : (isView ? CompassSvgIcons.eye : CompassSvgIcons.table),
                 size: 13.0,
-                color: CompassColors.darkTextMuted,
+                color: _theme.textMuted,
               ),
               const SizedBox(width: 8.0),
               Expanded(
                 child: Text(
                   _currentName,
                   overflow: TextOverflow.ellipsis,
-                  style: CompassTypography.monoSmall(color: CompassColors.darkTextMuted),
+                  style: CompassTypography.monoSmall(color: _theme.textMuted),
                 ),
               ),
             ],
@@ -162,7 +165,7 @@ class _RenameModalState extends State<RenameModal> {
         Container(
           padding: const EdgeInsets.all(10.0),
           decoration: BoxDecoration(
-            color: CompassColors.darkBgSubtle,
+            color: _theme.bgSubtle,
             borderRadius: BorderRadius.circular(8.0),
             border: Border.all(color: const Color(0x9921313C), width: 1.0),
           ),
@@ -171,15 +174,15 @@ class _RenameModalState extends State<RenameModal> {
             children: [
               Row(
                 children: [
-                  const CompassSvg(
+                  CompassSvg(
                     svgString: CompassSvgIcons.activity,
                     size: 12.0,
-                    color: CompassColors.greenAccent,
+                    color: _theme.accent,
                   ),
                   const SizedBox(width: 6.0),
                   Text(
                     'MongoDB Naming Rules',
-                    style: CompassTypography.bodyMedium(color: CompassColors.darkTextPrimary),
+                    style: CompassTypography.bodyMedium(color: _theme.textPrimary),
                   ),
                 ],
               ),
@@ -190,7 +193,7 @@ class _RenameModalState extends State<RenameModal> {
                     : (isView
                         ? 'Views will retain their pipeline definition and underlying collection source under the new name.'
                         : 'Collection names cannot contain "\$" or begin with "system.". Any views referencing this collection will automatically have their source updated.'),
-                style: CompassTypography.caption(color: CompassColors.darkTextMuted),
+                style: CompassTypography.caption(color: _theme.textMuted),
               ),
             ],
           ),

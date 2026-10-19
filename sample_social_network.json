@@ -1,0 +1,62 @@
+{
+  "users": [
+    {
+      "_id": { "$oid": "60c72b2f9b1d8b0015f8a030" },
+      "username": "coder_sam",
+      "email": "samuel.dev@example.com",
+      "profile": {
+        "display_name": "Sam Thorne",
+        "bio": "Building scalable systems and drinking espresso.",
+        "location": "Seattle, WA"
+      },
+      "followers_count": 342,
+      "created_at": { "$date": "2023-01-15T08:30:00Z" }
+    },
+    {
+      "_id": { "$oid": "60c72b2f9b1d8b0015f8a031" },
+      "username": "design_maya",
+      "email": "maya.art@example.com",
+      "profile": {
+        "display_name": "Maya Lin",
+        "bio": "UI/UX enthusiast and digital illustrator.",
+        "location": "Toronto, Canada"
+      },
+      "followers_count": 1280,
+      "created_at": { "$date": "2023-03-22T14:15:00Z" }
+    }
+  ],
+  "posts": [
+    {
+      "_id": { "$oid": "60c72b2f9b1d8b0015f8a040" },
+      "author_id": { "$oid": "60c72b2f9b1d8b0015f8a030" },
+      "content": "Just deployed my first custom MongoDB aggregation pipeline! Loving the flexibility.",
+      "tags": ["mongodb", "database", "backend"],
+      "likes_count": 42,
+      "created_at": { "$date": "2023-10-01T10:00:00Z" }
+    },
+    {
+      "_id": { "$oid": "60c72b2f9b1d8b0015f8a041" },
+      "author_id": { "$oid": "60c72b2f9b1d8b0015f8a031" },
+      "content": "Minimalist design isn't about removing features—it's about removing friction.",
+      "tags": ["design", "ux", "product"],
+      "likes_count": 115,
+      "created_at": { "$date": "2023-10-02T16:45:00Z" }
+    }
+  ],
+  "comments": [
+    {
+      "_id": { "$oid": "60c72b2f9b1d8b0015f8a050" },
+      "post_id": { "$oid": "60c72b2f9b1d8b0015f8a040" },
+      "author_id": { "$oid": "60c72b2f9b1d8b0015f8a031" },
+      "text": "Congrats Sam! Aggregation pipelines are a game changer once you get indexing right.",
+      "created_at": { "$date": "2023-10-01T10:15:00Z" }
+    },
+    {
+      "_id": { "$oid": "60c72b2f9b1d8b0015f8a051" },
+      "post_id": { "$oid": "60c72b2f9b1d8b0015f8a041" },
+      "author_id": { "$oid": "60c72b2f9b1d8b0015f8a030" },
+      "text": "100% agree. Simple interfaces hide complex engineering.",
+      "created_at": { "$date": "2023-10-02T17:05:00Z" }
+    }
+  ]
+}

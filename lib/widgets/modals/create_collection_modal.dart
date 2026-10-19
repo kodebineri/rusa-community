@@ -2,7 +2,7 @@ import 'package:flutter/widgets.dart';
 import '../../icons/compass_svg_icons.dart';
 import '../../models/mongo_models.dart';
 import '../../services/mongo_engine.dart';
-import '../../theme/compass_colors.dart';
+import '../../theme/compass_theme.dart';
 import '../../theme/compass_typography.dart';
 import 'compass_modal.dart';
 
@@ -30,6 +30,8 @@ class CreateCollectionModal extends StatefulWidget {
 }
 
 class _CreateCollectionModalState extends State<CreateCollectionModal> {
+  CompassTheme get _theme => CompassTheme.of(context);
+
   late final TextEditingController _collController = TextEditingController();
   String _selectedDb = '';
   String? _errorMsg;
@@ -99,6 +101,7 @@ class _CreateCollectionModalState extends State<CreateCollectionModal> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = CompassTheme.of(context);
     return CompassModalShell(
       isOpen: widget.isOpen,
       maxWidth: 448.0,
@@ -145,17 +148,17 @@ class _CreateCollectionModalState extends State<CreateCollectionModal> {
           onTap: () => setState(() => _showAdvanced = !_showAdvanced),
           child: Row(
             children: [
-              const CompassSvg(svgString: CompassSvgIcons.sliders, size: 13.0, color: CompassColors.greenAccent),
+              CompassSvg(svgString: CompassSvgIcons.sliders, size: 13.0, color: theme.accent),
               const SizedBox(width: 6.0),
               Text(
                 'Advanced Options (Capped, Collation)',
-                style: CompassTypography.bodyMedium(color: CompassColors.greenAccent),
+                style: CompassTypography.bodyMedium(color: theme.accent),
               ),
               const SizedBox(width: 6.0),
               CompassSvg(
                 svgString: _showAdvanced ? CompassSvgIcons.chevronUp : CompassSvgIcons.chevronDown,
                 size: 12.0,
-                color: CompassColors.greenAccent,
+                color: theme.accent,
               ),
             ],
           ),
@@ -166,9 +169,9 @@ class _CreateCollectionModalState extends State<CreateCollectionModal> {
           Container(
             padding: const EdgeInsets.all(12.0),
             decoration: BoxDecoration(
-              color: CompassColors.darkBgSubtle,
+              color: theme.bgSubtle,
               borderRadius: BorderRadius.circular(8.0),
-              border: Border.all(color: CompassColors.darkBorder, width: 1.0),
+              border: Border.all(color: theme.border, width: 1.0),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -190,7 +193,7 @@ class _CreateCollectionModalState extends State<CreateCollectionModal> {
                   ),
                 ],
                 const SizedBox(height: 8.0),
-                Container(height: 1.0, color: CompassColors.darkBorder),
+                Container(height: 1.0, color: theme.border),
                 const SizedBox(height: 8.0),
                 _buildCheckRow(
                   label: 'Custom Collation',
@@ -243,10 +246,10 @@ class _CreateCollectionModalState extends State<CreateCollectionModal> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 10.0, vertical: 6.0),
         decoration: BoxDecoration(
-          color: selected ? CompassColors.greenBadgeBg : CompassColors.darkBgInput,
+          color: selected ? _theme.greenBadgeBg : _theme.bgInput,
           borderRadius: BorderRadius.circular(6.0),
           border: Border.all(
-            color: selected ? CompassColors.greenBadgeBorder : CompassColors.darkBorder,
+            color: selected ? _theme.greenBadgeBorder : _theme.border,
             width: 1.0,
           ),
         ),
@@ -256,13 +259,13 @@ class _CreateCollectionModalState extends State<CreateCollectionModal> {
             CompassSvg(
               svgString: CompassSvgIcons.database,
               size: 12.0,
-              color: selected ? CompassColors.greenAccent : CompassColors.darkTextMuted,
+              color: selected ? _theme.accent : _theme.textMuted,
             ),
             const SizedBox(width: 6.0),
             Text(
               '${db.name} (${db.collections.length})',
               style: CompassTypography.monoSmall(
-                color: selected ? CompassColors.greenAccent : CompassColors.darkTextSecondary,
+                color: selected ? _theme.accent : _theme.textSecondary,
               ),
             ),
           ],
@@ -278,17 +281,17 @@ class _CreateCollectionModalState extends State<CreateCollectionModal> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 10.0, vertical: 5.0),
         decoration: BoxDecoration(
-          color: selected ? CompassColors.greenBadgeBg : CompassColors.darkBgInput,
+          color: selected ? _theme.greenBadgeBg : _theme.bgInput,
           borderRadius: BorderRadius.circular(6.0),
           border: Border.all(
-            color: selected ? CompassColors.greenBadgeBorder : CompassColors.darkBorder,
+            color: selected ? _theme.greenBadgeBorder : _theme.border,
             width: 1.0,
           ),
         ),
         child: Text(
           locale,
           style: CompassTypography.monoSmall(
-            color: selected ? CompassColors.greenAccent : CompassColors.darkTextSecondary,
+            color: selected ? _theme.accent : _theme.textSecondary,
           ),
         ),
       ),
@@ -311,16 +314,16 @@ class _CreateCollectionModalState extends State<CreateCollectionModal> {
             height: 15.0,
             margin: const EdgeInsets.only(top: 1.0),
             decoration: BoxDecoration(
-              color: value ? CompassColors.greenAccent : CompassColors.darkBgInput,
+              color: value ? _theme.accent : _theme.bgInput,
               borderRadius: BorderRadius.circular(3.0),
               border: Border.all(
-                color: value ? CompassColors.greenAccent : CompassColors.darkBorder,
+                color: value ? _theme.accent : _theme.border,
                 width: 1.0,
               ),
             ),
             alignment: Alignment.center,
             child: value
-                ? const CompassSvg(svgString: CompassSvgIcons.check, size: 11.0, color: CompassColors.greenNavy)
+                ? CompassSvg(svgString: CompassSvgIcons.check, size: 11.0, color: _theme.onAccent)
                 : null,
           ),
           const SizedBox(width: 8.0),
@@ -328,9 +331,9 @@ class _CreateCollectionModalState extends State<CreateCollectionModal> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(label, style: CompassTypography.bodyMedium(color: CompassColors.darkTextPrimary)),
+                Text(label, style: CompassTypography.bodyMedium(color: _theme.textPrimary)),
                 if (description != null)
-                  Text(description, style: CompassTypography.caption(color: CompassColors.darkTextMuted)),
+                  Text(description, style: CompassTypography.caption(color: _theme.textMuted)),
               ],
             ),
           ),
@@ -343,16 +346,16 @@ class _CreateCollectionModalState extends State<CreateCollectionModal> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text(label, style: CompassTypography.caption(color: CompassColors.darkTextMuted)),
+        Text(label, style: CompassTypography.caption(color: _theme.textMuted)),
         const SizedBox(height: 4.0),
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 7.0),
           decoration: BoxDecoration(
-            color: CompassColors.darkBgInput,
+            color: _theme.bgInput,
             borderRadius: BorderRadius.circular(4.0),
-            border: Border.all(color: CompassColors.darkBorder, width: 1.0),
+            border: Border.all(color: _theme.border, width: 1.0),
           ),
-          child: Text(value, style: CompassTypography.monoSmall(color: CompassColors.darkTextPrimary)),
+          child: Text(value, style: CompassTypography.monoSmall(color: _theme.textPrimary)),
         ),
       ],
     );

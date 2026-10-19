@@ -6,6 +6,7 @@ import '../../icons/compass_svg_icons.dart';
 import '../../models/mongo_models.dart';
 import '../../services/mongo_engine.dart';
 import '../../theme/compass_colors.dart';
+import '../../theme/compass_theme.dart';
 import '../../theme/compass_typography.dart';
 import '../modals/compass_modal.dart';
 
@@ -24,16 +25,16 @@ class AggregationPreset {
 }
 
 const Map<String, String> _defaultTemplates = {
-  r'$match': '{\n  "year": { "\$gte": 1990 }\n}',
-  r'$group': '{\n  "_id": "\$year",\n  "count": { "\$sum": 1 },\n  "avgRating": { "\$avg": "\$imdb.rating" }\n}',
+  r'$match': '{\n  "published_year": { "\$gte": 2015 }\n}',
+  r'$group': '{\n  "_id": "\$publisher_id",\n  "count": { "\$sum": 1 },\n  "avgRating": { "\$avg": "\$rating" }\n}',
   r'$sort': '{\n  "_id": -1\n}',
-  r'$project': '{\n  "title": 1,\n  "year": 1,\n  "rating": "\$imdb.rating"\n}',
+  r'$project': '{\n  "title": 1,\n  "published_year": 1,\n  "rating": 1\n}',
   r'$limit': '10',
   r'$skip': '0',
-  r'$unwind': '"\$genres"',
-  r'$count': '"total_movies"',
-  r'$addFields': '{\n  "isModern": { "\$gte": ["\$year", 2000] }\n}',
-  r'$lookup': '{\n  "from": "comments",\n  "localField": "_id",\n  "foreignField": "movie_id",\n  "as": "userComments"\n}',
+  r'$unwind': '"\$genre_ids"',
+  r'$count': '"total_books"',
+  r'$addFields': '{\n  "isRecent": { "\$gte": ["\$published_year", 2020] }\n}',
+  r'$lookup': '{\n  "from": "publishers",\n  "localField": "publisher_id",\n  "foreignField": "_id",\n  "as": "publisher"\n}',
 };
 
 const List<String> _availableOperators = [
@@ -71,19 +72,21 @@ class AggregationsView extends StatefulWidget {
 }
 
 class _AggregationsViewState extends State<AggregationsView> {
+  CompassTheme get _theme => CompassTheme.of(context);
+
   String _activeMode = 'visual'; // 'visual' or 'raw'
 
   final List<PipelineStage> _stages = [
     PipelineStage(
       id: '1',
       operator: r'$match',
-      content: '{\n  "year": { "\$gte": 1980 }\n}',
+      content: '{\n  "published_year": { "\$gte": 2015 }\n}',
       enabled: true,
     ),
     PipelineStage(
       id: '2',
       operator: r'$group',
-      content: '{\n  "_id": "\$year",\n  "count": { "\$sum": 1 },\n  "avgRating": { "\$avg": "\$imdb.rating" }\n}',
+      content: '{\n  "_id": "\$publisher_id",\n  "count": { "\$sum": 1 },\n  "avgRating": { "\$avg": "\$rating" }\n}',
       enabled: true,
     ),
     PipelineStage(
@@ -110,20 +113,20 @@ class _AggregationsViewState extends State<AggregationsView> {
     AggregationPreset(
       id: 'match-group-sort',
       name: 'Match & Group',
-      description: 'Filter year >= 1980, group by year with count & avg rating, sort descending',
+      description: 'Filter published_year >= 2015, group by publisher with count & avg rating, sort descending',
       stages: [
-        PipelineStage(id: 'p1', operator: r'$match', content: '{\n  "year": { "\$gte": 1980 }\n}', enabled: true),
-        PipelineStage(id: 'p2', operator: r'$group', content: '{\n  "_id": "\$year",\n  "count": { "\$sum": 1 },\n  "avgRating": { "\$avg": "\$imdb.rating" }\n}', enabled: true),
-        PipelineStage(id: 'p3', operator: r'$sort', content: '{\n  "_id": -1\n}', enabled: true),
+        PipelineStage(id: 'p1', operator: r'$match', content: '{\n  "published_year": { "\$gte": 2015 }\n}', enabled: true),
+        PipelineStage(id: 'p2', operator: r'$group', content: '{\n  "_id": "\$publisher_id",\n  "count": { "\$sum": 1 },\n  "avgRating": { "\$avg": "\$rating" }\n}', enabled: true),
+        PipelineStage(id: 'p3', operator: r'$sort', content: '{\n  "count": -1\n}', enabled: true),
       ],
     ),
     AggregationPreset(
       id: 'unwind-genres',
       name: 'Unwind & Count',
-      description: 'Deconstruct genres array and calculate count per genre',
+      description: 'Deconstruct genre_ids array and calculate count per genre',
       stages: [
-        PipelineStage(id: 'u1', operator: r'$unwind', content: '"\$genres"', enabled: true),
-        PipelineStage(id: 'u2', operator: r'$group', content: '{\n  "_id": "\$genres",\n  "count": { "\$sum": 1 }\n}', enabled: true),
+        PipelineStage(id: 'u1', operator: r'$unwind', content: '"\$genre_ids"', enabled: true),
+        PipelineStage(id: 'u2', operator: r'$group', content: '{\n  "_id": "\$genre_ids",\n  "count": { "\$sum": 1 }\n}', enabled: true),
         PipelineStage(id: 'u3', operator: r'$sort', content: '{\n  "count": -1\n}', enabled: true),
         PipelineStage(id: 'u4', operator: r'$limit', content: '10', enabled: true),
       ],
@@ -131,31 +134,31 @@ class _AggregationsViewState extends State<AggregationsView> {
     AggregationPreset(
       id: 'top-rated',
       name: 'Top 10 Rated',
-      description: 'Sort by imdb.rating descending and project fields',
+      description: 'Sort by rating descending and project fields',
       stages: [
-        PipelineStage(id: 't1', operator: r'$sort', content: '{\n  "imdb.rating": -1\n}', enabled: true),
-        PipelineStage(id: 't2', operator: r'$project', content: '{\n  "title": 1,\n  "year": 1,\n  "rating": "\$imdb.rating",\n  "genres": 1\n}', enabled: true),
+        PipelineStage(id: 't1', operator: r'$sort', content: '{\n  "rating": -1\n}', enabled: true),
+        PipelineStage(id: 't2', operator: r'$project', content: '{\n  "title": 1,\n  "published_year": 1,\n  "rating": 1,\n  "genre_ids": 1\n}', enabled: true),
         PipelineStage(id: 't3', operator: r'$limit', content: '10', enabled: true),
       ],
     ),
     AggregationPreset(
-      id: 'lookup-comments',
-      name: 'Lookup Comments',
-      description: 'Join movies collection with comments',
+      id: 'lookup-publishers',
+      name: 'Lookup Publishers',
+      description: 'Join books collection with publishers',
       stages: [
-        PipelineStage(id: 'l1', operator: r'$match', content: '{\n  "year": { "\$gte": 1990 }\n}', enabled: true),
-        PipelineStage(id: 'l2', operator: r'$lookup', content: '{\n  "from": "comments",\n  "localField": "_id",\n  "foreignField": "movie_id",\n  "as": "userComments"\n}', enabled: true),
-        PipelineStage(id: 'l3', operator: r'$project', content: '{\n  "title": 1,\n  "year": 1,\n  "userComments": 1\n}', enabled: true),
+        PipelineStage(id: 'l1', operator: r'$match', content: '{\n  "published_year": { "\$gte": 2015 }\n}', enabled: true),
+        PipelineStage(id: 'l2', operator: r'$lookup', content: '{\n  "from": "publishers",\n  "localField": "publisher_id",\n  "foreignField": "_id",\n  "as": "publisher"\n}', enabled: true),
+        PipelineStage(id: 'l3', operator: r'$project', content: '{\n  "title": 1,\n  "published_year": 1,\n  "publisher": 1\n}', enabled: true),
         PipelineStage(id: 'l4', operator: r'$limit', content: '5', enabled: true),
       ],
     ),
     AggregationPreset(
       id: 'count-aggregate',
       name: 'Count Documents',
-      description: 'Filter movies and count total',
+      description: 'Filter books and count total',
       stages: [
-        PipelineStage(id: 'c1', operator: r'$match', content: '{\n  "year": { "\$gte": 1990 }\n}', enabled: true),
-        PipelineStage(id: 'c2', operator: r'$count', content: '"total_movies"', enabled: true),
+        PipelineStage(id: 'c1', operator: r'$match', content: '{\n  "published_year": { "\$gte": 2015 }\n}', enabled: true),
+        PipelineStage(id: 'c2', operator: r'$count', content: '"total_books"', enabled: true),
       ],
     ),
   ];
@@ -408,9 +411,9 @@ class _AggregationsViewState extends State<AggregationsView> {
         Container(
           padding: const EdgeInsets.all(12.0),
           decoration: BoxDecoration(
-            color: CompassColors.darkBgPanel,
+            color: _theme.bgPanel,
             borderRadius: BorderRadius.circular(8.0),
-            border: Border.all(color: CompassColors.darkBorder, width: 1.0),
+            border: Border.all(color: _theme.border, width: 1.0),
           ),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -419,9 +422,9 @@ class _AggregationsViewState extends State<AggregationsView> {
               Container(
                 padding: const EdgeInsets.all(3.0),
                 decoration: BoxDecoration(
-                  color: CompassColors.darkBgSubtle,
+                  color: _theme.bgSubtle,
                   borderRadius: BorderRadius.circular(6.0),
-                  border: Border.all(color: CompassColors.darkBorder, width: 1.0),
+                  border: Border.all(color: _theme.border, width: 1.0),
                 ),
                 child: Row(
                   children: [
@@ -441,20 +444,20 @@ class _AggregationsViewState extends State<AggregationsView> {
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 6.0),
                       decoration: BoxDecoration(
-                        color: CompassColors.greenAccent,
+                        color: _theme.accent,
                         borderRadius: BorderRadius.circular(6.0),
                       ),
                       child: Row(
                         children: [
-                          const CompassSvg(
+                          CompassSvg(
                             svgString: CompassSvgIcons.play,
                             size: 13.0,
-                            color: CompassColors.greenNavy,
+                            color: _theme.onAccent,
                           ),
                           const SizedBox(width: 6.0),
                           Text(
                             _isRunning ? 'Running...' : 'Run Pipeline',
-                            style: CompassTypography.header(color: CompassColors.greenNavy),
+                            style: CompassTypography.header(color: _theme.onAccent),
                           ),
                         ],
                       ),
@@ -498,21 +501,21 @@ class _AggregationsViewState extends State<AggregationsView> {
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 10.0, vertical: 6.0),
                       decoration: BoxDecoration(
-                        color: CompassColors.darkBgSubtle,
+                        color: _theme.bgSubtle,
                         borderRadius: BorderRadius.circular(6.0),
-                        border: Border.all(color: CompassColors.darkBorder, width: 1.0),
+                        border: Border.all(color: _theme.border, width: 1.0),
                       ),
                       child: Row(
                         children: [
-                          const CompassSvg(
+                          CompassSvg(
                             svgString: CompassSvgIcons.code,
                             size: 13.0,
-                            color: CompassColors.greenAccent,
+                            color: _theme.accent,
                           ),
                           const SizedBox(width: 6.0),
                           Text(
                             'Export Code',
-                            style: CompassTypography.bodyMedium(color: CompassColors.darkTextSecondary),
+                            style: CompassTypography.bodyMedium(color: _theme.textSecondary),
                           ),
                         ],
                       ),
@@ -552,34 +555,34 @@ class _AggregationsViewState extends State<AggregationsView> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 6.0),
         decoration: BoxDecoration(
-          color: isActive ? CompassColors.darkBgPanel : const Color(0x00000000),
+          color: isActive ? _theme.bgPanel : const Color(0x00000000),
           borderRadius: BorderRadius.circular(4.0),
-          border: isActive ? Border.all(color: CompassColors.darkBorder, width: 1.0) : null,
+          border: isActive ? Border.all(color: _theme.border, width: 1.0) : null,
         ),
         child: Row(
           children: [
             CompassSvg(
               svgString: modeKey == 'visual' ? CompassSvgIcons.layers : CompassSvgIcons.code,
               size: 13.0,
-              color: isActive ? CompassColors.greenAccent : CompassColors.darkTextMuted,
+              color: isActive ? _theme.accent : _theme.textMuted,
             ),
             const SizedBox(width: 6.0),
             Text(
               title,
               style: isActive
-                  ? CompassTypography.header(color: CompassColors.darkTextPrimary)
-                  : CompassTypography.bodyRegular(color: CompassColors.darkTextMuted),
+                  ? CompassTypography.header(color: _theme.textPrimary)
+                  : CompassTypography.bodyRegular(color: _theme.textMuted),
             ),
             const SizedBox(width: 6.0),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 5.0, vertical: 1.0),
               decoration: BoxDecoration(
-                color: CompassColors.darkBgSubtle,
+                color: _theme.bgSubtle,
                 borderRadius: BorderRadius.circular(10.0),
               ),
               child: Text(
                 badge,
-                style: CompassTypography.caption(color: CompassColors.darkTextMuted),
+                style: CompassTypography.caption(color: _theme.textMuted),
               ),
             ),
           ],
@@ -592,9 +595,9 @@ class _AggregationsViewState extends State<AggregationsView> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),
       decoration: BoxDecoration(
-        color: CompassColors.darkBgPanel,
+        color: _theme.bgPanel,
         borderRadius: BorderRadius.circular(6.0),
-        border: Border.all(color: CompassColors.darkBorder, width: 1.0),
+        border: Border.all(color: _theme.border, width: 1.0),
       ),
       child: Row(
         children: [
@@ -606,7 +609,7 @@ class _AggregationsViewState extends State<AggregationsView> {
           const SizedBox(width: 8.0),
           Text(
             'Presets:',
-            style: CompassTypography.monoBold(color: CompassColors.darkTextMuted, size: 11.0),
+            style: CompassTypography.monoBold(color: _theme.textMuted, size: 11.0),
           ),
           const SizedBox(width: 8.0),
           Expanded(
@@ -621,13 +624,13 @@ class _AggregationsViewState extends State<AggregationsView> {
                         margin: const EdgeInsets.only(right: 6.0),
                         padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
                         decoration: BoxDecoration(
-                          color: CompassColors.darkBgSubtle,
+                          color: _theme.bgSubtle,
                           borderRadius: BorderRadius.circular(4.0),
-                          border: Border.all(color: CompassColors.darkBorder, width: 1.0),
+                          border: Border.all(color: _theme.border, width: 1.0),
                         ),
                         child: Text(
                           preset.name,
-                          style: CompassTypography.caption(color: CompassColors.darkTextSecondary),
+                          style: CompassTypography.caption(color: _theme.textSecondary),
                         ),
                       ),
                     ),
@@ -648,24 +651,24 @@ class _AggregationsViewState extends State<AggregationsView> {
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 14.0, vertical: 8.0),
           decoration: BoxDecoration(
-            color: CompassColors.darkBgPanel,
+            color: _theme.bgPanel,
             borderRadius: BorderRadius.circular(8.0),
-            border: Border.all(color: CompassColors.darkBorder, width: 1.0),
+            border: Border.all(color: _theme.border, width: 1.0),
           ),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Row(
                 children: [
-                  const CompassSvg(
+                  CompassSvg(
                     svgString: CompassSvgIcons.layers,
                     size: 14.0,
-                    color: CompassColors.greenAccent,
+                    color: _theme.accent,
                   ),
                   const SizedBox(width: 8.0),
                   Text(
                     'Visual Pipeline Stages',
-                    style: CompassTypography.header(),
+                    style: CompassTypography.header(color: _theme.textPrimary),
                   ),
                 ],
               ),
@@ -680,22 +683,22 @@ class _AggregationsViewState extends State<AggregationsView> {
                       child: Container(
                         padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
                         decoration: BoxDecoration(
-                          color: CompassColors.darkBgSubtle,
+                          color: _theme.bgSubtle,
                           borderRadius: BorderRadius.circular(4.0),
-                          border: Border.all(color: CompassColors.darkBorder, width: 1.0),
+                          border: Border.all(color: _theme.border, width: 1.0),
                         ),
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            const CompassSvg(
+                            CompassSvg(
                               svgString: CompassSvgIcons.plus,
                               size: 10.0,
-                              color: CompassColors.greenAccent,
+                              color: _theme.accent,
                             ),
                             const SizedBox(width: 4.0),
                             Text(
                               op,
-                              style: CompassTypography.monoSmall(color: CompassColors.greenAccent),
+                              style: CompassTypography.monoSmall(color: _theme.accent),
                             ),
                           ],
                         ),
@@ -706,21 +709,21 @@ class _AggregationsViewState extends State<AggregationsView> {
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 10.0, vertical: 5.0),
                       decoration: BoxDecoration(
-                        color: CompassColors.greenAccent,
+                        color: _theme.accent,
                         borderRadius: BorderRadius.circular(4.0),
                       ),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          const CompassSvg(
+                          CompassSvg(
                             svgString: CompassSvgIcons.plus,
                             size: 11.0,
-                            color: CompassColors.greenNavy,
+                            color: _theme.onAccent,
                           ),
                           const SizedBox(width: 4.0),
                           Text(
                             'Add Stage',
-                            style: CompassTypography.header(color: CompassColors.greenNavy),
+                            style: CompassTypography.header(color: _theme.onAccent),
                           ),
                         ],
                       ),
@@ -739,29 +742,29 @@ class _AggregationsViewState extends State<AggregationsView> {
           Container(
             padding: const EdgeInsets.all(24.0),
             decoration: BoxDecoration(
-              color: CompassColors.darkBgPanel,
+              color: _theme.bgPanel,
               borderRadius: BorderRadius.circular(8.0),
-              border: Border.all(color: CompassColors.darkBorder, width: 1.0),
+              border: Border.all(color: _theme.border, width: 1.0),
             ),
             child: Center(
               child: Column(
                 children: [
-                  const CompassSvg(
+                  CompassSvg(
                     svgString: CompassSvgIcons.layers,
                     size: 28.0,
-                    color: CompassColors.darkTextMuted,
+                    color: _theme.textMuted,
                   ),
                   const SizedBox(height: 8.0),
                   Text(
                     'No pipeline stages added yet.',
-                    style: CompassTypography.bodyMedium(color: CompassColors.darkTextMuted),
+                    style: CompassTypography.bodyMedium(color: _theme.textMuted),
                   ),
                   const SizedBox(height: 8.0),
                   GestureDetector(
                     onTap: () => _addStage(r'$match'),
                     child: Text(
                       '+ Add your first stage',
-                      style: CompassTypography.header(color: CompassColors.greenAccent),
+                      style: CompassTypography.header(color: _theme.accent),
                     ),
                   ),
                 ],
@@ -782,10 +785,10 @@ class _AggregationsViewState extends State<AggregationsView> {
     return Container(
       margin: const EdgeInsets.only(bottom: 12.0),
       decoration: BoxDecoration(
-        color: CompassColors.darkBgPanel,
+        color: _theme.bgPanel,
         borderRadius: BorderRadius.circular(8.0),
         border: Border.all(
-          color: stage.enabled ? CompassColors.darkBorder : CompassColors.darkBorder.withValues(alpha: 0.5),
+          color: stage.enabled ? _theme.border : _theme.border.withValues(alpha: 0.5),
           width: 1.0,
         ),
       ),
@@ -796,9 +799,9 @@ class _AggregationsViewState extends State<AggregationsView> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),
             decoration: BoxDecoration(
-              color: stage.enabled ? CompassColors.darkBgSubtle : CompassColors.darkBgApp,
-              border: const Border(
-                bottom: BorderSide(color: CompassColors.darkBorder, width: 1.0),
+              color: stage.enabled ? _theme.bgSubtle : _theme.bgApp,
+              border: Border(
+                bottom: BorderSide(color: _theme.border, width: 1.0),
               ),
             ),
             child: Row(
@@ -809,7 +812,7 @@ class _AggregationsViewState extends State<AggregationsView> {
                   children: [
                     Text(
                       'Stage ${index + 1}:',
-                      style: CompassTypography.monoSmall(color: CompassColors.darkTextMuted),
+                      style: CompassTypography.monoSmall(color: _theme.textMuted),
                     ),
                     const SizedBox(width: 8.0),
 
@@ -823,10 +826,10 @@ class _AggregationsViewState extends State<AggregationsView> {
                       child: Container(
                         padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
                         decoration: BoxDecoration(
-                          color: CompassColors.darkBgInput,
+                          color: _theme.bgInput,
                           borderRadius: BorderRadius.circular(4.0),
                           border: Border.all(
-                            color: isPickerOpen ? CompassColors.greenAccent : CompassColors.darkBorder,
+                            color: isPickerOpen ? _theme.accent : _theme.border,
                             width: 1.0,
                           ),
                         ),
@@ -836,7 +839,7 @@ class _AggregationsViewState extends State<AggregationsView> {
                             Text(
                               stage.operator,
                               style: CompassTypography.monoBold(
-                                color: stage.enabled ? CompassColors.greenAccent : CompassColors.darkTextMuted,
+                                color: stage.enabled ? _theme.accent : _theme.textMuted,
                                 size: 12.0,
                               ),
                             ),
@@ -844,7 +847,7 @@ class _AggregationsViewState extends State<AggregationsView> {
                             CompassSvg(
                               svgString: isPickerOpen ? CompassSvgIcons.chevronUp : CompassSvgIcons.chevronDown,
                               size: 11.0,
-                              color: CompassColors.darkTextMuted,
+                              color: _theme.textMuted,
                             ),
                           ],
                         ),
@@ -859,13 +862,13 @@ class _AggregationsViewState extends State<AggregationsView> {
                         padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
                         decoration: BoxDecoration(
                           color: stage.enabled
-                              ? CompassColors.greenBadgeBg
-                              : CompassColors.darkBgSubtle,
+                              ? _theme.greenBadgeBg
+                              : _theme.bgSubtle,
                           borderRadius: BorderRadius.circular(4.0),
                           border: Border.all(
                             color: stage.enabled
-                                ? CompassColors.greenBadgeBorder
-                                : CompassColors.darkBorder,
+                                ? _theme.greenBadgeBorder
+                                : _theme.border,
                             width: 1.0,
                           ),
                         ),
@@ -875,13 +878,13 @@ class _AggregationsViewState extends State<AggregationsView> {
                             CompassSvg(
                               svgString: stage.enabled ? CompassSvgIcons.check : CompassSvgIcons.close,
                               size: 10.0,
-                              color: stage.enabled ? CompassColors.greenAccent : CompassColors.darkTextMuted,
+                              color: stage.enabled ? _theme.accent : _theme.textMuted,
                             ),
                             const SizedBox(width: 4.0),
                             Text(
                               stage.enabled ? 'Enabled' : 'Disabled',
                               style: CompassTypography.caption(
-                                color: stage.enabled ? CompassColors.greenAccent : CompassColors.darkTextMuted,
+                                color: stage.enabled ? _theme.accent : _theme.textMuted,
                               ),
                             ),
                           ],
@@ -900,10 +903,10 @@ class _AggregationsViewState extends State<AggregationsView> {
                         onTap: () => _moveStageUp(index),
                         child: Container(
                           padding: const EdgeInsets.all(5.0),
-                          child: const CompassSvg(
+                          child: CompassSvg(
                             svgString: CompassSvgIcons.chevronUp,
                             size: 13.0,
-                            color: CompassColors.darkTextMuted,
+                            color: _theme.textMuted,
                           ),
                         ),
                       ),
@@ -913,10 +916,10 @@ class _AggregationsViewState extends State<AggregationsView> {
                         onTap: () => _moveStageDown(index),
                         child: Container(
                           padding: const EdgeInsets.all(5.0),
-                          child: const CompassSvg(
+                          child: CompassSvg(
                             svgString: CompassSvgIcons.chevronDown,
                             size: 13.0,
-                            color: CompassColors.darkTextMuted,
+                            color: _theme.textMuted,
                           ),
                         ),
                       ),
@@ -926,10 +929,10 @@ class _AggregationsViewState extends State<AggregationsView> {
                       onTap: () => _duplicateStage(stage, index),
                       child: Container(
                         padding: const EdgeInsets.all(5.0),
-                        child: const CompassSvg(
+                        child: CompassSvg(
                           svgString: CompassSvgIcons.copy,
                           size: 13.0,
-                          color: CompassColors.darkTextMuted,
+                          color: _theme.textMuted,
                         ),
                       ),
                     ),
@@ -956,13 +959,13 @@ class _AggregationsViewState extends State<AggregationsView> {
           if (isPickerOpen)
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),
-              color: CompassColors.darkBgPanel,
+              color: _theme.bgPanel,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
                     'Select Stage Operator:',
-                    style: CompassTypography.caption(color: CompassColors.darkTextMuted),
+                    style: CompassTypography.caption(color: _theme.textMuted),
                   ),
                   const SizedBox(height: 6.0),
                   Wrap(
@@ -976,13 +979,13 @@ class _AggregationsViewState extends State<AggregationsView> {
                             padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
                             decoration: BoxDecoration(
                               color: op == stage.operator
-                                  ? CompassColors.greenBadgeBg
-                                  : CompassColors.darkBgSubtle,
+                                  ? _theme.greenBadgeBg
+                                  : _theme.bgSubtle,
                               borderRadius: BorderRadius.circular(4.0),
                               border: Border.all(
                                 color: op == stage.operator
-                                    ? CompassColors.greenAccent
-                                    : CompassColors.darkBorder,
+                                    ? _theme.accent
+                                    : _theme.border,
                                 width: 1.0,
                               ),
                             ),
@@ -990,8 +993,8 @@ class _AggregationsViewState extends State<AggregationsView> {
                               op,
                               style: CompassTypography.monoSmall(
                                 color: op == stage.operator
-                                    ? CompassColors.greenAccent
-                                    : CompassColors.darkTextSecondary,
+                                    ? _theme.accent
+                                    : _theme.textSecondary,
                               ),
                             ),
                           ),
@@ -1005,7 +1008,7 @@ class _AggregationsViewState extends State<AggregationsView> {
           // Editable Code Area
           Container(
             padding: const EdgeInsets.all(10.0),
-            color: CompassColors.darkBgInput,
+            color: _theme.bgInput,
             child: CompassInput(
               controller: controller,
               maxLines: 7,
@@ -1028,19 +1031,19 @@ class _AggregationsViewState extends State<AggregationsView> {
   Widget _buildRawEditor() {
     return Container(
       decoration: BoxDecoration(
-        color: CompassColors.darkBgPanel,
+        color: _theme.bgPanel,
         borderRadius: BorderRadius.circular(8.0),
-        border: Border.all(color: CompassColors.darkBorder, width: 1.0),
+        border: Border.all(color: _theme.border, width: 1.0),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),
-            decoration: const BoxDecoration(
-              color: CompassColors.darkBgSubtle,
+            decoration: BoxDecoration(
+              color: _theme.bgSubtle,
               border: Border(
-                bottom: BorderSide(color: CompassColors.darkBorder, width: 1.0),
+                bottom: BorderSide(color: _theme.border, width: 1.0),
               ),
             ),
             child: Row(
@@ -1048,27 +1051,27 @@ class _AggregationsViewState extends State<AggregationsView> {
               children: [
                 Text(
                   'AGGREGATION SCRIPT (JSON OR MONGOSH)',
-                  style: CompassTypography.monoBold(color: CompassColors.darkTextMuted, size: 11.0),
+                  style: CompassTypography.monoBold(color: _theme.textMuted, size: 11.0),
                 ),
                 GestureDetector(
                   onTap: _runAggregation,
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 10.0, vertical: 4.0),
                     decoration: BoxDecoration(
-                      color: CompassColors.greenAccent,
+                      color: _theme.accent,
                       borderRadius: BorderRadius.circular(4.0),
                     ),
                     child: Row(
                       children: [
-                        const CompassSvg(
+                        CompassSvg(
                           svgString: CompassSvgIcons.play,
                           size: 11.0,
-                          color: CompassColors.greenNavy,
+                          color: _theme.onAccent,
                         ),
                         const SizedBox(width: 4.0),
                         Text(
                           'Run Aggregation',
-                          style: CompassTypography.header(color: CompassColors.greenNavy),
+                          style: CompassTypography.header(color: _theme.onAccent),
                         ),
                       ],
                     ),
@@ -1079,7 +1082,7 @@ class _AggregationsViewState extends State<AggregationsView> {
           ),
           Container(
             padding: const EdgeInsets.all(10.0),
-            color: CompassColors.darkBgInput,
+            color: _theme.bgInput,
             child: CompassInput(
               controller: _rawController,
               maxLines: 14,
@@ -1104,9 +1107,9 @@ class _AggregationsViewState extends State<AggregationsView> {
 
     return Container(
       decoration: BoxDecoration(
-        color: CompassColors.darkBgPanel,
+        color: _theme.bgPanel,
         borderRadius: BorderRadius.circular(8.0),
-        border: Border.all(color: CompassColors.darkBorder, width: 1.0),
+        border: Border.all(color: _theme.border, width: 1.0),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1114,10 +1117,10 @@ class _AggregationsViewState extends State<AggregationsView> {
           // Results Header
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 14.0, vertical: 10.0),
-            decoration: const BoxDecoration(
-              color: CompassColors.darkBgSubtle,
+            decoration: BoxDecoration(
+              color: _theme.bgSubtle,
               border: Border(
-                bottom: BorderSide(color: CompassColors.darkBorder, width: 1.0),
+                bottom: BorderSide(color: _theme.border, width: 1.0),
               ),
             ),
             child: Row(
@@ -1125,27 +1128,27 @@ class _AggregationsViewState extends State<AggregationsView> {
               children: [
                 Row(
                   children: [
-                    const CompassSvg(
+                    CompassSvg(
                       svgString: CompassSvgIcons.table,
                       size: 14.0,
-                      color: CompassColors.greenAccent,
+                      color: _theme.accent,
                     ),
                     const SizedBox(width: 8.0),
                     Text(
                       'Pipeline Results',
-                      style: CompassTypography.header(),
+                      style: CompassTypography.header(color: _theme.textPrimary),
                     ),
                     const SizedBox(width: 8.0),
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 6.0, vertical: 2.0),
                       decoration: BoxDecoration(
-                        color: CompassColors.darkBgInput,
+                        color: _theme.bgInput,
                         borderRadius: BorderRadius.circular(10.0),
-                        border: Border.all(color: CompassColors.darkBorder, width: 1.0),
+                        border: Border.all(color: _theme.border, width: 1.0),
                       ),
                       child: Text(
                         '$_totalResultCount docs (${_executionTimeMs.toStringAsFixed(1)} ms)',
-                        style: CompassTypography.monoSmall(color: CompassColors.darkTextMuted),
+                        style: CompassTypography.monoSmall(color: _theme.textMuted),
                       ),
                     ),
                   ],
@@ -1157,9 +1160,9 @@ class _AggregationsViewState extends State<AggregationsView> {
                     Container(
                       padding: const EdgeInsets.all(2.0),
                       decoration: BoxDecoration(
-                        color: CompassColors.darkBgInput,
+                        color: _theme.bgInput,
                         borderRadius: BorderRadius.circular(4.0),
-                        border: Border.all(color: CompassColors.darkBorder, width: 1.0),
+                        border: Border.all(color: _theme.border, width: 1.0),
                       ),
                       child: Row(
                         children: [
@@ -1168,15 +1171,15 @@ class _AggregationsViewState extends State<AggregationsView> {
                             child: Container(
                               padding: const EdgeInsets.symmetric(horizontal: 6.0, vertical: 2.0),
                               decoration: BoxDecoration(
-                                color: _resultViewMode == 'json' ? CompassColors.darkBgSubtle : const Color(0x00000000),
+                                color: _resultViewMode == 'json' ? _theme.bgSubtle : const Color(0x00000000),
                                 borderRadius: BorderRadius.circular(3.0),
                               ),
                               child: Text(
                                 'JSON',
                                 style: CompassTypography.caption(
                                   color: _resultViewMode == 'json'
-                                      ? CompassColors.darkTextPrimary
-                                      : CompassColors.darkTextMuted,
+                                      ? _theme.textPrimary
+                                      : _theme.textMuted,
                                 ),
                               ),
                             ),
@@ -1186,15 +1189,15 @@ class _AggregationsViewState extends State<AggregationsView> {
                             child: Container(
                               padding: const EdgeInsets.symmetric(horizontal: 6.0, vertical: 2.0),
                               decoration: BoxDecoration(
-                                color: _resultViewMode == 'table' ? CompassColors.darkBgSubtle : const Color(0x00000000),
+                                color: _resultViewMode == 'table' ? _theme.bgSubtle : const Color(0x00000000),
                                 borderRadius: BorderRadius.circular(3.0),
                               ),
                               child: Text(
                                 'Table',
                                 style: CompassTypography.caption(
                                   color: _resultViewMode == 'table'
-                                      ? CompassColors.darkTextPrimary
-                                      : CompassColors.darkTextMuted,
+                                      ? _theme.textPrimary
+                                      : _theme.textMuted,
                                 ),
                               ),
                             ),
@@ -1210,9 +1213,9 @@ class _AggregationsViewState extends State<AggregationsView> {
                       child: Container(
                         padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
                         decoration: BoxDecoration(
-                          color: CompassColors.darkBgSubtle,
+                          color: _theme.bgSubtle,
                           borderRadius: BorderRadius.circular(4.0),
-                          border: Border.all(color: CompassColors.darkBorder, width: 1.0),
+                          border: Border.all(color: _theme.border, width: 1.0),
                         ),
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
@@ -1220,13 +1223,13 @@ class _AggregationsViewState extends State<AggregationsView> {
                             CompassSvg(
                               svgString: _isCopied ? CompassSvgIcons.check : CompassSvgIcons.copy,
                               size: 12.0,
-                              color: _isCopied ? CompassColors.greenAccent : CompassColors.darkTextSecondary,
+                              color: _isCopied ? _theme.accent : _theme.textSecondary,
                             ),
                             const SizedBox(width: 4.0),
                             Text(
                               _isCopied ? 'Copied!' : 'Copy',
                               style: CompassTypography.caption(
-                                color: _isCopied ? CompassColors.greenAccent : CompassColors.darkTextSecondary,
+                                color: _isCopied ? _theme.accent : _theme.textSecondary,
                               ),
                             ),
                           ],
@@ -1257,26 +1260,26 @@ class _AggregationsViewState extends State<AggregationsView> {
               child: Center(
                 child: Text(
                   'No documents matched the aggregation pipeline.',
-                  style: CompassTypography.bodyRegular(color: CompassColors.darkTextMuted),
+                  style: CompassTypography.bodyRegular(color: _theme.textMuted),
                 ),
               ),
             )
           else if (_resultViewMode == 'json')
             Container(
               padding: const EdgeInsets.all(12.0),
-              color: CompassColors.darkBgInput,
+              color: _theme.bgInput,
               constraints: const BoxConstraints(maxHeight: 400.0),
               child: SingleChildScrollView(
                 child: Text(
                   formattedResultsJson,
-                  style: CompassTypography.monoRegular(color: CompassColors.darkTextPrimary, size: 12.0),
+                  style: CompassTypography.monoRegular(color: _theme.textPrimary, size: 12.0),
                 ),
               ),
             )
           else
             Container(
               padding: const EdgeInsets.all(12.0),
-              color: CompassColors.darkBgInput,
+              color: _theme.bgInput,
               constraints: const BoxConstraints(maxHeight: 400.0),
               child: SingleChildScrollView(
                 child: Column(
@@ -1287,13 +1290,13 @@ class _AggregationsViewState extends State<AggregationsView> {
                         margin: const EdgeInsets.only(bottom: 6.0),
                         padding: const EdgeInsets.all(8.0),
                         decoration: BoxDecoration(
-                          color: CompassColors.darkBgPanel,
+                          color: _theme.bgPanel,
                           borderRadius: BorderRadius.circular(4.0),
-                          border: Border.all(color: CompassColors.darkBorder, width: 1.0),
+                          border: Border.all(color: _theme.border, width: 1.0),
                         ),
                         child: Text(
                           jsonEncode(_results[i].data),
-                          style: CompassTypography.monoRegular(size: 11.0),
+                          style: CompassTypography.monoRegular(color: _theme.textPrimary, size: 11.0),
                         ),
                       ),
                   ],

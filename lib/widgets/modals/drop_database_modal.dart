@@ -1,6 +1,7 @@
 import 'package:flutter/widgets.dart';
 import '../../icons/compass_svg_icons.dart';
 import '../../theme/compass_colors.dart';
+import '../../theme/compass_theme.dart';
 import '../../theme/compass_typography.dart';
 import 'compass_modal.dart';
 
@@ -53,6 +54,7 @@ class _DropDatabaseModalState extends State<DropDatabaseModal> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = CompassTheme.of(context);
     return CompassModalShell(
       isOpen: widget.isOpen,
       maxWidth: 448.0,
@@ -112,12 +114,12 @@ class _DropDatabaseModalState extends State<DropDatabaseModal> {
             Expanded(
               child: Text(
                 'Type "${widget.dbName}" to confirm:',
-                style: CompassTypography.caption(color: CompassColors.darkTextSecondary),
+                style: CompassTypography.caption(color: theme.textSecondary),
               ),
             ),
             GestureDetector(
               onTap: () => setState(() => _typedController.text = widget.dbName),
-              child: Text('Auto-fill', style: CompassTypography.badge(color: CompassColors.greenAccent)),
+              child: Text('Auto-fill', style: CompassTypography.badge(color: theme.accent)),
             ),
           ],
         ),

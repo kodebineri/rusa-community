@@ -8,6 +8,7 @@ import '../../icons/compass_svg_icons.dart';
 import '../../models/mongo_models.dart';
 import '../../services/mongo_engine.dart';
 import '../../theme/compass_colors.dart';
+import '../../theme/compass_theme.dart';
 import '../../theme/compass_typography.dart';
 import 'compass_modal.dart';
 
@@ -53,6 +54,8 @@ class _ImportExportModalState extends State<ImportExportModal> {
   String? _fileName;
   int? _fileDocumentCount;
   bool _isPickingFile = false;
+
+  CompassTheme get _theme => CompassTheme.of(context);
 
   @override
   void didUpdateWidget(covariant ImportExportModal oldWidget) {
@@ -287,7 +290,7 @@ class _ImportExportModalState extends State<ImportExportModal> {
       const SizedBox(height: 12.0),
       Text(
         'Will export currently matched ${widget.documents.length} documents.',
-        style: CompassTypography.caption(color: CompassColors.darkTextMuted),
+        style: CompassTypography.caption(color: _theme.textMuted),
       ),
       if (_exportPreview.isNotEmpty) ...[
         const SizedBox(height: 10.0),
@@ -295,15 +298,15 @@ class _ImportExportModalState extends State<ImportExportModal> {
           constraints: const BoxConstraints(maxHeight: 140.0),
           padding: const EdgeInsets.all(10.0),
           decoration: BoxDecoration(
-            color: CompassColors.darkBgInput,
+            color: _theme.bgInput,
             borderRadius: BorderRadius.circular(8.0),
-            border: Border.all(color: CompassColors.darkBorder, width: 1.0),
+            border: Border.all(color: _theme.border, width: 1.0),
           ),
           child: SingleChildScrollView(
             child: Text(
               _exportPreview,
               style: CompassTypography.monoSmall(
-                  color: CompassColors.darkTextSecondary),
+                  color: _theme.textSecondary),
             ),
           ),
         ),
@@ -372,10 +375,10 @@ class _ImportExportModalState extends State<ImportExportModal> {
     return Container(
       padding: const EdgeInsets.all(12.0),
       decoration: BoxDecoration(
-        color: hasFile ? CompassColors.greenBadgeBg : CompassColors.darkBgInput,
+        color: hasFile ? _theme.greenBadgeBg : _theme.bgInput,
         borderRadius: BorderRadius.circular(8.0),
         border: Border.all(
-          color: hasFile ? CompassColors.greenAccent : CompassColors.darkBorder,
+          color: hasFile ? _theme.accent : _theme.border,
           width: 1.0,
         ),
       ),
@@ -385,8 +388,8 @@ class _ImportExportModalState extends State<ImportExportModal> {
             svgString: hasFile ? CompassSvgIcons.file : CompassSvgIcons.upload,
             size: 18.0,
             color: hasFile
-                ? CompassColors.greenAccent
-                : CompassColors.darkTextMuted,
+                ? _theme.accent
+                : _theme.textMuted,
           ),
           const SizedBox(width: 10.0),
           Expanded(
@@ -397,15 +400,15 @@ class _ImportExportModalState extends State<ImportExportModal> {
                   hasFile ? _fileName! : 'No file selected',
                   style: CompassTypography.bodyMedium(
                     color: hasFile
-                        ? CompassColors.darkTextPrimary
-                        : CompassColors.darkTextSecondary,
+                        ? _theme.textPrimary
+                        : _theme.textSecondary,
                   ),
                 ),
                 const SizedBox(height: 2.0),
                 Text(
                   subtitle,
                   style: CompassTypography.caption(
-                      color: CompassColors.darkTextMuted),
+                      color: _theme.textMuted),
                 ),
               ],
             ),
@@ -438,30 +441,30 @@ class _ImportExportModalState extends State<ImportExportModal> {
         padding: const EdgeInsets.all(12.0),
         decoration: BoxDecoration(
           color:
-              selected ? CompassColors.greenBadgeBg : CompassColors.darkBgInput,
+              selected ? _theme.greenBadgeBg : _theme.bgInput,
           borderRadius: BorderRadius.circular(8.0),
           border: Border.all(
             color:
-                selected ? CompassColors.greenAccent : CompassColors.darkBorder,
+                selected ? _theme.accent : _theme.border,
             width: 1.0,
           ),
         ),
         child: Row(
           children: [
-            const CompassSvg(
+            CompassSvg(
                 svgString: CompassSvgIcons.code,
                 size: 15.0,
-                color: CompassColors.greenAccent),
+                color: _theme.accent),
             const SizedBox(width: 8.0),
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(title,
                     style: CompassTypography.header(
-                        color: CompassColors.darkTextPrimary)),
+                        color: _theme.textPrimary)),
                 Text(description,
                     style: CompassTypography.caption(
-                        color: CompassColors.darkTextMuted)),
+                        color: _theme.textMuted)),
               ],
             ),
           ],
@@ -472,12 +475,12 @@ class _ImportExportModalState extends State<ImportExportModal> {
 
   Widget _statusBanner() {
     final color =
-        _statusIsError ? CompassColors.errorRed : CompassColors.greenAccent;
+        _statusIsError ? CompassColors.errorRed : _theme.accent;
     final bg =
-        _statusIsError ? CompassColors.errorRedBg : CompassColors.greenBadgeBg;
+        _statusIsError ? CompassColors.errorRedBg : _theme.greenBadgeBg;
     final border = _statusIsError
         ? CompassColors.errorRedBorder
-        : CompassColors.greenBadgeBorder;
+        : _theme.greenBadgeBorder;
     return Container(
       padding: const EdgeInsets.all(10.0),
       decoration: BoxDecoration(

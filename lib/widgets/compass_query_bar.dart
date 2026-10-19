@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:flutter/widgets.dart';
 import '../theme/compass_colors.dart';
+import '../theme/compass_theme.dart';
 import '../theme/compass_typography.dart';
 import '../icons/compass_svg_icons.dart';
 import '../models/mongo_models.dart';
@@ -177,11 +178,12 @@ class _CompassQueryBarState extends State<CompassQueryBar> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = CompassTheme.of(context);
     return Container(
-      decoration: const BoxDecoration(
-        color: CompassColors.darkBgPanel,
+      decoration: BoxDecoration(
+        color: theme.bgPanel,
         border: Border(
-          bottom: BorderSide(color: CompassColors.darkBorder, width: 1.0),
+          bottom: BorderSide(color: theme.border, width: 1.0),
         ),
       ),
       padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 10.0),
@@ -196,30 +198,31 @@ class _CompassQueryBarState extends State<CompassQueryBar> {
                 child: Container(
                   height: 36.0,
                   decoration: BoxDecoration(
-                    color: CompassColors.darkBgInput,
+                    color: theme.bgInput,
                     borderRadius: BorderRadius.circular(8.0),
                     border:
-                        Border.all(color: CompassColors.darkBorder, width: 1.0),
+                        Border.all(color: theme.border, width: 1.0),
                   ),
                   padding: const EdgeInsets.symmetric(horizontal: 10.0),
                   child: Row(
                     children: [
-                      const CompassSvg(
+                      CompassSvg(
                         svgString: CompassSvgIcons.search,
                         size: 14.0,
-                        color: CompassColors.darkTextMuted,
+                        color: theme.textMuted,
                       ),
                       const SizedBox(width: 6.0),
                       Text(
                         'FILTER',
                         style: CompassTypography.monoBold(
-                          color: CompassColors.greenAccent,
+                          color: theme.accent,
                           size: 11.0,
                         ),
                       ),
                       const SizedBox(width: 8.0),
                       Expanded(
                         child: _buildEditable(
+                          theme: theme,
                           controller: _filterController,
                           focusNode: _filterFocus,
                           placeholder:
@@ -236,10 +239,10 @@ class _CompassQueryBarState extends State<CompassQueryBar> {
                           color: CompassColors.warningAmber,
                         )
                       else if (widget.options.filter.trim().isNotEmpty)
-                        const CompassSvg(
+                        CompassSvg(
                           svgString: CompassSvgIcons.check,
                           size: 14.0,
-                          color: CompassColors.greenAccent,
+                          color: theme.accent,
                         ),
                     ],
                   ),
@@ -260,13 +263,13 @@ class _CompassQueryBarState extends State<CompassQueryBar> {
                   padding: const EdgeInsets.symmetric(horizontal: 12.0),
                   decoration: BoxDecoration(
                     color: _isOptionsExpanded
-                        ? CompassColors.greenBadgeBg
-                        : CompassColors.darkBgSubtle,
+                        ? theme.greenBadgeBg
+                        : theme.bgSubtle,
                     borderRadius: BorderRadius.circular(8.0),
                     border: Border.all(
                       color: _isOptionsExpanded
-                          ? CompassColors.greenBadgeBorder
-                          : CompassColors.darkBorder,
+                          ? theme.greenBadgeBorder
+                          : theme.border,
                       width: 1.0,
                     ),
                   ),
@@ -276,16 +279,16 @@ class _CompassQueryBarState extends State<CompassQueryBar> {
                         svgString: CompassSvgIcons.sliders,
                         size: 14.0,
                         color: _isOptionsExpanded
-                            ? CompassColors.greenAccent
-                            : CompassColors.darkTextSecondary,
+                            ? theme.accent
+                            : theme.textSecondary,
                       ),
                       const SizedBox(width: 6.0),
                       Text(
                         'Options',
                         style: CompassTypography.bodyMedium(
                           color: _isOptionsExpanded
-                              ? CompassColors.greenAccent
-                              : CompassColors.darkTextSecondary,
+                              ? theme.accent
+                              : theme.textSecondary,
                         ),
                       ),
                       const SizedBox(width: 4.0),
@@ -294,7 +297,7 @@ class _CompassQueryBarState extends State<CompassQueryBar> {
                             ? CompassSvgIcons.chevronUp
                             : CompassSvgIcons.chevronDown,
                         size: 12.0,
-                        color: CompassColors.darkTextMuted,
+                        color: theme.textMuted,
                       ),
                     ],
                   ),
@@ -310,16 +313,16 @@ class _CompassQueryBarState extends State<CompassQueryBar> {
                   height: 36.0,
                   width: 36.0,
                   decoration: BoxDecoration(
-                    color: CompassColors.darkBgSubtle,
+                    color: theme.bgSubtle,
                     borderRadius: BorderRadius.circular(8.0),
                     border:
-                        Border.all(color: CompassColors.darkBorder, width: 1.0),
+                        Border.all(color: theme.border, width: 1.0),
                   ),
                   alignment: Alignment.center,
-                  child: const CompassSvg(
+                  child: CompassSvg(
                     svgString: CompassSvgIcons.rotateCcw,
                     size: 14.0,
-                    color: CompassColors.darkTextMuted,
+                    color: theme.textMuted,
                   ),
                 ),
               ),
@@ -333,23 +336,23 @@ class _CompassQueryBarState extends State<CompassQueryBar> {
                   height: 36.0,
                   padding: const EdgeInsets.symmetric(horizontal: 12.0),
                   decoration: BoxDecoration(
-                    color: CompassColors.darkBgSubtle,
+                    color: theme.bgSubtle,
                     borderRadius: BorderRadius.circular(8.0),
                     border:
-                        Border.all(color: CompassColors.darkBorder, width: 1.0),
+                        Border.all(color: theme.border, width: 1.0),
                   ),
                   child: Row(
                     children: [
-                      const CompassSvg(
+                      CompassSvg(
                         svgString: CompassSvgIcons.code,
                         size: 14.0,
-                        color: CompassColors.greenAccent,
+                        color: theme.accent,
                       ),
                       const SizedBox(width: 6.0),
                       Text(
                         'Show Code',
                         style: CompassTypography.bodyMedium(
-                          color: CompassColors.darkTextSecondary,
+                          color: theme.textSecondary,
                         ),
                       ),
                     ],
@@ -366,7 +369,7 @@ class _CompassQueryBarState extends State<CompassQueryBar> {
                   height: 36.0,
                   padding: const EdgeInsets.symmetric(horizontal: 20.0),
                   decoration: BoxDecoration(
-                    color: CompassColors.greenAccent,
+                    color: theme.accent,
                     borderRadius: BorderRadius.circular(8.0),
                     boxShadow: const [
                       BoxShadow(
@@ -380,7 +383,7 @@ class _CompassQueryBarState extends State<CompassQueryBar> {
                   child: Text(
                     'Find',
                     style: CompassTypography.header(
-                        color: CompassColors.greenNavy),
+                        color: theme.onAccent),
                   ),
                 ),
               ),
@@ -392,9 +395,9 @@ class _CompassQueryBarState extends State<CompassQueryBar> {
             const SizedBox(height: 10.0),
             Container(
               padding: const EdgeInsets.only(top: 10.0),
-              decoration: const BoxDecoration(
+              decoration: BoxDecoration(
                 border: Border(
-                  top: BorderSide(color: CompassColors.darkBorder, width: 1.0),
+                  top: BorderSide(color: theme.border, width: 1.0),
                 ),
               ),
               child: Row(
@@ -404,6 +407,7 @@ class _CompassQueryBarState extends State<CompassQueryBar> {
                   Expanded(
                     flex: 2,
                     child: _buildOptionField(
+                      theme: theme,
                       title: 'PROJECT',
                       subtitle: '1 or 0',
                       placeholder: "{ title: 1, year: 1, _id: 0 }",
@@ -418,6 +422,7 @@ class _CompassQueryBarState extends State<CompassQueryBar> {
                   Expanded(
                     flex: 2,
                     child: _buildOptionField(
+                      theme: theme,
                       title: 'SORT',
                       subtitle: '1 (asc) / -1 (desc)',
                       placeholder: "{ year: -1, rating: -1 }",
@@ -432,6 +437,7 @@ class _CompassQueryBarState extends State<CompassQueryBar> {
                   Expanded(
                     flex: 1,
                     child: _buildOptionField(
+                      theme: theme,
                       title: 'SKIP',
                       placeholder: "0",
                       controller: _skipController,
@@ -445,6 +451,7 @@ class _CompassQueryBarState extends State<CompassQueryBar> {
                   Expanded(
                     flex: 1,
                     child: _buildOptionField(
+                      theme: theme,
                       title: 'LIMIT',
                       placeholder: "20",
                       controller: _limitController,
@@ -467,27 +474,27 @@ class _CompassQueryBarState extends State<CompassQueryBar> {
               children: [
                 Row(
                   children: [
-                    Text('Matches: ', style: CompassTypography.monoSmall()),
+                    Text('Matches: ', style: CompassTypography.monoSmall(color: theme.textSecondary)),
                     Text(
                       '${widget.totalResultsCount ?? 0}',
                       style: CompassTypography.monoBold(
-                          color: CompassColors.darkTextPrimary, size: 11.0),
+                          color: theme.textPrimary, size: 11.0),
                     ),
                     const SizedBox(width: 8.0),
-                    Text('·', style: CompassTypography.monoSmall()),
+                    Text('·', style: CompassTypography.monoSmall(color: theme.textMuted)),
                     const SizedBox(width: 8.0),
-                    Text('Time: ', style: CompassTypography.monoSmall()),
+                    Text('Time: ', style: CompassTypography.monoSmall(color: theme.textSecondary)),
                     Text(
                       '${widget.executionTimeMs ?? 0.8}ms',
                       style: CompassTypography.monoBold(
-                          color: CompassColors.greenAccent, size: 11.0),
+                          color: theme.accent, size: 11.0),
                     ),
                   ],
                 ),
                 Text(
                   'Tip: Press Enter to find',
                   style: CompassTypography.caption(
-                      color: CompassColors.darkTextMuted),
+                      color: theme.textMuted),
                 ),
               ],
             ),
@@ -498,6 +505,7 @@ class _CompassQueryBarState extends State<CompassQueryBar> {
   }
 
   Widget _buildOptionField({
+    required CompassTheme theme,
     required String title,
     String? subtitle,
     required String placeholder,
@@ -515,13 +523,13 @@ class _CompassQueryBarState extends State<CompassQueryBar> {
             Text(
               title,
               style: CompassTypography.monoBold(
-                  color: CompassColors.darkTextMuted, size: 10.0),
+                  color: theme.textMuted, size: 10.0),
             ),
             if (subtitle != null)
               Text(
                 subtitle,
                 style: CompassTypography.caption(
-                    color: CompassColors.darkTextMuted),
+                    color: theme.textMuted),
               ),
           ],
         ),
@@ -530,12 +538,13 @@ class _CompassQueryBarState extends State<CompassQueryBar> {
           height: 30.0,
           padding: const EdgeInsets.symmetric(horizontal: 8.0),
           decoration: BoxDecoration(
-            color: CompassColors.darkBgInput,
+            color: theme.bgInput,
             borderRadius: BorderRadius.circular(4.0),
-            border: Border.all(color: CompassColors.darkBorder, width: 1.0),
+            border: Border.all(color: theme.border, width: 1.0),
           ),
           alignment: Alignment.centerLeft,
           child: _buildEditable(
+            theme: theme,
             controller: controller,
             focusNode: focusNode,
             placeholder: placeholder,
@@ -554,6 +563,7 @@ class _CompassQueryBarState extends State<CompassQueryBar> {
   /// [EditableText] element keeps its slot and never loses its text-input
   /// connection when the field transitions between empty and non-empty.
   Widget _buildEditable({
+    required CompassTheme theme,
     required TextEditingController controller,
     required FocusNode focusNode,
     required String placeholder,
@@ -563,7 +573,7 @@ class _CompassQueryBarState extends State<CompassQueryBar> {
     double fontSize = 11.0,
   }) {
     final style = CompassTypography.monoRegular(
-        color: CompassColors.darkTextPrimary, size: fontSize);
+        color: theme.textPrimary, size: fontSize);
     return ValueListenableBuilder<TextEditingValue>(
       valueListenable: controller,
       builder: (context, value, _) {
@@ -577,7 +587,7 @@ class _CompassQueryBarState extends State<CompassQueryBar> {
               maintainSize: true,
               child: Text(
                 placeholder,
-                style: style.copyWith(color: CompassColors.darkTextMuted),
+                style: style.copyWith(color: theme.textMuted),
                 overflow: TextOverflow.ellipsis,
               ),
             ),
@@ -585,8 +595,8 @@ class _CompassQueryBarState extends State<CompassQueryBar> {
               controller: controller,
               focusNode: focusNode,
               style: style,
-              cursorColor: CompassColors.greenAccent,
-              backgroundCursorColor: CompassColors.darkBgInput,
+              cursorColor: theme.accent,
+              backgroundCursorColor: theme.bgInput,
               keyboardType: keyboardType,
               maxLines: 1,
               onChanged: onChanged,

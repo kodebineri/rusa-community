@@ -1,5 +1,6 @@
 import 'package:flutter/widgets.dart';
 import '../../theme/compass_colors.dart';
+import '../../theme/compass_theme.dart';
 import '../../theme/compass_typography.dart';
 import '../../icons/compass_svg_icons.dart';
 
@@ -28,6 +29,8 @@ class ExportLanguageModal extends StatefulWidget {
 }
 
 class _ExportLanguageModalState extends State<ExportLanguageModal> {
+  CompassTheme get _theme => CompassTheme.of(context);
+
   String _selectedLang = 'dart'; // dart, node, python, java, csharp
 
   String _generateSnippet() {
@@ -94,9 +97,9 @@ for doc in cursor:
           width: 580.0,
           margin: const EdgeInsets.all(24.0),
           decoration: BoxDecoration(
-            color: CompassColors.darkBgPanel,
+            color: _theme.bgPanel,
             borderRadius: BorderRadius.circular(12.0),
-            border: Border.all(color: CompassColors.darkBorder, width: 1.0),
+            border: Border.all(color: _theme.border, width: 1.0),
             boxShadow: const [
               BoxShadow(
                 color: Color(0x66000000),
@@ -115,21 +118,24 @@ for doc in cursor:
                 children: [
                   Row(
                     children: [
-                      const CompassSvg(
+                      CompassSvg(
                         svgString: CompassSvgIcons.code,
                         size: 16.0,
-                        color: CompassColors.greenAccent,
+                        color: _theme.accent,
                       ),
                       const SizedBox(width: 8.0),
-                      Text('Export Query to Language', style: CompassTypography.title()),
+                      Text(
+                        'Export Query to Language',
+                        style: CompassTypography.title(color: _theme.textPrimary),
+                      ),
                     ],
                   ),
                   GestureDetector(
                     onTap: widget.onClose,
-                    child: const CompassSvg(
+                    child: CompassSvg(
                       svgString: CompassSvgIcons.close,
                       size: 14.0,
-                      color: CompassColors.darkTextMuted,
+                      color: _theme.textMuted,
                     ),
                   ),
                 ],
@@ -154,13 +160,13 @@ for doc in cursor:
                 height: 220.0,
                 padding: const EdgeInsets.all(12.0),
                 decoration: BoxDecoration(
-                  color: CompassColors.darkBgInput,
+                  color: _theme.bgInput,
                   borderRadius: BorderRadius.circular(6.0),
-                  border: Border.all(color: CompassColors.darkBorder, width: 1.0),
+                  border: Border.all(color: _theme.border, width: 1.0),
                 ),
                 child: Text(
                   _generateSnippet(),
-                  style: CompassTypography.monoRegular(color: CompassColors.darkTextSecondary, size: 12.0),
+                  style: CompassTypography.monoRegular(color: _theme.textSecondary, size: 12.0),
                 ),
               ),
 
@@ -174,10 +180,10 @@ for doc in cursor:
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 14.0, vertical: 7.0),
                       decoration: BoxDecoration(
-                        color: CompassColors.greenAccent,
+                        color: _theme.accent,
                         borderRadius: BorderRadius.circular(6.0),
                       ),
-                      child: Text('Done', style: CompassTypography.header(color: CompassColors.greenNavy)),
+                      child: Text('Done', style: CompassTypography.header(color: _theme.onAccent)),
                     ),
                   ),
                 ],
@@ -198,18 +204,18 @@ for doc in cursor:
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 10.0, vertical: 6.0),
         decoration: BoxDecoration(
-          color: isSelected ? CompassColors.greenBadgeBg : CompassColors.darkBgSubtle,
+          color: isSelected ? _theme.greenBadgeBg : _theme.bgSubtle,
           borderRadius: BorderRadius.circular(6.0),
           border: Border.all(
-            color: isSelected ? CompassColors.greenBadgeBorder : CompassColors.darkBorder,
+            color: isSelected ? _theme.greenBadgeBorder : _theme.border,
             width: 1.0,
           ),
         ),
         child: Text(
           label,
           style: isSelected
-              ? CompassTypography.header(color: CompassColors.greenAccent)
-              : CompassTypography.bodyRegular(color: CompassColors.darkTextSecondary),
+              ? CompassTypography.header(color: _theme.accent)
+              : CompassTypography.bodyRegular(color: _theme.textSecondary),
         ),
       ),
     );

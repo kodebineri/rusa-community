@@ -1,0 +1,64 @@
+{
+  "books": [
+    {
+      "_id": { "$oid": "60c72b2f9b1d8b0015f8a001" },
+      "title": "The Silent Horizon",
+      "author": "Elena Rostova",
+      "isbn": "978-3-16-148410-0",
+      "published_year": 2019,
+      "publisher_id": { "$oid": "60c72b2f9b1d8b0015f8a010" },
+      "genre_ids": [
+        { "$oid": "60c72b2f9b1d8b0015f8a020" },
+        { "$oid": "60c72b2f9b1d8b0015f8a021" }
+      ],
+      "copies_available": 4,
+      "rating": 4.5
+    },
+    {
+      "_id": { "$oid": "60c72b2f9b1d8b0015f8a002" },
+      "title": "Algorithms of the Mind",
+      "author": "Dr. Marcus Vance",
+      "isbn": "978-1-23-456789-7",
+      "published_year": 2022,
+      "publisher_id": { "$oid": "60c72b2f9b1d8b0015f8a011" },
+      "genre_ids": [
+        { "$oid": "60c72b2f9b1d8b0015f8a022" }
+      ],
+      "copies_available": 2,
+      "rating": 4.8
+    }
+  ],
+  "publishers": [
+    {
+      "_id": { "$oid": "60c72b2f9b1d8b0015f8a010" },
+      "name": "Apex Academic Press",
+      "city": "Boston",
+      "country": "USA",
+      "founded_year": 1985
+    },
+    {
+      "_id": { "$oid": "60c72b2f9b1d8b0015f8a011" },
+      "name": "Vanguard Publishing House",
+      "city": "London",
+      "country": "UK",
+      "founded_year": 2001
+    }
+  ],
+  "genres": [
+    {
+      "_id": { "$oid": "60c72b2f9b1d8b0015f8a020" },
+      "name": "Science Fiction",
+      "description": "Speculative fiction dealing with imaginative and futuristic concepts."
+    },
+    {
+      "_id": { "$oid": "60c72b2f9b1d8b0015f8a021" },
+      "name": "Mystery",
+      "description": "Fiction revolving around the solution of a crime or secrets."
+    },
+    {
+      "_id": { "$oid": "60c72b2f9b1d8b0015f8a022" },
+      "name": "Technology",
+      "description": "Non-fiction works discussing computing, artificial intelligence, and software."
+    }
+  ]
+}

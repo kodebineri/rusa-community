@@ -3,19 +3,31 @@ import 'dart:convert';
 import 'package:flutter/widgets.dart';
 import '../../icons/compass_svg_icons.dart';
 import '../../services/mongo_engine.dart';
-import '../../theme/compass_colors.dart';
+import '../../theme/compass_theme.dart';
 import '../../theme/compass_typography.dart';
 import 'compass_modal.dart';
 
 /// Converted from src/components/InsertDocModal.tsx
 ///
-/// Used both for inserting a brand-new document and for editing an existing
-/// one (when [initialDoc] is supplied).
+/// Used for inserting a brand-new document, editing an existing one (when
+/// [initialDoc] is supplied), and — when [isClone] is set — reviewing a copy
+/// of an existing document before inserting it (the duplicate action).
 class InsertDocumentModal extends StatefulWidget {
   final bool isOpen;
   final VoidCallback onClose;
-  final Function(Map<String, dynamic> doc) onInsert;
+
+  /// Inserts the (possibly edited) document. Returns `null` on success or a
+  /// human-readable error message, which the dialog shows in its error banner.
+  final String? Function(Map<String, dynamic> doc) onInsert;
+
+  /// Document the dialog opens pre-filled with: the document being edited, or
+  /// the copied document when [isClone] is set.
   final Map<String, dynamic>? initialDoc;
+
+  /// Set by the duplicate/copy action: [initialDoc] is then a copy of an
+  /// existing document (given a fresh `_id` by the caller) which is inserted
+  /// as a new document instead of updating the original.
+  final bool isClone;
 
   const InsertDocumentModal({
     super.key,
@@ -23,6 +35,7 @@ class InsertDocumentModal extends StatefulWidget {
     required this.onClose,
     required this.onInsert,
     this.initialDoc,
+    this.isClone = false,
   });
 
   @override
@@ -77,7 +90,11 @@ class _InsertDocumentModalState extends State<InsertDocumentModal> {
         setState(() => _errorMsg = 'Document must be a JSON object.');
         return;
       }
-      widget.onInsert(Map<String, dynamic>.from(parsed));
+      final error = widget.onInsert(Map<String, dynamic>.from(parsed));
+      if (error != null) {
+        setState(() => _errorMsg = error);
+        return;
+      }
       widget.onClose();
     } catch (err) {
       setState(() => _errorMsg = 'JSON Parse Error: $err');
@@ -99,7 +116,8 @@ class _InsertDocumentModalState extends State<InsertDocumentModal> {
 
   @override
   Widget build(BuildContext context) {
-    final isEdit = widget.initialDoc != null;
+    final theme = CompassTheme.of(context);
+    final isEdit = widget.initialDoc != null && !widget.isClone;
     return CompassModalShell(
       isOpen: widget.isOpen,
       maxWidth: 576.0,
@@ -115,12 +133,12 @@ class _InsertDocumentModalState extends State<InsertDocumentModal> {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text('JSON DOCUMENT', style: CompassTypography.monoSmall(color: CompassColors.darkTextMuted)),
+            Text('JSON DOCUMENT', style: CompassTypography.monoSmall(color: theme.textMuted)),
             GestureDetector(
               onTap: _generateNewId,
               child: Text(
                 'Generate New _id',
-                style: CompassTypography.badge(color: CompassColors.greenAccent),
+                style: CompassTypography.badge(color: theme.accent),
               ),
             ),
           ],
@@ -147,7 +165,9 @@ class _InsertDocumentModalState extends State<InsertDocumentModal> {
           children: [
             CompassSecondaryButton(label: 'Cancel', onTap: widget.onClose),
             CompassPrimaryButton(
-              label: isEdit ? 'Save Changes' : 'Insert',
+              label: isEdit
+                  ? 'Save Changes'
+                  : (widget.isClone ? 'Insert Document' : 'Insert'),
               onTap: _submit,
             ),
           ],

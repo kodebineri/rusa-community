@@ -3,7 +3,7 @@ import 'package:flutter/widgets.dart';
 
 import '../icons/compass_svg_icons.dart';
 import '../models/collection_tab.dart';
-import '../theme/compass_colors.dart';
+import '../theme/compass_theme.dart';
 import '../theme/compass_typography.dart';
 
 /// Horizontal strip of open collection tabs at the top of the main pane
@@ -36,6 +36,12 @@ class _CollectionTabBarState extends State<CollectionTabBar> {
   /// Attached to whichever tab is currently active so it can be revealed with
   /// [Scrollable.ensureVisible].
   final GlobalKey _activeTabKey = GlobalKey();
+
+  // --- Theme-aware palette ---------------------------------------------------
+  // The strip reads the resolved palette from [CompassTheme] (provided at the
+  // root by `CompassApp`), so it follows the dark/light toggle without an
+  // `isDarkMode` constructor parameter.
+  CompassTheme get _theme => CompassTheme.of(context);
 
   @override
   void didUpdateWidget(covariant CollectionTabBar oldWidget) {
@@ -88,10 +94,10 @@ class _CollectionTabBarState extends State<CollectionTabBar> {
   Widget build(BuildContext context) {
     return Container(
       height: _tabHeight,
-      decoration: const BoxDecoration(
-        color: CompassColors.darkBgPanel,
+      decoration: BoxDecoration(
+        color: _theme.bgPanel,
         border: Border(
-          bottom: BorderSide(color: CompassColors.darkBorder, width: 1.0),
+          bottom: BorderSide(color: _theme.border, width: 1.0),
         ),
       ),
       child: Row(
@@ -116,7 +122,7 @@ class _CollectionTabBarState extends State<CollectionTabBar> {
             child: Center(
               child: Text(
                 '${widget.tabs.length} open',
-                style: CompassTypography.caption(color: CompassColors.darkTextMuted),
+                style: CompassTypography.caption(color: _theme.textMuted),
               ),
             ),
           ),
@@ -138,11 +144,11 @@ class _CollectionTabBarState extends State<CollectionTabBar> {
         constraints: const BoxConstraints(minWidth: 140.0, maxWidth: 200.0),
         padding: const EdgeInsets.only(left: 12.0, right: 6.0),
         decoration: BoxDecoration(
-          color: isActive ? CompassColors.darkBgSubtle : const Color(0x00000000),
+          color: isActive ? _theme.bgSubtle : const Color(0x00000000),
           border: Border(
-            right: const BorderSide(color: CompassColors.darkBorder, width: 1.0),
+            right: BorderSide(color: _theme.border, width: 1.0),
             bottom: BorderSide(
-              color: isActive ? CompassColors.greenAccent : CompassColors.darkBorder,
+              color: isActive ? _theme.accent : _theme.border,
               width: isActive ? 2.0 : 1.0,
             ),
           ),
@@ -155,7 +161,7 @@ class _CollectionTabBarState extends State<CollectionTabBar> {
                   CompassSvg(
                     svgString: tab.collName.isEmpty ? CompassSvgIcons.database : CompassSvgIcons.table,
                     size: 13.0,
-                    color: isActive ? CompassColors.greenAccent : CompassColors.darkTextMuted,
+                    color: isActive ? _theme.accent : _theme.textMuted,
                   ),
                   const SizedBox(width: 6.0),
                   Flexible(
@@ -165,8 +171,8 @@ class _CollectionTabBarState extends State<CollectionTabBar> {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: isActive
-                          ? CompassTypography.bodyMedium(color: CompassColors.darkTextPrimary)
-                          : CompassTypography.bodyRegular(color: CompassColors.darkTextSecondary),
+                          ? CompassTypography.bodyMedium(color: _theme.textPrimary)
+                          : CompassTypography.bodyRegular(color: _theme.textSecondary),
                     ),
                   ),
                   if (tab.collName.isNotEmpty) ...[
@@ -177,7 +183,7 @@ class _CollectionTabBarState extends State<CollectionTabBar> {
                         tab.dbName,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: CompassTypography.caption(color: CompassColors.darkTextMuted),
+                        style: CompassTypography.caption(color: _theme.textMuted),
                       ),
                     ),
                   ],
@@ -193,7 +199,7 @@ class _CollectionTabBarState extends State<CollectionTabBar> {
                 child: CompassSvg(
                   svgString: CompassSvgIcons.close,
                   size: 11.0,
-                  color: isActive ? CompassColors.darkTextSecondary : CompassColors.darkTextMuted,
+                  color: isActive ? _theme.textSecondary : _theme.textMuted,
                 ),
               ),
             ),

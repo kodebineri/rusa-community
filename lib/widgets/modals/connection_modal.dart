@@ -1,5 +1,6 @@
 import 'package:flutter/widgets.dart';
 import '../../theme/compass_colors.dart';
+import '../../theme/compass_theme.dart';
 import '../../theme/compass_typography.dart';
 import '../../icons/compass_svg_icons.dart';
 import '../../models/mongo_models.dart';
@@ -32,8 +33,8 @@ class ConnectionModal extends StatefulWidget {
   final ValueChanged<ConnectionProfile> onSaveConnection;
   final ValueChanged<String> onDeleteConnection;
 
-  /// Connects to the bundled sample datasets (`sample_mflix`,
-  /// `sample_analytics`, `sample_supplies`) and loads them into the workspace.
+  /// Connects to the bundled sample datasets (`library`,
+  /// `social_networks`) and loads them into the workspace.
   final VoidCallback onConnectSampleData;
 
   const ConnectionModal({
@@ -52,6 +53,8 @@ class ConnectionModal extends StatefulWidget {
 }
 
 class _ConnectionModalState extends State<ConnectionModal> {
+  CompassTheme get _theme => CompassTheme.of(context);
+
   late final TextEditingController _uriController;
   late final TextEditingController _nameController;
   late final TextEditingController _hostController;
@@ -208,9 +211,9 @@ class _ConnectionModalState extends State<ConnectionModal> {
             width: 560.0,
             margin: const EdgeInsets.all(24.0),
             decoration: BoxDecoration(
-              color: CompassColors.darkBgPanel,
+              color: _theme.bgPanel,
               borderRadius: BorderRadius.circular(12.0),
-              border: Border.all(color: CompassColors.darkBorder, width: 1.0),
+              border: Border.all(color: _theme.border, width: 1.0),
               boxShadow: const [
                 BoxShadow(
                   color: Color(0x66000000),
@@ -260,9 +263,9 @@ class _ConnectionModalState extends State<ConnectionModal> {
   Widget _buildHeader() {
     return Container(
       padding: const EdgeInsets.fromLTRB(20.0, 16.0, 20.0, 16.0),
-      decoration: const BoxDecoration(
-        color: CompassColors.darkBgSubtle,
-        border: Border(bottom: BorderSide(color: CompassColors.darkBorder, width: 1.0)),
+      decoration: BoxDecoration(
+        color: _theme.bgSubtle,
+        border: Border(bottom: BorderSide(color: _theme.border, width: 1.0)),
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -290,11 +293,14 @@ class _ConnectionModalState extends State<ConnectionModal> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('Connect to MongoDB', style: CompassTypography.title()),
+                      Text(
+                        'Connect to MongoDB',
+                        style: CompassTypography.title(color: _theme.textPrimary),
+                      ),
                       const SizedBox(height: 2.0),
                       Text(
                         'Connect to a standalone instance, replica set, or Atlas cluster',
-                        style: CompassTypography.caption(color: CompassColors.darkTextMuted),
+                        style: CompassTypography.caption(color: _theme.textMuted),
                       ),
                     ],
                   ),
@@ -306,10 +312,10 @@ class _ConnectionModalState extends State<ConnectionModal> {
             onTap: widget.onClose,
             child: Container(
               padding: const EdgeInsets.all(4.0),
-              child: const CompassSvg(
+              child: CompassSvg(
                 svgString: CompassSvgIcons.close,
                 size: 14.0,
-                color: CompassColors.darkTextMuted,
+                color: _theme.textMuted,
               ),
             ),
           ),
@@ -367,13 +373,13 @@ class _ConnectionModalState extends State<ConnectionModal> {
             children: [
               Text(
                 'Advanced Connection Options',
-                style: CompassTypography.bodyMedium(color: CompassColors.greenAccent),
+                style: CompassTypography.bodyMedium(color: _theme.accent),
               ),
               const SizedBox(width: 4.0),
               CompassSvg(
                 svgString: _showAdvanced ? CompassSvgIcons.chevronUp : CompassSvgIcons.chevronDown,
                 size: 13.0,
-                color: CompassColors.greenAccent,
+                color: _theme.accent,
               ),
             ],
           ),
@@ -383,9 +389,9 @@ class _ConnectionModalState extends State<ConnectionModal> {
           Container(
             padding: const EdgeInsets.all(12.0),
             decoration: BoxDecoration(
-              color: CompassColors.darkBgSubtle,
+              color: _theme.bgSubtle,
               borderRadius: BorderRadius.circular(8.0),
-              border: Border.all(color: CompassColors.darkBorder, width: 1.0),
+              border: Border.all(color: _theme.border, width: 1.0),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -464,9 +470,9 @@ class _ConnectionModalState extends State<ConnectionModal> {
         Container(
           padding: const EdgeInsets.all(12.0),
           decoration: BoxDecoration(
-            color: CompassColors.greenBadgeBg,
+            color: _theme.greenBadgeBg,
             borderRadius: BorderRadius.circular(8.0),
-            border: Border.all(color: CompassColors.greenBadgeBorder, width: 1.0),
+            border: Border.all(color: _theme.greenBadgeBorder, width: 1.0),
           ),
           child: Row(
             children: [
@@ -474,15 +480,15 @@ class _ConnectionModalState extends State<ConnectionModal> {
                 width: 32.0,
                 height: 32.0,
                 decoration: BoxDecoration(
-                  color: CompassColors.darkBgSubtle,
+                  color: _theme.bgSubtle,
                   borderRadius: BorderRadius.circular(8.0),
-                  border: Border.all(color: CompassColors.greenBadgeBorder, width: 1.0),
+                  border: Border.all(color: _theme.greenBadgeBorder, width: 1.0),
                 ),
                 alignment: Alignment.center,
-                child: const CompassSvg(
+                child: CompassSvg(
                   svgString: CompassSvgIcons.database,
                   size: 16.0,
-                  color: CompassColors.greenAccent,
+                  color: _theme.accent,
                 ),
               ),
               const SizedBox(width: 10.0),
@@ -490,11 +496,14 @@ class _ConnectionModalState extends State<ConnectionModal> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Local Sample Datasets', style: CompassTypography.header()),
+                    Text(
+                      'Local Sample Datasets',
+                      style: CompassTypography.header(color: _theme.textPrimary),
+                    ),
                     const SizedBox(height: 2.0),
                     Text(
-                      'sample_mflix · sample_analytics · sample_supplies',
-                      style: CompassTypography.caption(color: CompassColors.darkTextMuted),
+                      'library · social_networks',
+                      style: CompassTypography.caption(color: _theme.textMuted),
                     ),
                   ],
                 ),
@@ -514,15 +523,15 @@ class _ConnectionModalState extends State<ConnectionModal> {
   Widget _buildSavedSection() {
     return Container(
       padding: const EdgeInsets.only(top: 16.0),
-      decoration: const BoxDecoration(
-        border: Border(top: BorderSide(color: CompassColors.darkBorder, width: 1.0)),
+      decoration: BoxDecoration(
+        border: Border(top: BorderSide(color: _theme.border, width: 1.0)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Text(
             'SAVED CONNECTIONS (${widget.savedConnections.length})',
-            style: CompassTypography.caption(color: CompassColors.darkTextMuted),
+            style: CompassTypography.caption(color: _theme.textMuted),
           ),
           const SizedBox(height: 8.0),
           if (widget.savedConnections.isEmpty)
@@ -530,7 +539,7 @@ class _ConnectionModalState extends State<ConnectionModal> {
               padding: const EdgeInsets.symmetric(vertical: 8.0),
               child: Text(
                 'No saved connections yet.',
-                style: CompassTypography.bodyMedium(color: CompassColors.darkTextMuted),
+                style: CompassTypography.bodyMedium(color: _theme.textMuted),
               ),
             ),
           for (final profile in widget.savedConnections) _buildSavedItem(profile),
@@ -544,9 +553,9 @@ class _ConnectionModalState extends State<ConnectionModal> {
       margin: const EdgeInsets.only(bottom: 6.0),
       padding: const EdgeInsets.all(10.0),
       decoration: BoxDecoration(
-        color: CompassColors.darkBgSubtle,
+        color: _theme.bgSubtle,
         borderRadius: BorderRadius.circular(8.0),
-        border: Border.all(color: CompassColors.darkBorder, width: 1.0),
+        border: Border.all(color: _theme.border, width: 1.0),
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -558,11 +567,14 @@ class _ConnectionModalState extends State<ConnectionModal> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(profile.name, style: CompassTypography.header()),
+                  Text(
+                    profile.name,
+                    style: CompassTypography.header(color: _theme.textPrimary),
+                  ),
                   const SizedBox(height: 2.0),
                   Text(
                     profile.uri,
-                    style: CompassTypography.monoSmall(color: CompassColors.darkTextMuted),
+                    style: CompassTypography.monoSmall(color: _theme.textMuted),
                   ),
                 ],
               ),
@@ -574,13 +586,13 @@ class _ConnectionModalState extends State<ConnectionModal> {
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 10.0, vertical: 5.0),
               decoration: BoxDecoration(
-                color: CompassColors.darkBgPanel,
+                color: _theme.bgPanel,
                 borderRadius: BorderRadius.circular(4.0),
-                border: Border.all(color: CompassColors.darkBorder, width: 1.0),
+                border: Border.all(color: _theme.border, width: 1.0),
               ),
               child: Text(
                 'Connect',
-                style: CompassTypography.caption(color: CompassColors.greenAccent),
+                style: CompassTypography.caption(color: _theme.accent),
               ),
             ),
           ),
@@ -605,16 +617,16 @@ class _ConnectionModalState extends State<ConnectionModal> {
   Widget _buildFooter() {
     return Container(
       padding: const EdgeInsets.fromLTRB(20.0, 12.0, 20.0, 12.0),
-      decoration: const BoxDecoration(
-        color: CompassColors.darkBgSubtle,
-        border: Border(top: BorderSide(color: CompassColors.darkBorder, width: 1.0)),
+      decoration: BoxDecoration(
+        color: _theme.bgSubtle,
+        border: Border(top: BorderSide(color: _theme.border, width: 1.0)),
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Text(
             'MongoDB Compass v1.42.0 Web Client',
-            style: CompassTypography.caption(color: CompassColors.darkTextMuted),
+            style: CompassTypography.caption(color: _theme.textMuted),
           ),
           Row(
             children: [

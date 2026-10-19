@@ -1,6 +1,7 @@
 import 'package:flutter/widgets.dart';
 import '../../icons/compass_svg_icons.dart';
 import '../../theme/compass_colors.dart';
+import '../../theme/compass_theme.dart';
 import '../../theme/compass_typography.dart';
 import 'compass_modal.dart';
 
@@ -50,6 +51,8 @@ class _DropCollectionModalState extends State<DropCollectionModal> {
 
   bool get _isConfirmed => _typedController.text.trim() == widget.collName;
 
+  CompassTheme get _theme => CompassTheme.of(context);
+
   void _submit() {
     if (_isConfirmed) {
       widget.onConfirm();
@@ -59,6 +62,7 @@ class _DropCollectionModalState extends State<DropCollectionModal> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = CompassTheme.of(context);
     final isView = widget.isView;
     final accent = isView ? CompassColors.warningAmber : CompassColors.errorRed;
     final accentBg = isView ? CompassColors.warningAmberBg : CompassColors.errorRedBg;
@@ -120,13 +124,13 @@ class _DropCollectionModalState extends State<DropCollectionModal> {
         Container(
           padding: const EdgeInsets.all(12.0),
           decoration: BoxDecoration(
-            color: CompassColors.darkBgSubtle,
+            color: theme.bgSubtle,
             borderRadius: BorderRadius.circular(8.0),
-            border: Border.all(color: CompassColors.darkBorder, width: 1.0),
+            border: Border.all(color: theme.border, width: 1.0),
           ),
           child: Column(
             children: [
-              _metaRow('Database:', widget.dbName, CompassColors.darkTextPrimary),
+              _metaRow('Database:', widget.dbName, theme.textPrimary),
               const SizedBox(height: 6.0),
               _metaRow(
                 isView ? 'View Name:' : 'Collection Name:',
@@ -137,11 +141,11 @@ class _DropCollectionModalState extends State<DropCollectionModal> {
               _metaRow(
                 'Documents Affected:',
                 '${widget.documentCount}',
-                CompassColors.darkTextPrimary,
+                theme.textPrimary,
               ),
               if (!isView) ...[
                 const SizedBox(height: 6.0),
-                _metaRow('Indexes Affected:', '${widget.indexesCount}', CompassColors.darkTextPrimary),
+                _metaRow('Indexes Affected:', '${widget.indexesCount}', theme.textPrimary),
               ],
             ],
           ),
@@ -155,14 +159,14 @@ class _DropCollectionModalState extends State<DropCollectionModal> {
             Expanded(
               child: Text(
                 'Type "${widget.collName}" to confirm:',
-                style: CompassTypography.caption(color: CompassColors.darkTextSecondary),
+                style: CompassTypography.caption(color: theme.textSecondary),
               ),
             ),
             GestureDetector(
               onTap: () => setState(() => _typedController.text = widget.collName),
               child: Text(
                 'Auto-fill',
-                style: CompassTypography.badge(color: CompassColors.greenAccent),
+                style: CompassTypography.badge(color: theme.accent),
               ),
             ),
           ],
@@ -193,7 +197,7 @@ class _DropCollectionModalState extends State<DropCollectionModal> {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text(label, style: CompassTypography.caption(color: CompassColors.darkTextMuted)),
+        Text(label, style: CompassTypography.caption(color: _theme.textMuted)),
         const SizedBox(width: 12.0),
         Flexible(
           child: Text(

@@ -1,5 +1,6 @@
 import 'package:flutter/widgets.dart';
 import '../../theme/compass_colors.dart';
+import '../../theme/compass_theme.dart';
 import '../../theme/compass_typography.dart';
 import '../../icons/compass_svg_icons.dart';
 import '../../models/mongo_models.dart';
@@ -31,6 +32,8 @@ class _DocumentTableViewState extends State<DocumentTableView> {
   String? _sortCol;
   bool _sortAsc = true;
 
+  CompassTheme get _theme => CompassTheme.of(context);
+
   @override
   Widget build(BuildContext context) {
     if (widget.documents.isEmpty) {
@@ -39,7 +42,7 @@ class _DocumentTableViewState extends State<DocumentTableView> {
         padding: const EdgeInsets.symmetric(vertical: 48.0),
         child: Text(
           'No documents match the current query',
-          style: CompassTypography.caption(color: CompassColors.darkTextMuted),
+          style: CompassTypography.caption(color: _theme.textMuted),
         ),
       );
     }
@@ -73,9 +76,9 @@ class _DocumentTableViewState extends State<DocumentTableView> {
 
     return Container(
       decoration: BoxDecoration(
-        color: CompassColors.darkBgPanel,
+        color: _theme.bgPanel,
         borderRadius: BorderRadius.circular(8.0),
-        border: Border.all(color: CompassColors.darkBorder, width: 1.0),
+        border: Border.all(color: _theme.border, width: 1.0),
         boxShadow: const [
           BoxShadow(
             color: Color(0x1A000000),
@@ -92,10 +95,10 @@ class _DocumentTableViewState extends State<DocumentTableView> {
             // Table Header Row
             Container(
               height: 38.0,
-              decoration: const BoxDecoration(
-                color: CompassColors.darkBgSubtle,
+              decoration: BoxDecoration(
+                color: _theme.bgSubtle,
                 border: Border(
-                  bottom: BorderSide(color: CompassColors.darkBorder, width: 1.0),
+                  bottom: BorderSide(color: _theme.border, width: 1.0),
                 ),
               ),
               child: Row(
@@ -106,7 +109,7 @@ class _DocumentTableViewState extends State<DocumentTableView> {
                     alignment: Alignment.center,
                     child: Text(
                       '#',
-                      style: CompassTypography.monoBold(color: CompassColors.darkTextMuted, size: 11.0),
+                      style: CompassTypography.monoBold(color: _theme.textMuted, size: 11.0),
                     ),
                   ),
                   for (final key in allKeys)
@@ -129,14 +132,14 @@ class _DocumentTableViewState extends State<DocumentTableView> {
                             Text(
                               key,
                               style: key == '_id'
-                                  ? CompassTypography.monoBold(color: CompassColors.greenAccent, size: 11.0)
-                                  : CompassTypography.monoBold(color: CompassColors.darkTextPrimary, size: 11.0),
+                                  ? CompassTypography.monoBold(color: _theme.accent, size: 11.0)
+                                  : CompassTypography.monoBold(color: _theme.textPrimary, size: 11.0),
                             ),
                             const SizedBox(width: 4.0),
-                            const CompassSvg(
+                            CompassSvg(
                               svgString: CompassSvgIcons.arrowUpDown,
                               size: 11.0,
-                              color: CompassColors.darkTextMuted,
+                              color: _theme.textMuted,
                             ),
                           ],
                         ),
@@ -149,7 +152,7 @@ class _DocumentTableViewState extends State<DocumentTableView> {
                     alignment: Alignment.centerRight,
                     child: Text(
                       'ACTIONS',
-                      style: CompassTypography.monoBold(color: CompassColors.darkTextMuted, size: 10.0),
+                      style: CompassTypography.monoBold(color: _theme.textMuted, size: 10.0),
                     ),
                   ),
                 ],
@@ -168,9 +171,9 @@ class _DocumentTableViewState extends State<DocumentTableView> {
   Widget _buildTableRow(MongoDocument doc, int index, List<String> allKeys) {
     return Container(
       height: 36.0,
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         border: Border(
-          bottom: BorderSide(color: CompassColors.darkBorder, width: 1.0),
+          bottom: BorderSide(color: _theme.border, width: 1.0),
         ),
       ),
       child: Row(
@@ -179,14 +182,14 @@ class _DocumentTableViewState extends State<DocumentTableView> {
           Container(
             width: 48.0,
             alignment: Alignment.center,
-            decoration: const BoxDecoration(
+            decoration: BoxDecoration(
               border: Border(
-                right: BorderSide(color: CompassColors.darkBorder, width: 1.0),
+                right: BorderSide(color: _theme.border, width: 1.0),
               ),
             ),
             child: Text(
               '${index + 1}',
-              style: CompassTypography.monoSmall(color: CompassColors.darkTextMuted),
+              style: CompassTypography.monoSmall(color: _theme.textMuted),
             ),
           ),
 
@@ -204,9 +207,9 @@ class _DocumentTableViewState extends State<DocumentTableView> {
             width: 100.0,
             padding: const EdgeInsets.symmetric(horizontal: 12.0),
             alignment: Alignment.centerRight,
-            decoration: const BoxDecoration(
+            decoration: BoxDecoration(
               border: Border(
-                left: BorderSide(color: CompassColors.darkBorder, width: 1.0),
+                left: BorderSide(color: _theme.border, width: 1.0),
               ),
             ),
             child: Row(
@@ -248,25 +251,25 @@ class _DocumentTableViewState extends State<DocumentTableView> {
       return Container(
         padding: const EdgeInsets.symmetric(horizontal: 6.0, vertical: 2.0),
         decoration: BoxDecoration(
-          color: CompassColors.greenBadgeBg,
+          color: _theme.greenBadgeBg,
           borderRadius: BorderRadius.circular(4.0),
-          border: Border.all(color: CompassColors.greenBadgeBorder, width: 1.0),
+          border: Border.all(color: _theme.greenBadgeBorder, width: 1.0),
         ),
         child: Text(
           '$val',
-          style: CompassTypography.monoBold(color: CompassColors.greenAccent, size: 11.0),
+          style: CompassTypography.monoBold(color: _theme.accent, size: 11.0),
           overflow: TextOverflow.ellipsis,
         ),
       );
     }
     if (val == null) {
-      return Text('null', style: CompassTypography.monoSmall(color: CompassColors.bsonNull));
+      return Text('null', style: CompassTypography.monoSmall(color: _theme.bsonNull));
     }
     if (val is bool) {
       return Text(
         val.toString(),
         style: CompassTypography.monoMedium(
-          color: val ? CompassColors.greenAccent : CompassColors.errorRed,
+          color: val ? _theme.accent : CompassColors.errorRed,
           size: 11.0,
         ),
       );
@@ -274,24 +277,24 @@ class _DocumentTableViewState extends State<DocumentTableView> {
     if (val is num) {
       return Text(
         val.toString(),
-        style: CompassTypography.monoMedium(color: CompassColors.bsonNumber, size: 11.0),
+        style: CompassTypography.monoMedium(color: _theme.bsonNumber, size: 11.0),
       );
     }
     if (val is List) {
       return Text(
         '[${val.length} items]',
-        style: CompassTypography.monoSmall(color: CompassColors.darkTextMuted),
+        style: CompassTypography.monoSmall(color: _theme.textMuted),
       );
     }
     if (val is Map) {
       return Text(
         '{ ... }',
-        style: CompassTypography.monoSmall(color: CompassColors.darkTextMuted),
+        style: CompassTypography.monoSmall(color: _theme.textMuted),
       );
     }
     return Text(
       val.toString(),
-      style: CompassTypography.bodyRegular(color: CompassColors.darkTextSecondary),
+      style: CompassTypography.bodyRegular(color: _theme.textSecondary),
       overflow: TextOverflow.ellipsis,
     );
   }

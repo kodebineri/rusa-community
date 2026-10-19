@@ -1,6 +1,7 @@
 import 'package:flutter/widgets.dart';
 import '../../icons/compass_svg_icons.dart';
 import '../../theme/compass_colors.dart';
+import '../../theme/compass_theme.dart';
 import '../../theme/compass_typography.dart';
 
 /// Shared modal primitives for the MongoDB Compass Flutter client.
@@ -28,6 +29,8 @@ class CompassModalShell extends StatelessWidget {
   Widget build(BuildContext context) {
     if (!isOpen) return const SizedBox.shrink();
 
+    final theme = CompassTheme.of(context);
+
     return Positioned.fill(
       child: LayoutBuilder(
         builder: (context, constraints) {
@@ -39,9 +42,9 @@ class CompassModalShell extends StatelessWidget {
             width: width,
             margin: const EdgeInsets.all(16.0),
             decoration: BoxDecoration(
-              color: CompassColors.darkBgPanel,
+              color: theme.bgPanel,
               borderRadius: BorderRadius.circular(12.0),
-              border: Border.all(color: CompassColors.darkBorder, width: 1.0),
+              border: Border.all(color: theme.border, width: 1.0),
               boxShadow: const [
                 BoxShadow(
                   color: Color(0x66000000),
@@ -91,9 +94,9 @@ class CompassModalHeader extends StatelessWidget {
   final String title;
   final String? subtitle;
   final String iconSvg;
-  final Color iconColor;
-  final Color iconBg;
-  final Color iconBorder;
+  final Color? iconColor;
+  final Color? iconBg;
+  final Color? iconBorder;
   final VoidCallback onClose;
 
   const CompassModalHeader({
@@ -101,20 +104,25 @@ class CompassModalHeader extends StatelessWidget {
     required this.title,
     this.subtitle,
     required this.iconSvg,
-    this.iconColor = CompassColors.greenAccent,
-    this.iconBg = CompassColors.greenBadgeBg,
-    this.iconBorder = CompassColors.greenBadgeBorder,
+    this.iconColor,
+    this.iconBg,
+    this.iconBorder,
     required this.onClose,
   });
 
   @override
   Widget build(BuildContext context) {
+    final theme = CompassTheme.of(context);
+    final iconColor = this.iconColor ?? theme.accent;
+    final iconBg = this.iconBg ?? theme.greenBadgeBg;
+    final iconBorder = this.iconBorder ?? theme.greenBadgeBorder;
+
     return Container(
       padding: const EdgeInsets.only(bottom: 12.0),
       margin: const EdgeInsets.only(bottom: 4.0),
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         border: Border(
-          bottom: BorderSide(color: CompassColors.darkBorder, width: 1.0),
+          bottom: BorderSide(color: theme.border, width: 1.0),
         ),
       ),
       child: Row(
@@ -136,10 +144,10 @@ class CompassModalHeader extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(title, style: CompassTypography.header(color: CompassColors.darkTextPrimary)),
+                Text(title, style: CompassTypography.header(color: theme.textPrimary)),
                 if (subtitle != null) ...[
                   const SizedBox(height: 2.0),
-                  Text(subtitle!, style: CompassTypography.caption(color: CompassColors.darkTextMuted)),
+                  Text(subtitle!, style: CompassTypography.caption(color: theme.textMuted)),
                 ],
               ],
             ),
@@ -148,10 +156,10 @@ class CompassModalHeader extends StatelessWidget {
             onTap: onClose,
             child: Container(
               padding: const EdgeInsets.all(4.0),
-              child: const CompassSvg(
+              child: CompassSvg(
                 svgString: CompassSvgIcons.close,
                 size: 14.0,
-                color: CompassColors.darkTextMuted,
+                color: theme.textMuted,
               ),
             ),
           ),
@@ -171,6 +179,8 @@ class CompassFieldLabel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = CompassTheme.of(context);
+
     return Padding(
       padding: const EdgeInsets.only(bottom: 4.0),
       child: Row(
@@ -178,12 +188,12 @@ class CompassFieldLabel extends StatelessWidget {
         children: [
           Row(
             children: [
-              Text(label, style: CompassTypography.bodyMedium(color: CompassColors.darkTextSecondary)),
+              Text(label, style: CompassTypography.bodyMedium(color: theme.textSecondary)),
               if (trailing != null) trailing!,
             ],
           ),
           if (hint != null)
-            Text(hint!, style: CompassTypography.caption(color: CompassColors.darkTextMuted)),
+            Text(hint!, style: CompassTypography.caption(color: theme.textMuted)),
         ],
       ),
     );
@@ -227,6 +237,8 @@ class CompassInput extends StatefulWidget {
 class _CompassInputState extends State<CompassInput> {
   late final FocusNode _focusNode = FocusNode();
 
+  CompassTheme get _theme => CompassTheme.of(context);
+
   @override
   void dispose() {
     _focusNode.dispose();
@@ -236,8 +248,8 @@ class _CompassInputState extends State<CompassInput> {
   @override
   Widget build(BuildContext context) {
     final TextStyle style = widget.mono
-        ? CompassTypography.monoRegular(color: CompassColors.darkTextPrimary, size: 12.0)
-        : CompassTypography.bodyMedium(color: CompassColors.darkTextPrimary);
+        ? CompassTypography.monoRegular(color: _theme.textPrimary, size: 12.0)
+        : CompassTypography.bodyMedium(color: _theme.textPrimary);
 
     final int resolvedMinLines =
         widget.minLines ?? (widget.minLinesAuto && widget.maxLines > 1 ? widget.maxLines : 1);
@@ -245,9 +257,9 @@ class _CompassInputState extends State<CompassInput> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10.0, vertical: 8.0),
       decoration: BoxDecoration(
-        color: CompassColors.darkBgInput,
+        color: _theme.bgInput,
         borderRadius: BorderRadius.circular(6.0),
-        border: Border.all(color: CompassColors.darkBorder, width: 1.0),
+        border: Border.all(color: _theme.border, width: 1.0),
       ),
       child: ValueListenableBuilder<TextEditingValue>(
         valueListenable: widget.controller,
@@ -260,7 +272,7 @@ class _CompassInputState extends State<CompassInput> {
                   padding: const EdgeInsets.only(top: 1.0),
                   child: Text(
                     widget.placeholder,
-                    style: style.copyWith(color: CompassColors.darkTextMuted),
+                    style: style.copyWith(color: _theme.textMuted),
                   ),
                 ),
               EditableText(
@@ -268,9 +280,9 @@ class _CompassInputState extends State<CompassInput> {
                 focusNode: _focusNode,
                 autofocus: widget.autofocus,
                 style: style,
-                cursorColor: CompassColors.greenAccent,
-                backgroundCursorColor: CompassColors.darkBgInput,
-                selectionColor: CompassColors.greenBadgeBg,
+                cursorColor: _theme.accent,
+                backgroundCursorColor: _theme.bgInput,
+                selectionColor: _theme.greenBadgeBg,
                 maxLines: widget.maxLines,
                 minLines: resolvedMinLines,
                 obscureText: widget.obscureText,
@@ -302,12 +314,14 @@ class CompassPrimaryButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = CompassTheme.of(context);
+
     return GestureDetector(
       onTap: onTap,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
         decoration: BoxDecoration(
-          color: onTap == null ? const Color(0x1A00ED64) : CompassColors.greenAccent,
+          color: onTap == null ? theme.greenBadgeBg : theme.accent,
           borderRadius: BorderRadius.circular(6.0),
         ),
         child: Row(
@@ -318,14 +332,14 @@ class CompassPrimaryButton extends StatelessWidget {
               CompassSvg(
                 svgString: iconSvg!,
                 size: 13.0,
-                color: onTap == null ? CompassColors.darkTextMuted : CompassColors.greenNavy,
+                color: onTap == null ? theme.textMuted : theme.onAccent,
               ),
               const SizedBox(width: 6.0),
             ],
             Text(
               label,
               style: CompassTypography.header(
-                color: onTap == null ? CompassColors.darkTextMuted : CompassColors.greenNavy,
+                color: onTap == null ? theme.textMuted : theme.onAccent,
               ),
             ),
           ],
@@ -350,23 +364,25 @@ class CompassSecondaryButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = CompassTheme.of(context);
+
     return GestureDetector(
       onTap: onTap,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14.0, vertical: 8.0),
         decoration: BoxDecoration(
-          color: CompassColors.darkBgSubtle,
+          color: theme.bgSubtle,
           borderRadius: BorderRadius.circular(6.0),
-          border: Border.all(color: CompassColors.darkBorder, width: 1.0),
+          border: Border.all(color: theme.border, width: 1.0),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
             if (iconSvg != null) ...[
-              CompassSvg(svgString: iconSvg!, size: 13.0, color: CompassColors.darkTextSecondary),
+              CompassSvg(svgString: iconSvg!, size: 13.0, color: theme.textSecondary),
               const SizedBox(width: 6.0),
             ],
-            Text(label, style: CompassTypography.bodyMedium(color: CompassColors.darkTextSecondary)),
+            Text(label, style: CompassTypography.bodyMedium(color: theme.textSecondary)),
           ],
         ),
       ),
@@ -448,11 +464,13 @@ class CompassModalFooter extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = CompassTheme.of(context);
+
     return Container(
       padding: const EdgeInsets.only(top: 12.0),
       margin: const EdgeInsets.only(top: 4.0),
-      decoration: const BoxDecoration(
-        border: Border(top: BorderSide(color: CompassColors.darkBorder, width: 1.0)),
+      decoration: BoxDecoration(
+        border: Border(top: BorderSide(color: theme.border, width: 1.0)),
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.end,

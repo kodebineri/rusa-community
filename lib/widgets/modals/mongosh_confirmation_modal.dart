@@ -2,6 +2,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import '../../icons/compass_svg_icons.dart';
 import '../../theme/compass_colors.dart';
+import '../../theme/compass_theme.dart';
 import '../../theme/compass_typography.dart';
 
 /// Details of a risky mongosh operation awaiting confirmation.
@@ -84,6 +85,8 @@ class _MongoshConfirmationModalState extends State<MongoshConfirmationModal> {
   final FocusNode _focusNode = FocusNode(debugLabel: 'mongosh-confirm');
   _RiskyAction _selectedAction = _RiskyAction.cancel;
   bool _canConfirmDestructive = false;
+
+  CompassTheme get _theme => CompassTheme.of(context);
 
   static const Color _cardBg = Color(0xFF12181F);
   static const Color _panelBg = Color(0xFF0A0E13);
@@ -176,7 +179,7 @@ class _MongoshConfirmationModalState extends State<MongoshConfirmationModal> {
             decoration: BoxDecoration(
               color: _cardBg,
               borderRadius: BorderRadius.circular(12.0),
-              border: Border.all(color: CompassColors.darkBorder, width: 1.0),
+              border: Border.all(color: _theme.border, width: 1.0),
               boxShadow: const [
                 BoxShadow(color: Color(0x99000000), blurRadius: 24.0, offset: Offset(0, 8)),
               ],
@@ -218,8 +221,8 @@ class _MongoshConfirmationModalState extends State<MongoshConfirmationModal> {
       // Header
       Container(
         padding: const EdgeInsets.only(bottom: 12.0),
-        decoration: const BoxDecoration(
-          border: Border(bottom: BorderSide(color: CompassColors.darkBorder, width: 1.0)),
+        decoration: BoxDecoration(
+          border: Border(bottom: BorderSide(color: _theme.border, width: 1.0)),
         ),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -265,19 +268,19 @@ class _MongoshConfirmationModalState extends State<MongoshConfirmationModal> {
                   const SizedBox(height: 2.0),
                   Text(
                     'mongosh requested execution of a data-altering command',
-                    style: CompassTypography.caption(color: CompassColors.darkTextMuted),
+                    style: CompassTypography.caption(color: _theme.textMuted),
                   ),
                 ],
               ),
             ),
             GestureDetector(
               onTap: widget.onCancel,
-              child: const Padding(
-                padding: EdgeInsets.all(4.0),
+              child: Padding(
+                padding: const EdgeInsets.all(4.0),
                 child: CompassSvg(
                   svgString: CompassSvgIcons.close,
                   size: 14.0,
-                  color: CompassColors.darkTextMuted,
+                  color: _theme.textMuted,
                 ),
               ),
             ),
@@ -305,9 +308,9 @@ class _MongoshConfirmationModalState extends State<MongoshConfirmationModal> {
       // Command preview
       Row(
         children: [
-          const CompassSvg(svgString: CompassSvgIcons.terminal, size: 13.0, color: CompassColors.greenAccent),
+          CompassSvg(svgString: CompassSvgIcons.terminal, size: 13.0, color: _theme.accent),
           const SizedBox(width: 6.0),
-          Text('COMMAND TO EXECUTE', style: CompassTypography.monoSmall(color: CompassColors.darkTextMuted)),
+          Text('COMMAND TO EXECUTE', style: CompassTypography.monoSmall(color: _theme.textMuted)),
         ],
       ),
       const SizedBox(height: 6.0),
@@ -356,7 +359,7 @@ class _MongoshConfirmationModalState extends State<MongoshConfirmationModal> {
       ),
       const SizedBox(height: 12.0),
 
-      Text('SELECT ACTION:', style: CompassTypography.monoSmall(color: CompassColors.darkTextMuted)),
+      Text('SELECT ACTION:', style: CompassTypography.monoSmall(color: _theme.textMuted)),
       const SizedBox(height: 8.0),
       _actionCard(
         label: 'Cancel Operation',
@@ -378,8 +381,8 @@ class _MongoshConfirmationModalState extends State<MongoshConfirmationModal> {
       // Footer actions
       Container(
         padding: const EdgeInsets.only(top: 12.0),
-        decoration: const BoxDecoration(
-          border: Border(top: BorderSide(color: CompassColors.darkBorder, width: 1.0)),
+        decoration: BoxDecoration(
+          border: Border(top: BorderSide(color: _theme.border, width: 1.0)),
         ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.end,
@@ -413,17 +416,17 @@ class _MongoshConfirmationModalState extends State<MongoshConfirmationModal> {
       decoration: BoxDecoration(
         color: _panelBg,
         borderRadius: BorderRadius.circular(8.0),
-        border: Border.all(color: CompassColors.darkBorder, width: 1.0),
+        border: Border.all(color: _theme.border, width: 1.0),
       ),
       child: Row(
         children: [
-          CompassSvg(svgString: iconSvg, size: 14.0, color: CompassColors.greenAccent),
+          CompassSvg(svgString: iconSvg, size: 14.0, color: _theme.accent),
           const SizedBox(width: 8.0),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(label, style: CompassTypography.badge(color: CompassColors.darkTextMuted)),
+                Text(label, style: CompassTypography.badge(color: _theme.textMuted)),
                 const SizedBox(height: 2.0),
                 Text(
                   value,
@@ -445,7 +448,7 @@ class _MongoshConfirmationModalState extends State<MongoshConfirmationModal> {
     required bool selected,
     required bool isCancel,
   }) {
-    final accent = isCancel ? CompassColors.greenAccent : CompassColors.errorRed;
+    final accent = isCancel ? _theme.accent : CompassColors.errorRed;
     return GestureDetector(
       onTap: () => setState(
         () => _selectedAction = isCancel ? _RiskyAction.cancel : _RiskyAction.confirm,
@@ -453,10 +456,10 @@ class _MongoshConfirmationModalState extends State<MongoshConfirmationModal> {
       child: Container(
         padding: const EdgeInsets.all(12.0),
         decoration: BoxDecoration(
-          color: selected ? (isCancel ? CompassColors.greenBadgeBg : CompassColors.errorRedBg) : _inactiveBg,
+          color: selected ? (isCancel ? _theme.greenBadgeBg : CompassColors.errorRedBg) : _inactiveBg,
           borderRadius: BorderRadius.circular(8.0),
           border: Border.all(
-            color: selected ? accent : CompassColors.darkBorder,
+            color: selected ? accent : _theme.border,
             width: selected ? 2.0 : 1.0,
           ),
         ),
@@ -468,14 +471,14 @@ class _MongoshConfirmationModalState extends State<MongoshConfirmationModal> {
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 color: selected ? accent : const Color(0x00000000),
-                border: Border.all(color: selected ? accent : CompassColors.darkTextMuted, width: 2.0),
+                border: Border.all(color: selected ? accent : _theme.textMuted, width: 2.0),
               ),
               alignment: Alignment.center,
               child: selected
                   ? CompassSvg(
                       svgString: CompassSvgIcons.check,
                       size: 11.0,
-                      color: isCancel ? CompassColors.greenNavy : const Color(0xFFFFFFFF),
+                      color: isCancel ? _theme.onAccent : const Color(0xFFFFFFFF),
                     )
                   : null,
             ),
@@ -491,7 +494,7 @@ class _MongoshConfirmationModalState extends State<MongoshConfirmationModal> {
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 6.0, vertical: 2.0),
                         decoration: BoxDecoration(
-                          color: isCancel ? CompassColors.greenBadgeBg : CompassColors.errorRedBg,
+                          color: isCancel ? _theme.greenBadgeBg : CompassColors.errorRedBg,
                           borderRadius: BorderRadius.circular(4.0),
                         ),
                         child: Text(tag, style: CompassTypography.badge(color: accent)),
@@ -499,14 +502,14 @@ class _MongoshConfirmationModalState extends State<MongoshConfirmationModal> {
                     ],
                   ),
                   const SizedBox(height: 2.0),
-                  Text(description, style: CompassTypography.caption(color: CompassColors.darkTextMuted)),
+                  Text(description, style: CompassTypography.caption(color: _theme.textMuted)),
                 ],
               ),
             ),
             CompassSvg(
               svgString: isCancel ? CompassSvgIcons.shieldCheck : CompassSvgIcons.activity,
               size: 15.0,
-              color: selected ? accent : CompassColors.darkTextMuted,
+              color: selected ? accent : _theme.textMuted,
             ),
           ],
         ),
@@ -534,7 +537,7 @@ class _MongoshConfirmationModalState extends State<MongoshConfirmationModal> {
           color: selected ? accent : _inactiveBg,
           borderRadius: BorderRadius.circular(8.0),
           border: Border.all(
-            color: selected ? accent : CompassColors.darkBorder,
+            color: selected ? accent : _theme.border,
             width: 2.0,
           ),
         ),

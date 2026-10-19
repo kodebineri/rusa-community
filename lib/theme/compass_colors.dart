@@ -29,6 +29,13 @@ class CompassColors {
   static const Color greenBadgeBorder = Color(0x4000ED64); // rgba(0, 237, 100, 0.25)
   static const Color greenBadgeText = Color(0xFF00ED64);
 
+  // Accent Badge Tokens (light mode) - forest green tints read better on white
+  static const Color lightGreenBadgeBg = Color(0x1400684A); // rgba(0, 104, 74, 0.08)
+  static const Color lightGreenBadgeBorder = Color(0x3300684A); // rgba(0, 104, 74, 0.20)
+
+  // Content colour drawn on top of an accent-coloured fill
+  static const Color lightOnAccent = Color(0xFFFFFFFF);
+
   // Light theme palette
   static const Color lightBgApp = Color(0xFFF9FBFA);
   static const Color lightBgSidebar = Color(0xFFF4F6F8);
@@ -65,6 +72,14 @@ class CompassColors {
   static const Color bsonBoolean = Color(0xFF93C5FD);
   static const Color bsonDate = Color(0xFFC084FC);
   static const Color bsonNull = Color(0xFFFB7185);
+
+  // BSON Type specific syntax colors (Light Mode) - darker tones for contrast on white
+  static const Color lightBsonObjectId = Color(0xFF00684A);
+  static const Color lightBsonString = Color(0xFF047857);
+  static const Color lightBsonNumber = Color(0xFF9A6700);
+  static const Color lightBsonBoolean = Color(0xFF1D4ED8);
+  static const Color lightBsonDate = Color(0xFF7E22CE);
+  static const Color lightBsonNull = Color(0xFFBE123C);
 
   // Scrollbar colors
   static const Color scrollbarThumb = Color(0xFF21313C);

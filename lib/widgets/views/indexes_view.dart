@@ -1,5 +1,6 @@
 import 'package:flutter/widgets.dart';
 import '../../theme/compass_colors.dart';
+import '../../theme/compass_theme.dart';
 import '../../theme/compass_typography.dart';
 import '../../icons/compass_svg_icons.dart';
 import '../../models/mongo_models.dart';
@@ -29,6 +30,7 @@ class IndexesView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = CompassTheme.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -36,28 +38,28 @@ class IndexesView extends StatelessWidget {
         Container(
           padding: const EdgeInsets.all(14.0),
           decoration: BoxDecoration(
-            color: CompassColors.darkBgPanel,
+            color: theme.bgPanel,
             borderRadius: BorderRadius.circular(8.0),
-            border: Border.all(color: CompassColors.darkBorder, width: 1.0),
+            border: Border.all(color: theme.border, width: 1.0),
           ),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Row(
                 children: [
-                  const CompassSvg(
+                  CompassSvg(
                     svgString: CompassSvgIcons.key,
                     size: 16.0,
-                    color: CompassColors.greenAccent,
+                    color: theme.accent,
                   ),
                   const SizedBox(width: 8.0),
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('Indexes', style: CompassTypography.header()),
+                      Text('Indexes', style: CompassTypography.header(color: theme.textPrimary)),
                       Text(
                         'Indexes support efficient execution of queries in MongoDB.',
-                        style: CompassTypography.caption(),
+                        style: CompassTypography.caption(color: theme.textMuted),
                       ),
                     ],
                   ),
@@ -68,20 +70,20 @@ class IndexesView extends StatelessWidget {
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 14.0, vertical: 7.0),
                   decoration: BoxDecoration(
-                    color: CompassColors.greenAccent,
+                    color: theme.accent,
                     borderRadius: BorderRadius.circular(6.0),
                   ),
                   child: Row(
                     children: [
-                      const CompassSvg(
+                      CompassSvg(
                         svgString: CompassSvgIcons.plus,
                         size: 13.0,
-                        color: CompassColors.greenNavy,
+                        color: theme.onAccent,
                       ),
                       const SizedBox(width: 4.0),
                       Text(
                         'Create Index',
-                        style: CompassTypography.header(color: CompassColors.greenNavy),
+                        style: CompassTypography.header(color: theme.onAccent),
                       ),
                     ],
                   ),
@@ -96,9 +98,9 @@ class IndexesView extends StatelessWidget {
         // Indexes Table
         Container(
           decoration: BoxDecoration(
-            color: CompassColors.darkBgPanel,
+            color: theme.bgPanel,
             borderRadius: BorderRadius.circular(8.0),
-            border: Border.all(color: CompassColors.darkBorder, width: 1.0),
+            border: Border.all(color: theme.border, width: 1.0),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -107,34 +109,34 @@ class IndexesView extends StatelessWidget {
               Container(
                 height: 38.0,
                 padding: const EdgeInsets.symmetric(horizontal: 14.0),
-                decoration: const BoxDecoration(
-                  color: CompassColors.darkBgSubtle,
+                decoration: BoxDecoration(
+                  color: theme.bgSubtle,
                   border: Border(
-                    bottom: BorderSide(color: CompassColors.darkBorder, width: 1.0),
+                    bottom: BorderSide(color: theme.border, width: 1.0),
                   ),
                 ),
                 child: Row(
                   children: [
                     Expanded(
                       flex: 2,
-                      child: Text('INDEX NAME', style: CompassTypography.monoBold(color: CompassColors.darkTextMuted, size: 10.0)),
+                      child: Text('INDEX NAME', style: CompassTypography.monoBold(color: theme.textMuted, size: 10.0)),
                     ),
                     Expanded(
                       flex: 2,
-                      child: Text('FIELDS & ORDER', style: CompassTypography.monoBold(color: CompassColors.darkTextMuted, size: 10.0)),
+                      child: Text('FIELDS & ORDER', style: CompassTypography.monoBold(color: theme.textMuted, size: 10.0)),
                     ),
                     Expanded(
                       flex: 1,
-                      child: Text('PROPERTIES', style: CompassTypography.monoBold(color: CompassColors.darkTextMuted, size: 10.0)),
+                      child: Text('PROPERTIES', style: CompassTypography.monoBold(color: theme.textMuted, size: 10.0)),
                     ),
                     Expanded(
                       flex: 1,
-                      child: Text('SIZE', style: CompassTypography.monoBold(color: CompassColors.darkTextMuted, size: 10.0)),
+                      child: Text('SIZE', style: CompassTypography.monoBold(color: theme.textMuted, size: 10.0)),
                     ),
                     Container(
                       width: 70.0,
                       alignment: Alignment.centerRight,
-                      child: Text('ACTIONS', style: CompassTypography.monoBold(color: CompassColors.darkTextMuted, size: 10.0)),
+                      child: Text('ACTIONS', style: CompassTypography.monoBold(color: theme.textMuted, size: 10.0)),
                     ),
                   ],
                 ),
@@ -145,9 +147,9 @@ class IndexesView extends StatelessWidget {
                 Container(
                   height: 42.0,
                   padding: const EdgeInsets.symmetric(horizontal: 14.0),
-                  decoration: const BoxDecoration(
+                  decoration: BoxDecoration(
                     border: Border(
-                      bottom: BorderSide(color: CompassColors.darkBorder, width: 1.0),
+                      bottom: BorderSide(color: theme.border, width: 1.0),
                     ),
                   ),
                   child: Row(
@@ -158,16 +160,16 @@ class IndexesView extends StatelessWidget {
                         child: Row(
                           children: [
                             if (idx.name == '_id_') ...[
-                              const CompassSvg(
+                              CompassSvg(
                                 svgString: CompassSvgIcons.shieldCheck,
                                 size: 13.0,
-                                color: CompassColors.greenAccent,
+                                color: theme.accent,
                               ),
                               const SizedBox(width: 6.0),
                             ],
                             Text(
                               idx.name,
-                              style: CompassTypography.monoMedium(color: CompassColors.darkTextPrimary),
+                              style: CompassTypography.monoMedium(color: theme.textPrimary),
                             ),
                           ],
                         ),
@@ -177,7 +179,7 @@ class IndexesView extends StatelessWidget {
                         flex: 2,
                         child: Text(
                           idx.keys.toString(),
-                          style: CompassTypography.monoMedium(color: CompassColors.greenAccent),
+                          style: CompassTypography.monoMedium(color: theme.accent),
                         ),
                       ),
                       // Properties
@@ -196,7 +198,7 @@ class IndexesView extends StatelessWidget {
                                 child: Text('Unique', style: CompassTypography.caption(color: CompassColors.infoBlue)),
                               )
                             else
-                              Text('Default', style: CompassTypography.caption(color: CompassColors.darkTextMuted)),
+                              Text('Default', style: CompassTypography.caption(color: theme.textMuted)),
                           ],
                         ),
                       ),
@@ -205,7 +207,7 @@ class IndexesView extends StatelessWidget {
                         flex: 1,
                         child: Text(
                           '${idx.sizeKb} KB',
-                          style: CompassTypography.monoSmall(color: CompassColors.darkTextMuted),
+                          style: CompassTypography.monoSmall(color: theme.textMuted),
                         ),
                       ),
                       // Actions
@@ -213,7 +215,7 @@ class IndexesView extends StatelessWidget {
                         width: 70.0,
                         alignment: Alignment.centerRight,
                         child: idx.name == '_id_'
-                            ? Text('Protected', style: CompassTypography.caption(color: CompassColors.darkTextMuted))
+                            ? Text('Protected', style: CompassTypography.caption(color: theme.textMuted))
                             : GestureDetector(
                                 onTap: () => onDropIndex(idx.name),
                                 child: Container(

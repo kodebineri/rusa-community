@@ -1,5 +1,6 @@
 import 'package:flutter/widgets.dart';
 import '../theme/compass_colors.dart';
+import '../theme/compass_theme.dart';
 import '../theme/compass_typography.dart';
 import '../icons/compass_svg_icons.dart';
 import '../models/mongo_models.dart';
@@ -39,12 +40,13 @@ class CompassHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = CompassTheme.of(context);
     return Container(
-      decoration: const BoxDecoration(
-        color: CompassColors.darkBgPanel,
+      decoration: BoxDecoration(
+        color: theme.bgPanel,
         border: Border(
           bottom: BorderSide(
-            color: CompassColors.darkBorder,
+            color: theme.border,
             width: 1.0,
           ),
         ),
@@ -72,10 +74,10 @@ class CompassHeader extends StatelessWidget {
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(6.0),
                   ),
-                  child: const CompassSvg(
+                  child: CompassSvg(
                     svgString: CompassSvgIcons.menu,
                     size: 18.0,
-                    color: CompassColors.darkTextSecondary,
+                    color: theme.textSecondary,
                   ),
                 ),
               ),
@@ -116,23 +118,23 @@ class CompassHeader extends StatelessWidget {
                     const SizedBox(width: 8.0), // exact CSS gap
                     Text(
                       'Compass',
-                      style: CompassTypography.title(color: CompassColors.darkTextPrimary),
+                      style: CompassTypography.title(color: theme.textPrimary),
                     ),
                     const SizedBox(width: 3.0),
                     Text(
                       'Flutter',
-                      style: CompassTypography.title(color: CompassColors.greenAccent),
+                      style: CompassTypography.title(color: theme.accent),
                     ),
                     const SizedBox(width: 6.0),
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 5.0, vertical: 2.0),
                       decoration: BoxDecoration(
                         borderRadius: BorderRadius.circular(4.0),
-                        border: Border.all(color: CompassColors.darkBorder, width: 1.0),
+                        border: Border.all(color: theme.border, width: 1.0),
                       ),
                       child: Text(
                         '7.0.8',
-                        style: CompassTypography.caption(color: CompassColors.darkTextMuted),
+                        style: CompassTypography.caption(color: theme.textMuted),
                       ),
                     ),
                   ],
@@ -144,7 +146,7 @@ class CompassHeader extends StatelessWidget {
               Container(
                 width: 1.0,
                 height: 20.0,
-                color: CompassColors.darkBorder,
+                color: theme.border,
               ),
               const SizedBox(width: 12.0),
 
@@ -155,9 +157,9 @@ class CompassHeader extends StatelessWidget {
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 10.0, vertical: 5.0),
                     decoration: BoxDecoration(
-                      color: CompassColors.darkBgSubtle,
+                      color: theme.bgSubtle,
                       borderRadius: BorderRadius.circular(6.0),
-                      border: Border.all(color: CompassColors.darkBorder, width: 1.0),
+                      border: Border.all(color: theme.border, width: 1.0),
                     ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
@@ -165,15 +167,15 @@ class CompassHeader extends StatelessWidget {
                         Container(
                           width: 8.0,
                           height: 8.0,
-                          decoration: const BoxDecoration(
-                            color: CompassColors.greenAccent,
+                          decoration: BoxDecoration(
+                            color: theme.accent,
                             shape: BoxShape.circle,
                           ),
                         ),
                         const SizedBox(width: 6.0),
                         Text(
                           connection!.name,
-                          style: CompassTypography.bodyMedium(color: CompassColors.darkTextPrimary),
+                          style: CompassTypography.bodyMedium(color: theme.textPrimary),
                         ),
                       ],
                     ),
@@ -226,15 +228,15 @@ class CompassHeader extends StatelessWidget {
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const CompassSvg(
+                        CompassSvg(
                           svgString: CompassSvgIcons.rotateCcw,
                           size: 14.0,
-                          color: CompassColors.darkTextSecondary,
+                          color: theme.textSecondary,
                         ),
                         const SizedBox(width: 6.0),
                         Text(
                           'Reset Samples',
-                          style: CompassTypography.bodyRegular(color: CompassColors.darkTextSecondary),
+                          style: CompassTypography.bodyRegular(color: theme.textSecondary),
                         ),
                       ],
                     ),
@@ -249,10 +251,10 @@ class CompassHeader extends StatelessWidget {
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 10.0, vertical: 6.0),
                   decoration: BoxDecoration(
-                    color: isTerminalOpen ? CompassColors.greenForest : CompassColors.darkBgSubtle,
+                    color: isTerminalOpen ? CompassColors.greenForest : theme.bgSubtle,
                     borderRadius: BorderRadius.circular(6.0),
                     border: Border.all(
-                      color: isTerminalOpen ? CompassColors.greenAccent : CompassColors.darkBorder,
+                      color: isTerminalOpen ? CompassColors.greenAccent : theme.border,
                       width: 1.0,
                     ),
                   ),
@@ -262,13 +264,13 @@ class CompassHeader extends StatelessWidget {
                       CompassSvg(
                         svgString: CompassSvgIcons.terminal,
                         size: 14.0,
-                        color: isTerminalOpen ? const Color(0xFFFFFFFF) : CompassColors.greenAccent,
+                        color: isTerminalOpen ? const Color(0xFFFFFFFF) : theme.accent,
                       ),
                       const SizedBox(width: 6.0),
                       Text(
                         '_mongosh',
                         style: CompassTypography.monoMedium(
-                          color: isTerminalOpen ? const Color(0xFFFFFFFF) : CompassColors.darkTextPrimary,
+                          color: isTerminalOpen ? const Color(0xFFFFFFFF) : theme.textPrimary,
                           size: 11.0,
                         ),
                       ),
@@ -290,7 +292,7 @@ class CompassHeader extends StatelessWidget {
                   child: CompassSvg(
                     svgString: isDarkMode ? CompassSvgIcons.sun : CompassSvgIcons.moon,
                     size: 16.0,
-                    color: isDarkMode ? CompassColors.warningAmber : CompassColors.darkTextSecondary,
+                    color: isDarkMode ? CompassColors.warningAmber : theme.textSecondary,
                   ),
                 ),
               ),
@@ -320,12 +322,12 @@ class CompassHeader extends StatelessWidget {
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 14.0, vertical: 6.0),
                     decoration: BoxDecoration(
-                      color: CompassColors.greenAccent,
+                      color: theme.accent,
                       borderRadius: BorderRadius.circular(6.0),
                     ),
                     child: Text(
                       'Connect',
-                      style: CompassTypography.header(color: CompassColors.greenNavy),
+                      style: CompassTypography.header(color: theme.onAccent),
                     ),
                   ),
                 ),

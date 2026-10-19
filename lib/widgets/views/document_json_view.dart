@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/widgets.dart';
 import '../../theme/compass_colors.dart';
+import '../../theme/compass_theme.dart';
 import '../../theme/compass_typography.dart';
 import '../../icons/compass_svg_icons.dart';
 import '../../models/mongo_models.dart';
@@ -33,6 +34,8 @@ class DocumentJsonView extends StatefulWidget {
 class _DocumentJsonViewState extends State<DocumentJsonView> {
   String? _editingId;
 
+  CompassTheme get _theme => CompassTheme.of(context);
+
   @override
   Widget build(BuildContext context) {
     if (widget.documents.isEmpty) {
@@ -41,7 +44,7 @@ class _DocumentJsonViewState extends State<DocumentJsonView> {
         padding: const EdgeInsets.symmetric(vertical: 48.0),
         child: Text(
           'No documents match the current query',
-          style: CompassTypography.caption(color: CompassColors.darkTextMuted),
+          style: CompassTypography.caption(color: _theme.textMuted),
         ),
       );
     }
@@ -63,9 +66,9 @@ class _DocumentJsonViewState extends State<DocumentJsonView> {
     return Container(
       margin: const EdgeInsets.only(bottom: 12.0),
       decoration: BoxDecoration(
-        color: CompassColors.darkBgPanel,
+        color: _theme.bgPanel,
         borderRadius: BorderRadius.circular(8.0),
-        border: Border.all(color: CompassColors.darkBorder, width: 1.0),
+        border: Border.all(color: _theme.border, width: 1.0),
         boxShadow: const [
           BoxShadow(
             color: Color(0x1A000000),
@@ -80,12 +83,12 @@ class _DocumentJsonViewState extends State<DocumentJsonView> {
           // JSON Card Header Bar
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),
-            decoration: const BoxDecoration(
-              color: CompassColors.darkBgSubtle,
+            decoration: BoxDecoration(
+              color: _theme.bgSubtle,
               border: Border(
-                bottom: BorderSide(color: CompassColors.darkBorder, width: 1.0),
+                bottom: BorderSide(color: _theme.border, width: 1.0),
               ),
-              borderRadius: BorderRadius.only(
+              borderRadius: const BorderRadius.only(
                 topLeft: Radius.circular(8.0),
                 topRight: Radius.circular(8.0),
               ),
@@ -97,12 +100,12 @@ class _DocumentJsonViewState extends State<DocumentJsonView> {
                   children: [
                     Text(
                       '#${index + 1}',
-                      style: CompassTypography.monoSmall(color: CompassColors.darkTextMuted),
+                      style: CompassTypography.monoSmall(color: _theme.textMuted),
                     ),
                     const SizedBox(width: 8.0),
                     Text(
                       '_id: "${doc.id}"',
-                      style: CompassTypography.monoBold(color: CompassColors.greenAccent, size: 11.0),
+                      style: CompassTypography.monoBold(color: _theme.accent, size: 11.0),
                     ),
                   ],
                 ),
@@ -113,10 +116,10 @@ class _DocumentJsonViewState extends State<DocumentJsonView> {
                       onTap: () => widget.onCloneDocument(doc),
                       child: Container(
                         padding: const EdgeInsets.all(4.0),
-                        child: const CompassSvg(
+                        child: CompassSvg(
                           svgString: CompassSvgIcons.copy,
                           size: 13.0,
-                          color: CompassColors.darkTextMuted,
+                          color: _theme.textMuted,
                         ),
                       ),
                     ),
@@ -132,7 +135,7 @@ class _DocumentJsonViewState extends State<DocumentJsonView> {
                         child: CompassSvg(
                           svgString: CompassSvgIcons.pencil,
                           size: 13.0,
-                          color: isEditing ? CompassColors.greenAccent : CompassColors.warningAmber,
+                          color: isEditing ? _theme.accent : CompassColors.warningAmber,
                         ),
                       ),
                     ),
@@ -157,11 +160,11 @@ class _DocumentJsonViewState extends State<DocumentJsonView> {
           // JSON Content Body
           Container(
             padding: const EdgeInsets.all(12.0),
-            color: CompassColors.darkBgInput,
+            color: _theme.bgInput,
             child: Text(
               formattedJson,
               style: CompassTypography.monoRegular(
-                color: CompassColors.darkTextSecondary,
+                color: _theme.textSecondary,
                 size: 12.0,
               ),
             ),

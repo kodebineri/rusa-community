@@ -3,6 +3,7 @@ import 'package:flutter/widgets.dart';
 import '../../icons/compass_svg_icons.dart';
 import '../../services/mongo_engine.dart';
 import '../../theme/compass_colors.dart';
+import '../../theme/compass_theme.dart';
 import '../../theme/compass_typography.dart';
 import 'compass_modal.dart';
 
@@ -111,6 +112,7 @@ class _SaveViewModalState extends State<SaveViewModal> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = CompassTheme.of(context);
     final currentError = _error ?? _validateName(_nameController.text);
     final isValid = currentError == null && _nameController.text.trim().isNotEmpty;
 
@@ -134,27 +136,27 @@ class _SaveViewModalState extends State<SaveViewModal> {
         Container(
           padding: const EdgeInsets.all(10.0),
           decoration: BoxDecoration(
-            color: CompassColors.darkBgSubtle,
+            color: theme.bgSubtle,
             borderRadius: BorderRadius.circular(8.0),
-            border: Border.all(color: CompassColors.darkBorder, width: 1.0),
+            border: Border.all(color: theme.border, width: 1.0),
           ),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Row(
                 children: [
-                  const CompassSvg(
+                  CompassSvg(
                     svgString: CompassSvgIcons.database,
                     size: 13.0,
-                    color: CompassColors.greenAccent,
+                    color: theme.accent,
                   ),
                   const SizedBox(width: 6.0),
-                  Text('Source Collection:', style: CompassTypography.caption(color: CompassColors.darkTextMuted)),
+                  Text('Source Collection:', style: CompassTypography.caption(color: theme.textMuted)),
                 ],
               ),
               Text(
                 '${widget.dbName}.${widget.sourceCollName}',
-                style: CompassTypography.monoMedium(color: CompassColors.darkTextPrimary),
+                style: CompassTypography.monoMedium(color: theme.textPrimary),
               ),
             ],
           ),
@@ -164,7 +166,7 @@ class _SaveViewModalState extends State<SaveViewModal> {
         const CompassFieldLabel(label: 'View Name', hint: '* required'),
         CompassInput(
           controller: _nameController,
-          placeholder: 'e.g. active_movies_view',
+          placeholder: 'e.g. active_books_view',
           autofocus: true,
           onSubmitted: (_) => _submit(),
           onChanged: (_) => setState(() => _error = null),
@@ -183,7 +185,7 @@ class _SaveViewModalState extends State<SaveViewModal> {
         else
           Text(
             'Will be listed alongside collections in the database tree view with a VIEW badge.',
-            style: CompassTypography.caption(color: CompassColors.darkTextMuted),
+            style: CompassTypography.caption(color: theme.textMuted),
           ),
         const SizedBox(height: 12.0),
 
@@ -193,11 +195,11 @@ class _SaveViewModalState extends State<SaveViewModal> {
           children: [
             Row(
               children: [
-                const CompassSvg(svgString: CompassSvgIcons.layers, size: 13.0, color: CompassColors.greenAccent),
+                CompassSvg(svgString: CompassSvgIcons.layers, size: 13.0, color: theme.accent),
                 const SizedBox(width: 6.0),
                 Text(
                   'Underlying Pipeline Definition (${widget.pipeline.length} stages)',
-                  style: CompassTypography.bodyMedium(color: CompassColors.darkTextSecondary),
+                  style: CompassTypography.bodyMedium(color: theme.textSecondary),
                 ),
               ],
             ),
@@ -208,12 +210,12 @@ class _SaveViewModalState extends State<SaveViewModal> {
                   CompassSvg(
                     svgString: _copied ? CompassSvgIcons.check : CompassSvgIcons.copy,
                     size: 12.0,
-                    color: _copied ? CompassColors.greenAccent : CompassColors.darkTextMuted,
+                    color: _copied ? theme.accent : theme.textMuted,
                   ),
                   const SizedBox(width: 4.0),
                   Text(
                     _copied ? 'Copied' : 'Copy',
-                    style: CompassTypography.caption(color: CompassColors.darkTextMuted),
+                    style: CompassTypography.caption(color: theme.textMuted),
                   ),
                 ],
               ),
@@ -225,14 +227,14 @@ class _SaveViewModalState extends State<SaveViewModal> {
           constraints: const BoxConstraints(maxHeight: 160.0),
           padding: const EdgeInsets.all(10.0),
           decoration: BoxDecoration(
-            color: CompassColors.darkBgInput,
+            color: theme.bgInput,
             borderRadius: BorderRadius.circular(8.0),
-            border: Border.all(color: CompassColors.darkBorder, width: 1.0),
+            border: Border.all(color: theme.border, width: 1.0),
           ),
           child: SingleChildScrollView(
             child: Text(
               widget.pipelineJsonString.isEmpty ? '[]' : widget.pipelineJsonString,
-              style: CompassTypography.monoSmall(color: CompassColors.darkTextSecondary),
+              style: CompassTypography.monoSmall(color: theme.textSecondary),
             ),
           ),
         ),
@@ -242,9 +244,9 @@ class _SaveViewModalState extends State<SaveViewModal> {
         Container(
           padding: const EdgeInsets.all(12.0),
           decoration: BoxDecoration(
-            color: CompassColors.darkBgSubtle,
+            color: theme.bgSubtle,
             borderRadius: BorderRadius.circular(8.0),
-            border: Border.all(color: CompassColors.darkBorder, width: 1.0),
+            border: Border.all(color: theme.border, width: 1.0),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -255,14 +257,14 @@ class _SaveViewModalState extends State<SaveViewModal> {
                   const SizedBox(width: 6.0),
                   Text(
                     'MongoDB View Characteristics',
-                    style: CompassTypography.bodyMedium(color: CompassColors.darkTextSecondary),
+                    style: CompassTypography.bodyMedium(color: theme.textSecondary),
                   ),
                 ],
               ),
               const SizedBox(height: 4.0),
               Text(
                 'Views behave like read-only collections. When queried with filters or projections, operations are executed on top of this aggregation pipeline. Underlying data remains authoritatively in ${widget.sourceCollName}.',
-                style: CompassTypography.caption(color: CompassColors.darkTextMuted),
+                style: CompassTypography.caption(color: theme.textMuted),
               ),
             ],
           ),
