@@ -1,12 +1,12 @@
 # Testing — `test/widget_test.dart`
 
-Companion to root `AGENTS.md`. Single test file, **14 `testWidgets` tests**, all widget
+Companion to root `AGENTS.md`. Single test file, **15 `testWidgets` tests**, all widget
 level (no unit tests, no integration tests, no golden tests).
 
 ## Commands
 
 ```bash
-flutter test                              # all (expect 14/14)
+flutter test                              # all (expect 15/15)
 flutter test test/widget_test.dart        # the only test file
 flutter analyze                           # must stay "No issues found"
 ```
@@ -32,6 +32,7 @@ misuse that would fail the test anyway.
 | 12 | `Analyze Schema button shows progress and re-runs the analysis` | open Schema → auto-analysis shows disabled `Analyzing...` → 250 ms pump → idle + field cards; insert a doc with a new field directly via `mongoEngine.insertDocument` (schema stays stale) → tap **Analyze Schema** → `Analyzing...` → pump → new field card + header count `10 unique fields` |
 | 13 | `Create Index modal creates an index and reports duplicate names` | Indexes section → **Create Index** opens `CreateIndexModal`; empty field → `'Field name is required'`; `year` + `-1 (Descending)` + unique checkbox → create → modal closes, `year_-1` row + `{year: -1}` in the table, engine index `unique == true` / `keys['year'] == -1`; re-create the same name → `'An index with this name or key pattern already exists'` banner, engine count unchanged |
 | 14 | `Drop Index modal removes a non-protected index after confirmation` | trash count = `indexes.length - 1` (`_id_` row shows "Protected"); first trash (`isbn_1`, seed order) → `DropIndexModal` shows header title + danger button `'Drop Index'` (`findsNWidgets(2)`) and `isbn_1`; **Cancel** keeps the index; reopen → danger button → engine no longer has `isbn_1`, row + trash disappear, `_id_` untouched |
+| 15 | `tree view starts with data structures collapsed` | default `library.books` tree: zero `chevronDown`, two `chevronRight` (one `genre_ids` per doc), `[ ... 2 items ]` + `[ ... 1 items ]` summaries, no `0:` child rows; tap chevron → child rows `0:`/`1:` appear + summary gone; tap again → summary restored |
 
 ## Recurring techniques (copy these patterns)
 

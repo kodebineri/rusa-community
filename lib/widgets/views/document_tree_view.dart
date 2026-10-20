@@ -150,7 +150,6 @@ class DocumentTreeView extends StatelessWidget {
             _TreeNodeWidget(
               propKey: entry.key,
               value: entry.value,
-              depth: 0,
             ),
         ],
       ),
@@ -161,12 +160,10 @@ class DocumentTreeView extends StatelessWidget {
 class _TreeNodeWidget extends StatefulWidget {
   final String propKey;
   final dynamic value;
-  final int depth;
 
   const _TreeNodeWidget({
     required this.propKey,
     required this.value,
-    required this.depth,
   });
 
   @override
@@ -181,7 +178,11 @@ class _TreeNodeWidgetState extends State<_TreeNodeWidget> {
   @override
   void initState() {
     super.initState();
-    _isExpanded = widget.depth < 1;
+    // Documents open with every Object/Array node collapsed (at all depths),
+    // so the tree shows `{ ... }` / `[ ... n items ]` until the user expands
+    // it. (The React reference expanded `depth < 2`; collapsed-by-default is a
+    // deliberate deviation.)
+    _isExpanded = false;
   }
 
   String _detectType(dynamic val) {
@@ -307,14 +308,12 @@ class _TreeNodeWidgetState extends State<_TreeNodeWidget> {
                     _TreeNodeWidget(
                       propKey: '$i',
                       value: (widget.value as List)[i],
-                      depth: widget.depth + 1,
                     )
                 else if (type == 'Object')
                   for (final entry in (widget.value as Map).entries)
                     _TreeNodeWidget(
                       propKey: entry.key.toString(),
                       value: entry.value,
-                      depth: widget.depth + 1,
                     ),
               ],
             ),

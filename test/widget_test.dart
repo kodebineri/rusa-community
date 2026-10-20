@@ -875,4 +875,66 @@ void main() {
     expect(trashIcons, findsNWidgets(originalIndexCount - 2));
     expect(find.text('Protected'), findsOneWidget); // `_id_` is untouched
   });
+
+  testWidgets('tree view starts with data structures collapsed', (WidgetTester tester) async {
+    tester.view.physicalSize = const Size(1920.0, 1080.0);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(const CompassApp());
+    await tester.pump();
+    for (var i = 0; i < 50 && tester.takeException() != null; i++) {}
+
+    final tree = find.byType(DocumentTreeView);
+    expect(tree, findsOneWidget);
+
+    final chevronDown = find.descendant(
+      of: tree,
+      matching: find.byWidgetPredicate(
+        (w) => w is CompassSvg && w.svgString == CompassSvgIcons.chevronDown,
+      ),
+    );
+    final chevronRight = find.descendant(
+      of: tree,
+      matching: find.byWidgetPredicate(
+        (w) => w is CompassSvg && w.svgString == CompassSvgIcons.chevronRight,
+      ),
+    );
+
+    // `library.books` seeds two docs, each with one expandable field
+    // (`genre_ids`, 2 and 1 entries). Every Object/Array node starts collapsed.
+    expect(chevronDown, findsNothing, reason: 'no node starts expanded');
+    expect(chevronRight, findsNWidgets(2));
+    expect(
+      find.descendant(of: tree, matching: find.text('[ ... 2 items ]')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: tree, matching: find.text('[ ... 1 items ]')),
+      findsOneWidget,
+    );
+    expect(find.descendant(of: tree, matching: find.text('0:')), findsNothing);
+
+    // Expanding one array reveals its items and swaps the chevron.
+    await tester.tap(chevronRight.first);
+    await tester.pump();
+    expect(chevronDown, findsOneWidget);
+    expect(chevronRight, findsOneWidget);
+    expect(
+      find.descendant(of: tree, matching: find.text('[ ... 2 items ]')),
+      findsNothing,
+    );
+    expect(find.descendant(of: tree, matching: find.text('0:')), findsOneWidget);
+    expect(find.descendant(of: tree, matching: find.text('1:')), findsOneWidget);
+
+    // Collapsing it again restores the summary.
+    await tester.tap(chevronDown);
+    await tester.pump();
+    expect(chevronDown, findsNothing);
+    expect(
+      find.descendant(of: tree, matching: find.text('[ ... 2 items ]')),
+      findsOneWidget,
+    );
+  });
 }

@@ -13,7 +13,7 @@ the engine instance.
 - Active product: `lib/` (Dart/Flutter) — this is what you modify.
 - Original React reference: `src/` (TSX) — read-only reference for intended behavior;
   not compiled by Flutter. Comments in Dart files say "Converted from `src/components/X.tsx`".
-- Tests: `test/widget_test.dart` (14 widget tests, single file).
+- Tests: `test/widget_test.dart` (15 widget tests, single file).
 - Sample data sources of truth: `sample_library.json`, `sample_social_network.json` (repo root).
 - `README.md` at repo root is **stale AI Studio boilerplate** — ignore it.
 
@@ -22,7 +22,7 @@ the engine instance.
 | Task | Command |
 |---|---|
 | Static analysis (must be clean) | `flutter analyze` |
-| Tests (must be 14/14) | `flutter test` |
+| Tests (must be 15/15) | `flutter test` |
 | Run desktop app | `flutter run -d windows` |
 | Run a single test file | `flutter test test/widget_test.dart` |
 
