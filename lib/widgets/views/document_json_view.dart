@@ -1,10 +1,12 @@
 import 'dart:convert';
 import 'package:flutter/widgets.dart';
 import '../../theme/compass_colors.dart';
+import '../../theme/compass_density.dart';
 import '../../theme/compass_theme.dart';
 import '../../theme/compass_typography.dart';
 import '../../icons/compass_svg_icons.dart';
 import '../../models/mongo_models.dart';
+import '../compass_icon_button.dart';
 
 /// Converted from src/components/DocumentJsonView.tsx
 /// Adheres strictly to:
@@ -38,6 +40,7 @@ class _DocumentJsonViewState extends State<DocumentJsonView> {
 
   @override
   Widget build(BuildContext context) {
+    final density = CompassDensity.of(context);
     if (widget.documents.isEmpty) {
       return Container(
         alignment: Alignment.center,
@@ -49,22 +52,21 @@ class _DocumentJsonViewState extends State<DocumentJsonView> {
       );
     }
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        for (int i = 0; i < widget.documents.length; i++)
-          _buildJsonCard(widget.documents[i], i),
-      ],
+    return ListView.builder(
+      padding: EdgeInsets.all(density.isTouch ? 12.0 : 16.0),
+      itemCount: widget.documents.length,
+      itemBuilder: (context, i) => _buildJsonCard(widget.documents[i], i),
     );
   }
 
   Widget _buildJsonCard(MongoDocument doc, int index) {
+    final density = CompassDensity.of(context);
     final isEditing = _editingId == doc.id;
     const jsonEncoder = JsonEncoder.withIndent('  ');
     final formattedJson = jsonEncoder.convert(doc.data);
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 12.0),
+      margin: EdgeInsets.only(bottom: density.isTouch ? 10.0 : 12.0),
       decoration: BoxDecoration(
         color: _theme.bgPanel,
         borderRadius: BorderRadius.circular(8.0),
@@ -112,44 +114,35 @@ class _DocumentJsonViewState extends State<DocumentJsonView> {
                 // Action Buttons
                 Row(
                   children: [
-                    GestureDetector(
+                    CompassIconButton(
+                      svgString: CompassSvgIcons.copy,
                       onTap: () => widget.onCloneDocument(doc),
-                      child: Container(
-                        padding: const EdgeInsets.all(4.0),
-                        child: CompassSvg(
-                          svgString: CompassSvgIcons.copy,
-                          size: 13.0,
-                          color: _theme.textMuted,
-                        ),
-                      ),
+                      size: 13.0,
+                      padding: 4.0,
+                      color: _theme.textMuted,
+                      semanticLabel: 'Clone document',
                     ),
                     const SizedBox(width: 6.0),
-                    GestureDetector(
+                    CompassIconButton(
+                      svgString: CompassSvgIcons.pencil,
                       onTap: () {
                         setState(() {
                           _editingId = isEditing ? null : doc.id;
                         });
                       },
-                      child: Container(
-                        padding: const EdgeInsets.all(4.0),
-                        child: CompassSvg(
-                          svgString: CompassSvgIcons.pencil,
-                          size: 13.0,
-                          color: isEditing ? _theme.accent : CompassColors.warningAmber,
-                        ),
-                      ),
+                      size: 13.0,
+                      padding: 4.0,
+                      color: isEditing ? _theme.accent : CompassColors.warningAmber,
+                      semanticLabel: isEditing ? 'Finish editing' : 'Edit document',
                     ),
                     const SizedBox(width: 6.0),
-                    GestureDetector(
+                    CompassIconButton(
+                      svgString: CompassSvgIcons.trash,
                       onTap: () => widget.onDeleteDocument(doc.id, doc),
-                      child: Container(
-                        padding: const EdgeInsets.all(4.0),
-                        child: const CompassSvg(
-                          svgString: CompassSvgIcons.trash,
-                          size: 13.0,
-                          color: CompassColors.errorRed,
-                        ),
-                      ),
+                      size: 13.0,
+                      padding: 4.0,
+                      color: CompassColors.errorRed,
+                      semanticLabel: 'Delete document',
                     ),
                   ],
                 ),

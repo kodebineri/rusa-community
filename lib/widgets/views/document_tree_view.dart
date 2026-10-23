@@ -4,6 +4,8 @@ import '../../theme/compass_theme.dart';
 import '../../theme/compass_typography.dart';
 import '../../icons/compass_svg_icons.dart';
 import '../../models/mongo_models.dart';
+import '../../theme/compass_density.dart';
+import '../compass_icon_button.dart';
 
 /// Converted from src/components/DocumentTreeView.tsx
 /// Adheres strictly to:
@@ -29,6 +31,7 @@ class DocumentTreeView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = CompassTheme.of(context);
+    final density = CompassDensity.of(context);
     if (documents.isEmpty) {
       return Container(
         alignment: Alignment.center,
@@ -40,18 +43,17 @@ class DocumentTreeView extends StatelessWidget {
       );
     }
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        for (int i = 0; i < documents.length; i++)
-          _buildDocumentCard(documents[i], i, theme),
-      ],
+    return ListView.builder(
+      padding: EdgeInsets.all(density.isTouch ? 12.0 : 16.0),
+      itemCount: documents.length,
+      itemBuilder: (context, i) => _buildDocumentCard(context, documents[i], i, theme),
     );
   }
 
-  Widget _buildDocumentCard(MongoDocument doc, int index, CompassTheme theme) {
+  Widget _buildDocumentCard(BuildContext context, MongoDocument doc, int index, CompassTheme theme) {
+    final density = CompassDensity.of(context);
     return Container(
-      margin: const EdgeInsets.only(bottom: 12.0),
+      margin: EdgeInsets.only(bottom: density.isTouch ? 10.0 : 12.0),
       decoration: BoxDecoration(
         color: theme.bgPanel,
         borderRadius: BorderRadius.circular(8.0),
@@ -64,7 +66,7 @@ class DocumentTreeView extends StatelessWidget {
           ),
         ],
       ),
-      padding: const EdgeInsets.all(12.0),
+      padding: EdgeInsets.all(density.isTouch ? 10.0 : 12.0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -80,64 +82,64 @@ class DocumentTreeView extends StatelessWidget {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Row(
-                  children: [
-                    Text(
-                      '#${index + 1}',
-                      style: CompassTypography.monoSmall(color: theme.textMuted),
-                    ),
-                    const SizedBox(width: 8.0),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6.0, vertical: 2.0),
-                      decoration: BoxDecoration(
-                        color: theme.greenBadgeBg,
-                        borderRadius: BorderRadius.circular(4.0),
-                        border: Border.all(color: theme.greenBadgeBorder, width: 1.0),
+                // The id badge ellipsizes instead of pushing the action
+                // buttons off the card.
+                Expanded(
+                  child: Row(
+                    children: [
+                      Text(
+                        '#${index + 1}',
+                        style: CompassTypography.monoSmall(color: theme.textMuted),
                       ),
-                      child: Text(
-                        'ObjectId("${doc.id}")',
-                        style: CompassTypography.monoBold(color: theme.accent, size: 11.0),
+                      const SizedBox(width: 8.0),
+                      Flexible(
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6.0, vertical: 2.0),
+                          decoration: BoxDecoration(
+                            color: theme.greenBadgeBg,
+                            borderRadius: BorderRadius.circular(4.0),
+                            border: Border.all(color: theme.greenBadgeBorder, width: 1.0),
+                          ),
+                          child: Text(
+                            'ObjectId("${doc.id}")',
+                            overflow: TextOverflow.ellipsis,
+                            maxLines: 1,
+                            style: CompassTypography.monoBold(color: theme.accent, size: 11.0),
+                          ),
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
                 // Actions Strip
                 Row(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    GestureDetector(
+                    CompassIconButton(
+                      svgString: CompassSvgIcons.copy,
                       onTap: () => onCloneDocument(doc),
-                      child: Container(
-                        padding: const EdgeInsets.all(4.0),
-                        child: CompassSvg(
-                          svgString: CompassSvgIcons.copy,
-                          size: 13.0,
-                          color: theme.textMuted,
-                        ),
-                      ),
+                      size: 13.0,
+                      padding: 4.0,
+                      color: theme.textMuted,
+                      semanticLabel: 'Clone document',
                     ),
                     const SizedBox(width: 4.0),
-                    GestureDetector(
+                    CompassIconButton(
+                      svgString: CompassSvgIcons.pencil,
                       onTap: () => onEditDocument(doc),
-                      child: Container(
-                        padding: const EdgeInsets.all(4.0),
-                        child: const CompassSvg(
-                          svgString: CompassSvgIcons.pencil,
-                          size: 13.0,
-                          color: CompassColors.warningAmber,
-                        ),
-                      ),
+                      size: 13.0,
+                      padding: 4.0,
+                      color: CompassColors.warningAmber,
+                      semanticLabel: 'Edit document',
                     ),
                     const SizedBox(width: 4.0),
-                    GestureDetector(
+                    CompassIconButton(
+                      svgString: CompassSvgIcons.trash,
                       onTap: () => onDeleteDocument(doc.id, doc),
-                      child: Container(
-                        padding: const EdgeInsets.all(4.0),
-                        child: const CompassSvg(
-                          svgString: CompassSvgIcons.trash,
-                          size: 13.0,
-                          color: CompassColors.errorRed,
-                        ),
-                      ),
+                      size: 13.0,
+                      padding: 4.0,
+                      color: CompassColors.errorRed,
+                      semanticLabel: 'Delete document',
                     ),
                   ],
                 ),
@@ -223,6 +225,7 @@ class _TreeNodeWidgetState extends State<_TreeNodeWidget> {
   Widget build(BuildContext context) {
     final type = _detectType(widget.value);
     final isExpandable = (type == 'Object' || type == 'Array') && widget.value != null;
+    final density = CompassDensity.of(context);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -230,62 +233,119 @@ class _TreeNodeWidgetState extends State<_TreeNodeWidget> {
         Padding(
           padding: const EdgeInsets.symmetric(vertical: 2.0),
           child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
+            // On touch the expand chevron becomes a finger-sized button, so
+            // the row centres its children instead of top-aligning them.
+            crossAxisAlignment: density.isTouch
+                ? CrossAxisAlignment.center
+                : CrossAxisAlignment.start,
             children: [
               if (isExpandable)
-                GestureDetector(
+                CompassIconButton(
+                  svgString: _isExpanded
+                      ? CompassSvgIcons.chevronDown
+                      : CompassSvgIcons.chevronRight,
                   onTap: () {
                     setState(() {
                       _isExpanded = !_isExpanded;
                     });
                   },
-                  child: Container(
-                    padding: const EdgeInsets.only(top: 2.0, right: 4.0),
-                    child: CompassSvg(
-                      svgString: _isExpanded
-                          ? CompassSvgIcons.chevronDown
-                          : CompassSvgIcons.chevronRight,
-                      size: 11.0,
-                      color: _theme.textMuted,
-                    ),
-                  ),
+                  size: 11.0,
+                  padding: 0.0,
+                  color: _theme.textMuted,
+                  semanticLabel: _isExpanded ? 'Collapse value' : 'Expand value',
                 )
               else
-                const SizedBox(width: 15.0),
+                // Keeps non-expandable values aligned with the ones that have
+                // a chevron in front of them.
+                SizedBox(width: density.minTapTarget),
 
-              Text(
-                '${widget.propKey}:',
-                style: CompassTypography.monoBold(color: _theme.textPrimary, size: 12.0),
-              ),
-              const SizedBox(width: 6.0),
-              Text(
-                type == 'Array'
-                    ? 'Array (${(widget.value as List).length})'
-                    : type,
-                style: CompassTypography.caption(color: _theme.textMuted),
-              ),
-              const SizedBox(width: 6.0),
-
-              if (!isExpandable)
-                Expanded(
+              // On a phone the key, the type and the value share the width of
+              // the row, so the longer ones ellipsize instead of overflowing.
+              if (density.isTouch) ...[
+                Flexible(
+                  flex: 3,
                   child: Text(
-                    type == 'String' ? '"${widget.value}"' : '${widget.value}',
+                    '${widget.propKey}:',
+                    overflow: TextOverflow.ellipsis,
+                    maxLines: 1,
+                    style: CompassTypography.monoBold(color: _theme.textPrimary, size: 12.0),
+                  ),
+                ),
+                const SizedBox(width: 6.0),
+                Flexible(
+                  flex: 2,
+                  child: Text(
+                    type == 'Array'
+                        ? 'Array (${(widget.value as List).length})'
+                        : type,
+                    overflow: TextOverflow.ellipsis,
+                    maxLines: 1,
+                    style: CompassTypography.caption(color: _theme.textMuted),
+                  ),
+                ),
+                const SizedBox(width: 6.0),
+                if (!isExpandable)
+                  Expanded(
+                    flex: 5,
+                    child: Text(
+                      type == 'String' ? '"${widget.value}"' : '${widget.value}',
+                      overflow: TextOverflow.ellipsis,
+                      maxLines: 1,
+                      style: CompassTypography.monoRegular(
+                        color: _getTypeColor(type, _theme),
+                        size: 12.0,
+                      ),
+                    ),
+                  )
+                else if (!_isExpanded)
+                  Flexible(
+                    child: Text(
+                      type == 'Array'
+                          ? '[ ... ${(widget.value as List).length} items ]'
+                          : '{ ... }',
+                      overflow: TextOverflow.ellipsis,
+                      maxLines: 1,
+                      style: CompassTypography.monoRegular(
+                        color: _theme.textMuted,
+                        size: 12.0,
+                      ),
+                    ),
+                  ),
+              ] else ...[
+                Text(
+                  '${widget.propKey}:',
+                  style: CompassTypography.monoBold(color: _theme.textPrimary, size: 12.0),
+                ),
+                const SizedBox(width: 6.0),
+                Text(
+                  type == 'Array'
+                      ? 'Array (${(widget.value as List).length})'
+                      : type,
+                  style: CompassTypography.caption(color: _theme.textMuted),
+                ),
+                const SizedBox(width: 6.0),
+
+                if (!isExpandable)
+                  Expanded(
+                    child: Text(
+                      type == 'String' ? '"${widget.value}"' : '${widget.value}',
+                      style: CompassTypography.monoRegular(
+                        color: _getTypeColor(type, _theme),
+                        size: 12.0,
+                      ),
+                    ),
+                  )
+                else if (!_isExpanded)
+                  Text(
+                    type == 'Array'
+                        ? '[ ... ${(widget.value as List).length} items ]'
+                        : '{ ... }',
                     style: CompassTypography.monoRegular(
-                      color: _getTypeColor(type, _theme),
+                      color: _theme.textMuted,
                       size: 12.0,
                     ),
                   ),
-                )
-              else if (!_isExpanded)
-                Text(
-                  type == 'Array'
-                      ? '[ ... ${(widget.value as List).length} items ]'
-                      : '{ ... }',
-                  style: CompassTypography.monoRegular(
-                    color: _theme.textMuted,
-                    size: 12.0,
-                  ),
-                ),
+              ],
             ],
           ),
         ),

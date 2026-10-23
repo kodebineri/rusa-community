@@ -22,8 +22,12 @@ void main() => runApp(const DefaultTextEditingShortcuts(child: CompassApp()));
   `AnnotatedRegion<SystemUiOverlayStyle>` (transparent status bar, brightness from dark mode)
   → `CompassTheme(isDarkMode: _isDarkMode, …)` → manual `MediaQuery` fallback
   (`MediaQuery.fromView` if none) → `Directionality(ltr)` → `LayoutBuilder`
-  → `Container(bgApp)` → **`Stack`** (content column + all modal overlays).
+  → `Container(bgApp)` → **`Stack`** (content column + all modal overlays)
+  → `CompassDensity.forWidth(width: …)` (innermost: touch vs desktop metrics).
 - Breakpoint: `isDesktop = constraints.maxWidth >= 768` (sidebar is off-canvas below it).
+- **Density is width-driven, not platform-driven**: `flutter_test` forces
+  `TargetPlatform.android`, so a platform check would put the 1920 px test viewport into
+  the touch profile. `CompassDensity.touchBreakpoint` is also 768.
 
 ## State fields of `_CompassAppState`
 
@@ -40,7 +44,16 @@ void main() => runApp(const DefaultTextEditingShortcuts(child: CompassApp()));
 | `_savedConnections` | `List<ConnectionProfile>` | two seeded profiles (Local Standalone, Atlas Production) |
 
 **Panel flags (L74–76):** `_isConnectModalOpen`, `_isTerminalOpen` (docked mongosh shell),
-`_isMobileSidebarOpen` (off-canvas sidebar < 768px).
+`_isMobileSidebarOpen` (off-canvas sidebar < 768px), `_isHeaderActionsOpen` (touch-only
+header overflow sheet).
+
+**Layout flags (refreshed by the root `LayoutBuilder` on every layout pass):**
+
+| Field | Type | Purpose |
+|---|---|---|
+| `_isTouchLayout` | `bool` | `!isDesktop` — below the 768 px breakpoint |
+| `_windowWidth` | `double` | viewport width in logical pixels |
+| `_isCompactLayout` | `bool` (getter) | `_windowWidth < 900` — the labelled chrome collapses into icon buttons |
 
 **Modal state — flag + payload pairs (L95–142):**
 
@@ -89,7 +102,8 @@ Stack
 │        ├ _buildDocumentsPagination    (Tree/JSON/Table switcher + Prev/Next) — same condition
 │        └ Expanded > SingleChildScrollView(16) > _buildActiveTabView(...)
 │  3. CompassTerminal                   (docked mongosh drawer; the only "footer" region)
-└─ 14 modal overlays (always-installed children; each closed one renders SizedBox.shrink)
+└─ 14 modal overlays + the touch-only CompassActionSheet
+   (always-installed children; each closed one renders SizedBox.shrink)
 ```
 
 Data derived at the top of `build()` (~L713–719), all synchronous:
@@ -131,12 +145,16 @@ section no longer derives data in `build()` — `SchemaView` owns its analysis a
 
 - Breadcrumb row: db icon + db name + `>` + table icon + coll name + "N docs" chip;
   right side header actions (`_buildHeaderAction`): New Coll, Rename (eye icon for views),
-  Drop.
+  Drop. The breadcrumb names ellipsize (`Flexible` + `TextOverflow.ellipsis`) and the "N docs"
+  chip is hidden on touch.
 - Section tabs Row: left = `_buildTab(tabKey, title, svg)` for
   documents/aggregations/schema/indexes → `setState(() => _activeTab = tabKey)`.
 - Right actions gated on `_activeTab == 'documents' && activeColl != null`:
   amber **Read-Only View** badge when `activeColl.isView`, otherwise
   **Insert Document** primary button → `_openInsertDocument`; then Import / Export buttons.
+- **Narrow-window behaviour:** `_buildHeaderAction` returns a `CompassIconButton` instead of
+  a labelled chip when `_isCompactLayout` (< 900 px); `_buildDocumentsAction` does the same
+  for the Insert Document button and the Read-Only badge. On desktop the labels stay.
 
 ### Pagination (`_buildDocumentsPagination`, ~L1298–1373)
 
@@ -144,6 +162,8 @@ Left = segmented Tree/JSON/Table switcher (`_buildViewModeBtn` → `_docViewMode
 Right = `"start – end of total"` label + Prev/Next buttons that do
 `_queryOptions = _queryOptions.copyWith(skip: …)` — **`limit` doubles as page size**
 (default 20). Prev clamps at 0; Next adds `pageSize`, disabled when exhausted.
+On touch the whole bar becomes a horizontal `SingleChildScrollView` (the switcher, the
+label and the pager no longer fit on one phone-width line).
 
 ## Tab management (~L168–249)
 
@@ -207,6 +227,11 @@ Three modals hand-roll their own `Positioned.fill` overlay instead of `CompassMo
 `ConnectionModal` (fixed width 560), `ExportLanguageModal` (width 580),
 `MongoshConfirmationModal` (width 512).
 
+A **fourth** overlay is installed after them: `CompassActionSheet` (`_isHeaderActionsOpen`),
+the touch/narrow-window bottom sheet that hosts the header actions which do not fit
+(change connection / reset samples / `_mongosh` / disconnect). It is opened from the
+header's `⋮` button via `onOpenActions`.
+
 Payload-clearing asymmetry to remember: most `onClose` closures only flip the boolean;
 delete payload clears on confirm; insert payload (`_editingDoc`) clears on open/success.
 
@@ -238,23 +263,24 @@ Helpers: `_splitArgs` (bracket-depth aware), `_parseMap`.
 |---|---|
 | 40–52 | `main()` + DefaultTextEditingShortcuts rationale |
 | 54–59 | `CompassApp` + porting-constraint doc comment |
-| 61–160 | all state fields (grouped) |
-| 162–249 | tab handlers |
-| 251–357 | connection handlers |
-| 358–469 | db/collection/index modal handlers (create/rename/drop/drop-index) |
-| 471–557 | document CRUD |
-| 559–619 | import/export/language/save-view/reset/disconnect/terminal confirm |
-| 621–701 | `_executeTerminalCommand` + arg helpers |
-| 703 | `_theme` palette getter (workaround) |
-| 706–1024 | `build()` (header 729, sidebar 756, main pane 797–848, terminal 852, modals 864–984) |
-| 1026–1193 | `_buildCollectionHeader` |
-| 1195–1229 | `_buildTab` |
-| 1231–1258 | `_buildHeaderAction` |
-| 1260–1296 | `_buildViewModeBtn` |
-| 1298–1373 | `_buildDocumentsPagination` |
-| 1375–1393 | `_buildPageButton` |
-| 1395–1442 | `_buildDocumentsEmptyState` |
-| 1444–1513 | `_buildActiveTabView` |
+| 61–170 | all state fields (grouped) |
+| 188–275 | tab handlers |
+| 290–370 | connection handlers |
+| 378–490 | db/collection/index modal handlers (create/rename/drop/drop-index) |
+| 491–578 | document CRUD |
+| 579–640 | import/export/language/save-view/reset/disconnect/terminal confirm |
+| 641–720 | `_executeTerminalCommand` + arg helpers |
+| 718 | `_theme` palette getter (workaround) |
+| 726–1093 | `build()` (header ~750, sidebar ~780, main pane ~830–870, terminal ~870, overlays ~885–1048) |
+| 1095–1253 | `_buildCollectionHeader` |
+| 1255–1307 | `_buildDocumentsAction` (Insert Document / Read-Only badge) |
+| 1309–1343 | `_buildTab` |
+| 1345–1385 | `_buildHeaderAction` |
+| 1387–1423 | `_buildViewModeBtn` |
+| 1425–1518 | `_buildDocumentsPagination` |
+| 1520–1535 | `_buildPageButton` |
+| 1537–1584 | `_buildDocumentsEmptyState` |
+| 1586–1655 | `_buildActiveTabView` |
 
 ## Recipe: adding a new modal
 

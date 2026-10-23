@@ -5,11 +5,15 @@ open only the specific doc and file listed for your task.
 
 ## What this is
 
-A desktop-first **MongoDB Compass clone written in Flutter** (Dart), ported from a React/TSX
+A **MongoDB Compass clone written in Flutter** (Dart), ported from a React/TSX
 reference app. It runs fully against an **in-memory local Mongo engine** seeded with sample
 data by default, and can connect to a **real MongoDB server** (via `mongo_dart`) which swaps
 the engine instance.
 
+- **Responsive**: the desktop layout is the reference, but the app adapts to phone widths
+  (tap targets 44 dp, drawer sidebar, overflow sheets). See invariant 13 and
+  `docs/ui.md` → "Touch layer".
+- Platform folders: `android/`, `ios/`, `windows/` (macOS/Linux are not scaffolded).
 - Active product: `lib/` (Dart/Flutter) — this is what you modify.
 - Original React reference: `src/` (TSX) — read-only reference for intended behavior;
   not compiled by Flutter. Comments in Dart files say "Converted from `src/components/X.tsx`".
@@ -24,6 +28,7 @@ the engine instance.
 | Static analysis (must be clean) | `flutter analyze` |
 | Tests (must be 15/15) | `flutter test` |
 | Run desktop app | `flutter run -d windows` |
+| Run on Android | `flutter run -d <device>` (needs `INTERNET` — already in the main manifest) |
 | Run a single test file | `flutter test test/widget_test.dart` |
 
 There is no JS build step for the Flutter app (root `package.json`/`vite.config.ts` belong to
@@ -69,7 +74,7 @@ the legacy `src/` React app; `npm` is not needed for Flutter work).
 9. **Never throw out of `build()`.** The engine's `findDocuments` returns an empty result on
    parse errors; UI input parsing uses `tolerantParse` inside try/catch. Keep it that way.
 10. **Icons are `CompassSvg` + `CompassSvgIcons.<name>`** (inline SVG string constants in
-    `lib/icons/compass_svg_icons.dart`), never Material `Icon`. 33 icons exist; add new ones
+    `lib/icons/compass_svg_icons.dart`), never Material `Icon`. 34 icons exist; add new ones
     as new `static const String` SVG literals.
 11. **Theme:** colors come from `CompassTheme.of(context)` getters (a bool `isDarkMode`
     InheritedWidget over static `CompassColors` tokens) or `CompassTypography` factories.
@@ -79,6 +84,13 @@ the legacy `src/` React app; `npm` is not needed for Flutter work).
     (`documents|aggregations|schema|indexes`), view mode = `_docViewMode`
     (`tree|json|table`), tab index = `_activeTabIndex` (`-1` = none sentinel). There is no
     `_activeSection` or `_activeTabId`.
+13. **Touch layer (mobile):** metrics come from `CompassDensity.of(context)`
+    (`lib/theme/compass_density.dart`; tap target 20 dp desktop / **44 dp** touch, switched
+    by viewport width < 768). Icon-only controls use `CompassIconButton` (guarantees the hit
+    area without changing the glyph size); hover/tap feedback uses `CompassHover` (builder
+    API — the control paints its own hover fill); actions that do not fit go into
+    `CompassActionSheet`, which is a root-`Stack` child like the modals. Never hard-code
+    tap-target sizes.
 
 ## Known dead-ends / no-op code (don't "fix" silently, don't rely on)
 
@@ -99,6 +111,8 @@ the legacy `src/` React app; `npm` is not needed for Flutter work).
 | All models (`MongoDocument`, `QueryFilterOptions`, …) | `lib/models/mongo_models.dart` |
 | `CollectionTab` | `lib/models/collection_tab.dart` |
 | Modal primitives (`CompassModalShell`, `CompassInput`, buttons) | `lib/widgets/modals/compass_modal.dart` |
-| `CompassTheme`, `CompassColors`, `CompassTypography` | `lib/theme/` |
+| `CompassActionSheet` (touch overflow sheet) | `lib/widgets/modals/compass_action_sheet.dart` |
+| `CompassIconButton`, `CompassHover` | `lib/widgets/compass_icon_button.dart`, `lib/widgets/compass_hover.dart` |
+| `CompassTheme`, `CompassColors`, `CompassTypography`, `CompassDensity` | `lib/theme/` |
 | `CompassSvg`, `CompassSvgIcons` | `lib/icons/compass_svg_icons.dart` |
 | Tests | `test/widget_test.dart` |

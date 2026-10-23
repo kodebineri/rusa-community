@@ -2,6 +2,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'dart:async';
 import 'theme/compass_colors.dart';
+import 'theme/compass_density.dart';
 import 'theme/compass_theme.dart';
 import 'theme/compass_typography.dart';
 import 'icons/compass_svg_icons.dart';
@@ -11,6 +12,7 @@ import 'services/local_mongo_engine.dart';
 import 'services/mongo_engine.dart';
 import 'services/real_mongo_service.dart';
 import 'widgets/compass_header.dart';
+import 'widgets/compass_icon_button.dart';
 import 'widgets/collection_tab_bar.dart';
 import 'widgets/compass_sidebar.dart';
 import 'widgets/compass_query_bar.dart';
@@ -36,6 +38,7 @@ import 'widgets/modals/export_language_modal.dart';
 import 'widgets/modals/save_view_modal.dart';
 import 'widgets/modals/mongosh_confirmation_modal.dart';
 import 'widgets/modals/compass_modal.dart';
+import 'widgets/modals/compass_action_sheet.dart';
 
 void main() {
   // The app intentionally avoids MaterialApp/WidgetsApp, which normally install
@@ -74,6 +77,30 @@ class _CompassAppState extends State<CompassApp> {
   bool _isConnectModalOpen = false;
   bool _isTerminalOpen = false;
   bool _isMobileSidebarOpen = false;
+
+  /// True while the touch-only header overflow sheet is open.
+  bool _isHeaderActionsOpen = false;
+
+  /// True while the touch-only query-bar overflow sheet is open.
+  bool _isQueryActionsOpen = false;
+
+  /// Whether the query bar's options panel (project / sort / skip / limit) is
+  /// expanded. It lives here so the root-level overflow sheet can toggle it.
+  bool _isQueryOptionsExpanded = false;
+
+  /// True while the app is laid out for touch: the viewport is narrower than
+  /// the 768 px breakpoint. Refreshed by the root `LayoutBuilder` on every
+  /// layout pass, so the builder helpers below can adapt without having to
+  /// thread a `BuildContext` through every signature.
+  bool _isTouchLayout = false;
+
+  /// Width of the app viewport in logical pixels. Refreshed by the root
+  /// `LayoutBuilder` on every layout pass.
+  double _windowWidth = 1440.0;
+
+  /// True when the window is too narrow for the labelled chrome: the
+  /// labelled action chips collapse into icon buttons.
+  bool get _isCompactLayout => _windowWidth < 900.0;
 
   // Saved connection profiles (mirrors the React `savedConnections` state).
   List<ConnectionProfile> _savedConnections = [
@@ -702,290 +729,416 @@ class _CompassAppState extends State<CompassApp> {
   /// and silently fall back to dark. Use the palette-only instance instead.
   CompassTheme get _theme => CompassTheme.palette(_isDarkMode);
 
+  /// The app shell, hosted in an [OverlayEntry].
+  ///
+  /// The app has no [Navigator] (see the class doc comment), so it has to
+  /// provide a root [Overlay] itself: Flutter inserts the text selection UI —
+  /// the copy / paste context menu — into the nearest overlay, and a bare
+  /// [EditableText] without an overlay ancestor throws when it tries.
+  ///
+  /// The entry is created once and rebuilt through [OverlayState]; the builder
+  /// is a method so every rebuild produces a fresh shell (an [OverlayEntry]
+  /// only calls its builder when the overlay rebuilds it).
+  late final OverlayEntry _shellEntry = OverlayEntry(builder: _buildShell);
+
+  /// Builds the app shell that lives inside the overlay entry.
+  ///
+  /// The shell is hosted by [_shellEntry] so that the root [Overlay] is an
+  /// ancestor of every text field — Flutter's selection UI needs one.
+  Widget _buildShell(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isDesktop = constraints.maxWidth >= 768;
+        _isTouchLayout = !isDesktop;
+        _windowWidth = constraints.maxWidth;
+
+        final service = mongoEngine;
+        final dbs = service.getDatabases();
+        final activeDb = service.getDatabase(_selectedDbName);
+        final activeColl = activeDb?.collections[_selectedCollName];
+        final docs = activeColl?.documents ?? [];
+        final queryResult = service.findDocuments(_selectedDbName, _selectedCollName, _queryOptions);
+        final pageDocs = queryResult.documents;
+
+        final appShell = Container(
+          color: _theme.bgApp,
+          child: Stack(
+            children: [
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  // Header (h-14 / 56px)
+                  CompassHeader(
+                    connection: _connection,
+                    showResetSample: _realService == null,
+                    onOpenConnectModal: () {
+                      setState(() => _isConnectModalOpen = true);
+                    },
+                    onDisconnect: _handleDisconnect,
+                    onResetData: _handleResetData,
+                    isTerminalOpen: _isTerminalOpen,
+                    onToggleTerminal: () {
+                      setState(() => _isTerminalOpen = !_isTerminalOpen);
+                    },
+                    isDarkMode: _isDarkMode,
+                    onToggleDarkMode: () {
+                      setState(() => _isDarkMode = !_isDarkMode);
+                    },
+                    onToggleMobileSidebar: () {
+                      setState(() => _isMobileSidebarOpen = !_isMobileSidebarOpen);
+                    },
+                    isMobile: !isDesktop,
+                    onOpenActions: () {
+                      setState(() => _isHeaderActionsOpen = true);
+                    },
+                  ),
+
+                  // Main Body: Side-by-side on desktop, or off-canvas sidebar
+                  Expanded(
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        if (isDesktop || _isMobileSidebarOpen)
+                          CompassSidebar(
+                            databases: dbs,
+                            selectedDb: _selectedDbName,
+                            selectedColl: _selectedCollName,
+                            onSelectDatabase: (dbName) {
+                              setState(() {
+                                final db = service.getDatabase(dbName);
+                                final collName = db?.collections.keys.firstOrNull ?? '';
+                                if (collName.isNotEmpty) {
+                                  _openCollectionTab(dbName, collName);
+                                } else {
+                                  _selectedDbName = dbName;
+                                  _selectedCollName = '';
+                                }
+                                _isMobileSidebarOpen = false;
+                              });
+                            },
+                            onSelectCollection: (dbName, collName) {
+                              setState(() {
+                                _openCollectionTab(dbName, collName);
+                                _isMobileSidebarOpen = false;
+                              });
+                            },
+                            onOpenCreateDb: _openCreateDb,
+                            onOpenCreateColl: (dbName) => _openCreateCollection(dbName),
+                            onRenameDb: _openRenameDb,
+                            onRenameColl: (dbName, collName, isView) =>
+                                _openRenameColl(dbName, collName, isView),
+                            onDropDb: _openDropDb,
+                            onDropColl: _openDropColl,
+                            onRefresh: () {
+                              setState(() {});
+                            },
+                          ),
+
+                        // Active Collection Main Pane
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              if (_openTabs.isNotEmpty)
+                                CollectionTabBar(
+                                  tabs: _openTabs,
+                                  activeIndex: _activeTabIndex,
+                                  onSelect: (index) {
+                                    setState(() => _activateTabIndex(index));
+                                  },
+                                  onClose: (index) {
+                                    setState(() => _removeTabAt(index));
+                                  },
+                                ),
+
+                              // Collection Header Bar: Title, Breadcrumbs, Tab Switcher
+                              if (_activeTabIndex >= 0)
+                                _buildCollectionHeader(activeDb, activeColl),
+
+                              // Query Bar (only shown while a collection tab is open)
+                              if (_activeTabIndex >= 0 && _activeTab == 'documents')
+                                CompassQueryBar(
+                                  options: _queryOptions,
+                                  onChangeOptions: (updated) {
+                                    setState(() => _queryOptions = updated);
+                                  },
+                                  onExecuteQuery: () {
+                                    setState(() {});
+                                  },
+                                  onResetQuery: () {
+                                    setState(() => _queryOptions = QueryFilterOptions());
+                                  },
+                                  onExportToLanguage: _openExportLanguage,
+                                  optionsExpanded: _isQueryOptionsExpanded,
+                                  onToggleOptions: () {
+                                    setState(() =>
+                                        _isQueryOptionsExpanded = !_isQueryOptionsExpanded);
+                                  },
+                                  onOpenOverflow: () {
+                                    setState(() => _isQueryActionsOpen = true);
+                                  },
+                                  executionTimeMs: queryResult.executionTimeMs,
+                                  totalResultsCount: queryResult.totalCount,
+                                ),
+
+                              // Documents View Sub-Header: Pagination
+                              if (_activeTabIndex >= 0 && _activeTab == 'documents')
+                                _buildDocumentsPagination(queryResult),
+
+                              // Active Tab Content View
+                              Expanded(
+                                child: Container(
+                                  color: _theme.bgApp,
+                                  child: _activeTab == 'documents'
+                                      ? _buildActiveTabView(activeColl, pageDocs)
+                                      : SingleChildScrollView(
+                                          padding: const EdgeInsets.all(16.0),
+                                          child: _buildActiveTabView(activeColl, pageDocs),
+                                        ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  // Dockable Mongosh Shell at Bottom
+                  CompassTerminal(
+                    isOpen: _isTerminalOpen,
+                    onClose: () {
+                      setState(() => _isTerminalOpen = false);
+                    },
+                    activeDbName: _selectedDbName,
+                    onExecuteCommand: (command) => _executeTerminalCommand(command),
+                    onRequestConfirmation: _requestTerminalConfirmation,
+                  ),
+                ],
+              ),
+
+              // Connection Modal Overlay
+              ConnectionModal(
+                isOpen: _isConnectModalOpen,
+                onClose: () {
+                  setState(() => _isConnectModalOpen = false);
+                },
+                savedConnections: _savedConnections,
+                onConnect: _handleConnectProfile,
+                onSaveConnection: _handleSaveConnection,
+                onDeleteConnection: _handleDeleteConnection,
+                onConnectSampleData: _handleConnectSampleData,
+              ),
+
+              // ---- Popup / modal overlays (mirrors src/App.tsx) ----
+              CreateDbModal(
+                isOpen: _isCreateDbModalOpen,
+                onClose: () => setState(() => _isCreateDbModalOpen = false),
+                onSubmit: _handleCreateDbSubmit,
+              ),
+              CreateCollectionModal(
+                isOpen: _isCreateCollModalOpen,
+                onClose: () => setState(() => _isCreateCollModalOpen = false),
+                databases: dbs,
+                targetDbName: _createCollTargetDb,
+                onCreated: _handleCreateCollSubmit,
+              ),
+              CreateIndexModal(
+                isOpen: _isCreateIndexModalOpen,
+                onClose: () => setState(() => _isCreateIndexModalOpen = false),
+                dbName: _selectedDbName,
+                collName: _selectedCollName,
+                onCreated: () => setState(() {}),
+              ),
+              RenameModal(
+                isOpen: _isRenameModalOpen,
+                onClose: () => setState(() => _isRenameModalOpen = false),
+                type: _renameType,
+                dbName: _renameDbName,
+                collName: _renameCollName,
+                isView: _renameIsView,
+                onSuccess: _handleRenameSuccess,
+              ),
+              DropDatabaseModal(
+                isOpen: _isDropDbModalOpen,
+                onClose: () => setState(() => _isDropDbModalOpen = false),
+                onConfirm: _confirmDropDb,
+                dbName: _dropDbName,
+                collectionsCount: service.getDatabase(_dropDbName)?.collections.length ?? 0,
+              ),
+              DropCollectionModal(
+                isOpen: _isDropCollModalOpen,
+                onClose: () => setState(() => _isDropCollModalOpen = false),
+                onConfirm: _confirmDropColl,
+                dbName: _dropCollDbName,
+                collName: _dropCollName,
+                documentCount: _dropCollDocCount,
+                indexesCount: _dropCollIndexesCount,
+                isView: _dropCollIsView,
+              ),
+              DropIndexModal(
+                isOpen: _isDropIndexModalOpen,
+                onClose: () => setState(() => _isDropIndexModalOpen = false),
+                onConfirm: _confirmDropIndex,
+                dbName: _selectedDbName,
+                collName: _selectedCollName,
+                indexName: _dropIndexName,
+              ),
+              DeleteDocumentModal(
+                isOpen: _isDeleteDocModalOpen,
+                onClose: () => setState(() => _isDeleteDocModalOpen = false),
+                onConfirm: _confirmDeleteDocument,
+                dbName: _selectedDbName,
+                collName: _selectedCollName,
+                documentId: _deleteDocId,
+                document: _deleteDocTarget,
+              ),
+              InsertDocumentModal(
+                isOpen: _isInsertDocModalOpen,
+                onClose: () => setState(() {
+                  _isInsertDocModalOpen = false;
+                  _clonedDoc = null;
+                }),
+                onInsert: _handleInsertDocument,
+                initialDoc: _editingDoc ?? _clonedDoc,
+                isClone: _clonedDoc != null,
+              ),
+              ImportExportModal(
+                isOpen: _isImportExportModalOpen,
+                onClose: () => setState(() => _isImportExportModalOpen = false),
+                mode: _importExportMode,
+                dbName: _selectedDbName,
+                collName: _selectedCollName,
+                documents: docs,
+                onImportComplete: () => setState(() {}),
+              ),
+              ExportLanguageModal(
+                isOpen: _isExportLangModalOpen,
+                onClose: () => setState(() => _isExportLangModalOpen = false),
+                dbName: _selectedDbName,
+                collName: _selectedCollName,
+                filter: _queryOptions.filter,
+                sort: _queryOptions.sort,
+              ),
+              SaveViewModal(
+                isOpen: _isSaveViewModalOpen,
+                onClose: () => setState(() => _isSaveViewModalOpen = false),
+                dbName: _selectedDbName,
+                sourceCollName: _selectedCollName,
+                pipeline: _saveViewPipeline,
+                pipelineJsonString: _saveViewPipelineJson,
+                onViewSaved: (newName) {
+                  // A freshly saved view is a new collection: open it as a tab.
+                  setState(() => _openCollectionTab(_selectedDbName, newName));
+                },
+              ),
+              MongoshConfirmationModal(
+                isOpen: _pendingTerminalOperation != null,
+                operation: _pendingTerminalOperation,
+                onConfirm: _confirmTerminalOperation,
+                onCancel: _closeTerminalConfirmation,
+              ),
+
+              // Touch-only overflow sheet: the header actions that do not
+              // fit on a narrow screen live here.
+              CompassActionSheet(
+                isOpen: _isHeaderActionsOpen,
+                title: 'Actions',
+                onClose: () => setState(() => _isHeaderActionsOpen = false),
+                items: [
+                  CompassActionSheetItem(
+                    label: 'Change connection',
+                    svg: CompassSvgIcons.zap,
+                    onTap: () {
+                      setState(() => _isConnectModalOpen = true);
+                    },
+                  ),
+                  if (_realService == null)
+                    CompassActionSheetItem(
+                      label: 'Reset sample data',
+                      svg: CompassSvgIcons.rotateCcw,
+                      onTap: _handleResetData,
+                    ),
+                  CompassActionSheetItem(
+                    label: _isTerminalOpen ? 'Close _mongosh' : 'Open _mongosh',
+                    svg: CompassSvgIcons.terminal,
+                    onTap: () {
+                      setState(() => _isTerminalOpen = !_isTerminalOpen);
+                    },
+                  ),
+                  if (_connection != null)
+                    CompassActionSheetItem(
+                      label: 'Disconnect',
+                      svg: CompassSvgIcons.close,
+                      destructive: true,
+                      onTap: _handleDisconnect,
+                    ),
+                ],
+              ),
+
+              // Touch-only overflow sheet: the query-bar actions that do not
+              // fit on a narrow screen live here. It has to be a root-level
+              // child — the sheet is a `Positioned.fill` overlay, so hosting
+              // it inside the query bar would squeeze it into a sliver.
+              CompassActionSheet(
+                isOpen: _isQueryActionsOpen,
+                title: 'Query actions',
+                onClose: () => setState(() => _isQueryActionsOpen = false),
+                items: [
+                  CompassActionSheetItem(
+                    label: _isQueryOptionsExpanded
+                        ? 'Hide options'
+                        : 'Options (project, sort, skip, limit)',
+                    svg: CompassSvgIcons.sliders,
+                    onTap: () {
+                      setState(() {
+                        _isQueryOptionsExpanded = !_isQueryOptionsExpanded;
+                      });
+                    },
+                  ),
+                  CompassActionSheetItem(
+                    label: 'Reset query',
+                    svg: CompassSvgIcons.rotateCcw,
+                    onTap: () {
+                      setState(() => _queryOptions = QueryFilterOptions());
+                    },
+                  ),
+                  CompassActionSheetItem(
+                    label: 'Show generated code',
+                    svg: CompassSvgIcons.code,
+                    onTap: _openExportLanguage,
+                  ),
+                ],
+              ),
+            ],
+          ),
+        );
+
+        // Touch-sized targets below the breakpoint, mouse-sized above it.
+        return CompassDensity.forWidth(
+          width: constraints.maxWidth,
+          child: appShell,
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     Widget content = Directionality(
       textDirection: TextDirection.ltr,
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          final isDesktop = constraints.maxWidth >= 768;
-
-          final service = mongoEngine;
-          final dbs = service.getDatabases();
-          final activeDb = service.getDatabase(_selectedDbName);
-          final activeColl = activeDb?.collections[_selectedCollName];
-          final docs = activeColl?.documents ?? [];
-          final queryResult = service.findDocuments(_selectedDbName, _selectedCollName, _queryOptions);
-          final pageDocs = queryResult.documents;
-
-          return Container(
-            color: _theme.bgApp,
-            child: Stack(
-              children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    // Header (h-14 / 56px)
-                    CompassHeader(
-                      connection: _connection,
-                      showResetSample: _realService == null,
-                      onOpenConnectModal: () {
-                        setState(() => _isConnectModalOpen = true);
-                      },
-                      onDisconnect: _handleDisconnect,
-                      onResetData: _handleResetData,
-                      isTerminalOpen: _isTerminalOpen,
-                      onToggleTerminal: () {
-                        setState(() => _isTerminalOpen = !_isTerminalOpen);
-                      },
-                      isDarkMode: _isDarkMode,
-                      onToggleDarkMode: () {
-                        setState(() => _isDarkMode = !_isDarkMode);
-                      },
-                      onToggleMobileSidebar: () {
-                        setState(() => _isMobileSidebarOpen = !_isMobileSidebarOpen);
-                      },
-                    ),
-
-                    // Main Body: Side-by-side on desktop, or off-canvas sidebar
-                    Expanded(
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          if (isDesktop || _isMobileSidebarOpen)
-                            CompassSidebar(
-                              databases: dbs,
-                              selectedDb: _selectedDbName,
-                              selectedColl: _selectedCollName,
-                              onSelectDatabase: (dbName) {
-                                setState(() {
-                                  final db = service.getDatabase(dbName);
-                                  final collName = db?.collections.keys.firstOrNull ?? '';
-                                  if (collName.isNotEmpty) {
-                                    _openCollectionTab(dbName, collName);
-                                  } else {
-                                    _selectedDbName = dbName;
-                                    _selectedCollName = '';
-                                  }
-                                  _isMobileSidebarOpen = false;
-                                });
-                              },
-                              onSelectCollection: (dbName, collName) {
-                                setState(() {
-                                  _openCollectionTab(dbName, collName);
-                                  _isMobileSidebarOpen = false;
-                                });
-                              },
-                              onOpenCreateDb: _openCreateDb,
-                              onOpenCreateColl: (dbName) => _openCreateCollection(dbName),
-                              onRenameDb: _openRenameDb,
-                              onRenameColl: (dbName, collName, isView) =>
-                                  _openRenameColl(dbName, collName, isView),
-                              onDropDb: _openDropDb,
-                              onDropColl: _openDropColl,
-                              onRefresh: () {
-                                setState(() {});
-                              },
-                            ),
-
-                          // Active Collection Main Pane
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.stretch,
-                              children: [
-                                if (_openTabs.isNotEmpty)
-                                  CollectionTabBar(
-                                    tabs: _openTabs,
-                                    activeIndex: _activeTabIndex,
-                                    onSelect: (index) {
-                                      setState(() => _activateTabIndex(index));
-                                    },
-                                    onClose: (index) {
-                                      setState(() => _removeTabAt(index));
-                                    },
-                                  ),
-
-                                // Collection Header Bar: Title, Breadcrumbs, Tab Switcher
-                                if (_activeTabIndex >= 0)
-                                  _buildCollectionHeader(activeDb, activeColl),
-
-                                // Query Bar (only shown while a collection tab is open)
-                                if (_activeTabIndex >= 0 && _activeTab == 'documents')
-                                  CompassQueryBar(
-                                    options: _queryOptions,
-                                    onChangeOptions: (updated) {
-                                      setState(() => _queryOptions = updated);
-                                    },
-                                    onExecuteQuery: () {
-                                      setState(() {});
-                                    },
-                                    onResetQuery: () {
-                                      setState(() => _queryOptions = QueryFilterOptions());
-                                    },
-                                    onExportToLanguage: _openExportLanguage,
-                                    executionTimeMs: queryResult.executionTimeMs,
-                                    totalResultsCount: queryResult.totalCount,
-                                  ),
-
-                                // Documents View Sub-Header: Pagination
-                                if (_activeTabIndex >= 0 && _activeTab == 'documents')
-                                  _buildDocumentsPagination(queryResult),
-
-                                // Active Tab Content View
-                                Expanded(
-                                  child: Container(
-                                    color: _theme.bgApp,
-                                    child: SingleChildScrollView(
-                                      padding: const EdgeInsets.all(16.0),
-                                      child: _buildActiveTabView(activeColl, pageDocs),
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-
-                    // Dockable Mongosh Shell at Bottom
-                    CompassTerminal(
-                      isOpen: _isTerminalOpen,
-                      onClose: () {
-                        setState(() => _isTerminalOpen = false);
-                      },
-                      activeDbName: _selectedDbName,
-                      onExecuteCommand: (command) => _executeTerminalCommand(command),
-                      onRequestConfirmation: _requestTerminalConfirmation,
-                    ),
-                  ],
-                ),
-
-                // Connection Modal Overlay
-                ConnectionModal(
-                  isOpen: _isConnectModalOpen,
-                  onClose: () {
-                    setState(() => _isConnectModalOpen = false);
-                  },
-                  savedConnections: _savedConnections,
-                  onConnect: _handleConnectProfile,
-                  onSaveConnection: _handleSaveConnection,
-                  onDeleteConnection: _handleDeleteConnection,
-                  onConnectSampleData: _handleConnectSampleData,
-                ),
-
-                // ---- Popup / modal overlays (mirrors src/App.tsx) ----
-                CreateDbModal(
-                  isOpen: _isCreateDbModalOpen,
-                  onClose: () => setState(() => _isCreateDbModalOpen = false),
-                  onSubmit: _handleCreateDbSubmit,
-                ),
-                CreateCollectionModal(
-                  isOpen: _isCreateCollModalOpen,
-                  onClose: () => setState(() => _isCreateCollModalOpen = false),
-                  databases: dbs,
-                  targetDbName: _createCollTargetDb,
-                  onCreated: _handleCreateCollSubmit,
-                ),
-                CreateIndexModal(
-                  isOpen: _isCreateIndexModalOpen,
-                  onClose: () => setState(() => _isCreateIndexModalOpen = false),
-                  dbName: _selectedDbName,
-                  collName: _selectedCollName,
-                  onCreated: () => setState(() {}),
-                ),
-                RenameModal(
-                  isOpen: _isRenameModalOpen,
-                  onClose: () => setState(() => _isRenameModalOpen = false),
-                  type: _renameType,
-                  dbName: _renameDbName,
-                  collName: _renameCollName,
-                  isView: _renameIsView,
-                  onSuccess: _handleRenameSuccess,
-                ),
-                DropDatabaseModal(
-                  isOpen: _isDropDbModalOpen,
-                  onClose: () => setState(() => _isDropDbModalOpen = false),
-                  onConfirm: _confirmDropDb,
-                  dbName: _dropDbName,
-                  collectionsCount: service.getDatabase(_dropDbName)?.collections.length ?? 0,
-                ),
-                DropCollectionModal(
-                  isOpen: _isDropCollModalOpen,
-                  onClose: () => setState(() => _isDropCollModalOpen = false),
-                  onConfirm: _confirmDropColl,
-                  dbName: _dropCollDbName,
-                  collName: _dropCollName,
-                  documentCount: _dropCollDocCount,
-                  indexesCount: _dropCollIndexesCount,
-                  isView: _dropCollIsView,
-                ),
-                DropIndexModal(
-                  isOpen: _isDropIndexModalOpen,
-                  onClose: () => setState(() => _isDropIndexModalOpen = false),
-                  onConfirm: _confirmDropIndex,
-                  dbName: _selectedDbName,
-                  collName: _selectedCollName,
-                  indexName: _dropIndexName,
-                ),
-                DeleteDocumentModal(
-                  isOpen: _isDeleteDocModalOpen,
-                  onClose: () => setState(() => _isDeleteDocModalOpen = false),
-                  onConfirm: _confirmDeleteDocument,
-                  dbName: _selectedDbName,
-                  collName: _selectedCollName,
-                  documentId: _deleteDocId,
-                  document: _deleteDocTarget,
-                ),
-                InsertDocumentModal(
-                  isOpen: _isInsertDocModalOpen,
-                  onClose: () => setState(() {
-                    _isInsertDocModalOpen = false;
-                    _clonedDoc = null;
-                  }),
-                  onInsert: _handleInsertDocument,
-                  initialDoc: _editingDoc ?? _clonedDoc,
-                  isClone: _clonedDoc != null,
-                ),
-                ImportExportModal(
-                  isOpen: _isImportExportModalOpen,
-                  onClose: () => setState(() => _isImportExportModalOpen = false),
-                  mode: _importExportMode,
-                  dbName: _selectedDbName,
-                  collName: _selectedCollName,
-                  documents: docs,
-                  onImportComplete: () => setState(() {}),
-                ),
-                ExportLanguageModal(
-                  isOpen: _isExportLangModalOpen,
-                  onClose: () => setState(() => _isExportLangModalOpen = false),
-                  dbName: _selectedDbName,
-                  collName: _selectedCollName,
-                  filter: _queryOptions.filter,
-                  sort: _queryOptions.sort,
-                ),
-                SaveViewModal(
-                  isOpen: _isSaveViewModalOpen,
-                  onClose: () => setState(() => _isSaveViewModalOpen = false),
-                  dbName: _selectedDbName,
-                  sourceCollName: _selectedCollName,
-                  pipeline: _saveViewPipeline,
-                  pipelineJsonString: _saveViewPipelineJson,
-                  onViewSaved: (newName) {
-                    // A freshly saved view is a new collection: open it as a tab.
-                    setState(() => _openCollectionTab(_selectedDbName, newName));
-                  },
-                ),
-                MongoshConfirmationModal(
-                  isOpen: _pendingTerminalOperation != null,
-                  operation: _pendingTerminalOperation,
-                  onConfirm: _confirmTerminalOperation,
-                  onCancel: _closeTerminalConfirmation,
-                ),
-              ],
-            ),
-          );
-        },
+      child: TapRegionSurface(
+        // [TapRegionSurface] is what [WidgetsApp] would normally provide: it
+        // tells the text fields when the user taps outside of them, which is
+        // how the copy / paste context menu is dismissed. It has to wrap the
+        // overlay so that the menu — which lives in the overlay — counts as
+        // part of the field's region.
+        child: Overlay(
+          // The context menu may extend past the window edge (it is anchored
+          // to the text field), so the overlay must not clip its entries.
+          clipBehavior: Clip.none,
+          initialEntries: <OverlayEntry>[_shellEntry],
+        ),
       ),
     );
 
@@ -1040,45 +1193,59 @@ class _CompassAppState extends State<CompassApp> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Row(
-                  children: [
-                    CompassSvg(
-                      svgString: CompassSvgIcons.database,
-                      size: 15.0,
-                      color: _theme.accent,
-                    ),
-                    const SizedBox(width: 6.0),
-                    Text(
-                      _selectedDbName,
-                      style: CompassTypography.header(color: _theme.textPrimary),
-                    ),
-                    const SizedBox(width: 8.0),
-                    Text('>', style: CompassTypography.caption(color: _theme.textMuted)),
-                    const SizedBox(width: 8.0),
-                    CompassSvg(
-                      svgString: CompassSvgIcons.table,
-                      size: 15.0,
-                      color: _theme.textSecondary,
-                    ),
-                    const SizedBox(width: 6.0),
-                    Text(
-                      _selectedCollName,
-                      style: CompassTypography.title(color: _theme.textPrimary),
-                    ),
-                    const SizedBox(width: 8.0),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6.0, vertical: 2.0),
-                      decoration: BoxDecoration(
-                        color: _theme.bgSubtle,
-                        borderRadius: BorderRadius.circular(4.0),
-                        border: Border.all(color: _theme.border, width: 1.0),
+                // The breadcrumb takes whatever the actions leave behind and
+                // ellipsizes the names instead of overflowing.
+                Expanded(
+                  child: Row(
+                    children: [
+                      CompassSvg(
+                        svgString: CompassSvgIcons.database,
+                        size: 15.0,
+                        color: _theme.accent,
                       ),
-                      child: Text(
-                        '${activeColl?.documents.length ?? 0} docs',
-                        style: CompassTypography.caption(color: _theme.textMuted),
+                      const SizedBox(width: 6.0),
+                      Flexible(
+                        child: Text(
+                          _selectedDbName,
+                          overflow: TextOverflow.ellipsis,
+                          maxLines: 1,
+                          style: CompassTypography.header(color: _theme.textPrimary),
+                        ),
                       ),
-                    ),
-                  ],
+                      const SizedBox(width: 8.0),
+                      Text('>', style: CompassTypography.caption(color: _theme.textMuted)),
+                      const SizedBox(width: 8.0),
+                      CompassSvg(
+                        svgString: CompassSvgIcons.table,
+                        size: 15.0,
+                        color: _theme.textSecondary,
+                      ),
+                      const SizedBox(width: 6.0),
+                      Flexible(
+                        child: Text(
+                          _selectedCollName,
+                          overflow: TextOverflow.ellipsis,
+                          maxLines: 1,
+                          style: CompassTypography.title(color: _theme.textPrimary),
+                        ),
+                      ),
+                      if (!_isTouchLayout) ...[
+                        const SizedBox(width: 8.0),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6.0, vertical: 2.0),
+                          decoration: BoxDecoration(
+                            color: _theme.bgSubtle,
+                            borderRadius: BorderRadius.circular(4.0),
+                            border: Border.all(color: _theme.border, width: 1.0),
+                          ),
+                          child: Text(
+                            '${activeColl?.documents.length ?? 0} docs',
+                            style: CompassTypography.caption(color: _theme.textMuted),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
                 ),
 
                 // Right-side actions: collection actions + view mode switcher
@@ -1139,35 +1306,7 @@ class _CompassAppState extends State<CompassApp> {
                   padding: const EdgeInsets.symmetric(horizontal: 16.0),
                   child: Row(
                     children: [
-                      if (activeColl.isView)
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10.0, vertical: 5.0),
-                          decoration: BoxDecoration(
-                            color: CompassColors.warningAmberBg,
-                            borderRadius: BorderRadius.circular(6.0),
-                            border: Border.all(color: CompassColors.warningAmberBorder, width: 1.0),
-                          ),
-                          child: Row(
-                            children: [
-                              const CompassSvg(
-                                svgString: CompassSvgIcons.eye,
-                                size: 13.0,
-                                color: CompassColors.warningAmber,
-                              ),
-                              const SizedBox(width: 6.0),
-                              Text(
-                                'Read-Only View',
-                                style: CompassTypography.bodyMedium(color: CompassColors.warningAmber),
-                              ),
-                            ],
-                          ),
-                        )
-                      else
-                        CompassPrimaryButton(
-                          label: 'Insert Document',
-                          iconSvg: CompassSvgIcons.plus,
-                          onTap: _openInsertDocument,
-                        ),
+                      _buildDocumentsAction(activeColl),
                       const SizedBox(width: 8.0),
                       _buildHeaderAction(
                         svg: CompassSvgIcons.upload,
@@ -1189,6 +1328,65 @@ class _CompassAppState extends State<CompassApp> {
           ),
         ],
       ),
+    );
+  }
+
+  /// The documents-tab primary action: "Insert Document", or the read-only
+  /// badge when the open collection is a view.
+  ///
+  /// On touch layouts the labelled variants do not fit next to the tab strip,
+  /// so they collapse into icon buttons.
+  Widget _buildDocumentsAction(MongoCollection activeColl) {
+    if (activeColl.isView) {
+      if (_isTouchLayout) {
+        return CompassIconButton(
+          svgString: CompassSvgIcons.eye,
+          onTap: () {},
+          size: 15.0,
+          padding: 8.0,
+          color: CompassColors.warningAmber,
+          semanticLabel: 'Read-only view',
+        );
+      }
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10.0, vertical: 5.0),
+        decoration: BoxDecoration(
+          color: CompassColors.warningAmberBg,
+          borderRadius: BorderRadius.circular(6.0),
+          border: Border.all(color: CompassColors.warningAmberBorder, width: 1.0),
+        ),
+        child: Row(
+          children: [
+            const CompassSvg(
+              svgString: CompassSvgIcons.eye,
+              size: 13.0,
+              color: CompassColors.warningAmber,
+            ),
+            const SizedBox(width: 6.0),
+            Text(
+              'Read-Only View',
+              style: CompassTypography.bodyMedium(color: CompassColors.warningAmber),
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (_isTouchLayout) {
+      return CompassIconButton(
+        svgString: CompassSvgIcons.plus,
+        onTap: _openInsertDocument,
+        size: 15.0,
+        padding: 8.0,
+        color: _theme.accent,
+        semanticLabel: 'Insert document',
+      );
+    }
+
+    return CompassPrimaryButton(
+      label: 'Insert Document',
+      iconSvg: CompassSvgIcons.plus,
+      onTap: _openInsertDocument,
     );
   }
 
@@ -1234,6 +1432,19 @@ class _CompassAppState extends State<CompassApp> {
     required Color iconColor,
     required VoidCallback onTap,
   }) {
+    // On a narrow window the labelled chip does not fit next to the
+    // breadcrumbs, so it collapses into a finger-sized icon button.
+    if (_isCompactLayout) {
+      return CompassIconButton(
+        svgString: svg,
+        onTap: onTap,
+        size: 15.0,
+        padding: 8.0,
+        color: iconColor,
+        semanticLabel: label,
+      );
+    }
+
     return GestureDetector(
       onTap: onTap,
       child: Container(
@@ -1313,62 +1524,80 @@ class _CompassAppState extends State<CompassApp> {
     final canGoPrev = skip > 0 && total > 0;
     final canGoNext = (skip + pageSize) < total;
 
+    final viewModeSwitcher = Container(
+      padding: const EdgeInsets.all(2.0),
+      decoration: BoxDecoration(
+        color: _theme.bgSubtle,
+        borderRadius: BorderRadius.circular(6.0),
+        border: Border.all(color: _theme.border, width: 1.0),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _buildViewModeBtn('tree', CompassSvgIcons.layers, 'Tree'),
+          const SizedBox(width: 2.0),
+          _buildViewModeBtn('json', CompassSvgIcons.code, 'JSON'),
+          const SizedBox(width: 2.0),
+          _buildViewModeBtn('table', CompassSvgIcons.table, 'Table'),
+        ],
+      ),
+    );
+
+    final pager = Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(rangeLabel, style: CompassTypography.monoSmall(color: _theme.textMuted)),
+        const SizedBox(width: 12.0),
+        _buildPageButton(
+          svg: CompassSvgIcons.chevronLeft,
+          tooltip: 'Previous page',
+          enabled: canGoPrev,
+          onTap: () {
+            setState(() {
+              final next = skip - pageSize;
+              _queryOptions = _queryOptions.copyWith(skip: next < 0 ? 0 : next);
+            });
+          },
+        ),
+        const SizedBox(width: 4.0),
+        _buildPageButton(
+          svg: CompassSvgIcons.chevronRight,
+          tooltip: 'Next page',
+          enabled: canGoNext,
+          onTap: () {
+            setState(() => _queryOptions = _queryOptions.copyWith(skip: skip + pageSize));
+          },
+        ),
+      ],
+    );
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 6.0),
       decoration: BoxDecoration(
         color: _theme.bgPanel,
         border: Border(bottom: BorderSide(color: _theme.border, width: 1.0)),
       ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          // Left: document view mode switcher (Tree / JSON / Table)
-          Container(
-            padding: const EdgeInsets.all(2.0),
-            decoration: BoxDecoration(
-              color: _theme.bgSubtle,
-              borderRadius: BorderRadius.circular(6.0),
-              border: Border.all(color: _theme.border, width: 1.0),
-            ),
-            child: Row(
+      // On a phone the switcher, the range label and the pager do not fit on
+      // one line, so they scroll sideways instead of being clipped.
+      child: _isTouchLayout
+          ? SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  viewModeSwitcher,
+                  const SizedBox(width: 16.0),
+                  pager,
+                ],
+              ),
+            )
+          : Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                _buildViewModeBtn('tree', CompassSvgIcons.layers, 'Tree'),
-                const SizedBox(width: 2.0),
-                _buildViewModeBtn('json', CompassSvgIcons.code, 'JSON'),
-                const SizedBox(width: 2.0),
-                _buildViewModeBtn('table', CompassSvgIcons.table, 'Table'),
+                viewModeSwitcher,
+                pager,
               ],
             ),
-          ),
-          // Right: result range + page navigator
-          Row(
-            children: [
-              Text(rangeLabel, style: CompassTypography.monoSmall(color: _theme.textMuted)),
-              const SizedBox(width: 12.0),
-              _buildPageButton(
-                svg: CompassSvgIcons.chevronLeft,
-                tooltip: 'Previous page',
-                enabled: canGoPrev,
-                onTap: () {
-                  setState(() {
-                    final next = skip - pageSize;
-                    _queryOptions = _queryOptions.copyWith(skip: next < 0 ? 0 : next);
-                  });
-                },
-              ),
-              const SizedBox(width: 4.0),
-              _buildPageButton(
-                svg: CompassSvgIcons.chevronRight,
-                tooltip: 'Next page',
-                enabled: canGoNext,
-                onTap: () {
-                  setState(() => _queryOptions = _queryOptions.copyWith(skip: skip + pageSize));
-                },
-              ),
-            ],
-          ),
-        ],
-      ),
     );
   }
 
@@ -1378,16 +1607,13 @@ class _CompassAppState extends State<CompassApp> {
     required bool enabled,
     required VoidCallback onTap,
   }) {
-    return GestureDetector(
+    return CompassIconButton(
+      svgString: svg,
       onTap: enabled ? onTap : null,
-      child: Container(
-        padding: const EdgeInsets.all(4.0),
-        child: CompassSvg(
-          svgString: svg,
-          size: 16.0,
-          color: enabled ? _theme.textSecondary : _theme.border,
-        ),
-      ),
+      size: 16.0,
+      padding: 4.0,
+      color: enabled ? _theme.textSecondary : _theme.border,
+      semanticLabel: tooltip,
     );
   }
 

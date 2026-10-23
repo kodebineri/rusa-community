@@ -1,6 +1,8 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Required to talk to a real MongoDB server (mongodb:// and mongodb+srv://). -->
+    <uses-permission android:name="android.permission.INTERNET"/>
     <application
-        android:label="mongodb_compass_flutter"
+        android:label="MongoDB Compass"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity

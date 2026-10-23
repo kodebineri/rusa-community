@@ -3,6 +3,7 @@ import '../../theme/compass_colors.dart';
 import '../../theme/compass_theme.dart';
 import '../../theme/compass_typography.dart';
 import '../../icons/compass_svg_icons.dart';
+import '../compass_icon_button.dart';
 
 /// Converted from src/components/ExportLanguageModal.tsx
 /// Includes Dart / Flutter mongo_dart code generation!
@@ -130,13 +131,13 @@ for doc in cursor:
                       ),
                     ],
                   ),
-                  GestureDetector(
+                  CompassIconButton(
+                    svgString: CompassSvgIcons.close,
                     onTap: widget.onClose,
-                    child: CompassSvg(
-                      svgString: CompassSvgIcons.close,
-                      size: 14.0,
-                      color: _theme.textMuted,
-                    ),
+                    size: 14.0,
+                    padding: 4.0,
+                    color: _theme.textMuted,
+                    semanticLabel: 'Close',
                   ),
                 ],
               ),

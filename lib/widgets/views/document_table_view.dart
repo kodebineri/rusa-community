@@ -4,6 +4,8 @@ import '../../theme/compass_theme.dart';
 import '../../theme/compass_typography.dart';
 import '../../icons/compass_svg_icons.dart';
 import '../../models/mongo_models.dart';
+import '../../theme/compass_density.dart';
+import '../compass_icon_button.dart';
 
 /// Converted from src/components/DocumentTableView.tsx
 /// Adheres strictly to:
@@ -74,7 +76,13 @@ class _DocumentTableViewState extends State<DocumentTableView> {
       });
     }
 
+    final density = CompassDensity.of(context);
+    // Two finger-sized action buttons need more room than the mouse-sized
+    // ones, so the actions column grows on touch layouts.
+    final actionsWidth = density.isTouch ? 132.0 : 100.0;
+
     return Container(
+      margin: EdgeInsets.all(density.isTouch ? 12.0 : 16.0),
       decoration: BoxDecoration(
         color: _theme.bgPanel,
         borderRadius: BorderRadius.circular(8.0),
@@ -94,7 +102,7 @@ class _DocumentTableViewState extends State<DocumentTableView> {
           children: [
             // Table Header Row
             Container(
-              height: 38.0,
+              height: density.isTouch ? 44.0 : 38.0,
               decoration: BoxDecoration(
                 color: _theme.bgSubtle,
                 border: Border(
@@ -147,7 +155,7 @@ class _DocumentTableViewState extends State<DocumentTableView> {
                     ),
                   // Actions header
                   Container(
-                    width: 100.0,
+                    width: actionsWidth,
                     padding: const EdgeInsets.symmetric(horizontal: 12.0),
                     alignment: Alignment.centerRight,
                     child: Text(
@@ -169,8 +177,11 @@ class _DocumentTableViewState extends State<DocumentTableView> {
   }
 
   Widget _buildTableRow(MongoDocument doc, int index, List<String> allKeys) {
+    final density = CompassDensity.of(context);
+    final actionsWidth = density.isTouch ? 132.0 : 100.0;
+
     return Container(
-      height: 36.0,
+      height: density.rowHeight,
       decoration: BoxDecoration(
         border: Border(
           bottom: BorderSide(color: _theme.border, width: 1.0),
@@ -204,7 +215,7 @@ class _DocumentTableViewState extends State<DocumentTableView> {
 
           // Actions cell
           Container(
-            width: 100.0,
+            width: actionsWidth,
             padding: const EdgeInsets.symmetric(horizontal: 12.0),
             alignment: Alignment.centerRight,
             decoration: BoxDecoration(
@@ -215,28 +226,22 @@ class _DocumentTableViewState extends State<DocumentTableView> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
-                GestureDetector(
+                CompassIconButton(
+                  svgString: CompassSvgIcons.pencil,
                   onTap: () => widget.onEditDocument(doc),
-                  child: Container(
-                    padding: const EdgeInsets.all(4.0),
-                    child: const CompassSvg(
-                      svgString: CompassSvgIcons.pencil,
-                      size: 13.0,
-                      color: CompassColors.warningAmber,
-                    ),
-                  ),
+                  size: 13.0,
+                  padding: 4.0,
+                  color: CompassColors.warningAmber,
+                  semanticLabel: 'Edit document',
                 ),
                 const SizedBox(width: 4.0),
-                GestureDetector(
+                CompassIconButton(
+                  svgString: CompassSvgIcons.trash,
                   onTap: () => widget.onDeleteDocument(doc.id, doc),
-                  child: Container(
-                    padding: const EdgeInsets.all(4.0),
-                    child: const CompassSvg(
-                      svgString: CompassSvgIcons.trash,
-                      size: 13.0,
-                      color: CompassColors.errorRed,
-                    ),
-                  ),
+                  size: 13.0,
+                  padding: 4.0,
+                  color: CompassColors.errorRed,
+                  semanticLabel: 'Delete document',
                 ),
               ],
             ),

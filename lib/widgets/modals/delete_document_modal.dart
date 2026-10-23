@@ -7,6 +7,7 @@ import '../../models/mongo_models.dart';
 import '../../theme/compass_colors.dart';
 import '../../theme/compass_theme.dart';
 import '../../theme/compass_typography.dart';
+import '../compass_icon_button.dart';
 import 'compass_modal.dart';
 
 /// Converted from src/components/DeleteDocumentModal.tsx
@@ -146,13 +147,13 @@ class _DeleteDocumentModalState extends State<DeleteDocumentModal> {
                 ),
               ),
               const SizedBox(width: 8.0),
-              GestureDetector(
+              CompassIconButton(
+                svgString: _copied ? CompassSvgIcons.check : CompassSvgIcons.copy,
                 onTap: _copyId,
-                child: CompassSvg(
-                  svgString: _copied ? CompassSvgIcons.check : CompassSvgIcons.copy,
-                  size: 14.0,
-                  color: _copied ? _theme.accent : _theme.textMuted,
-                ),
+                size: 14.0,
+                padding: 4.0,
+                color: _copied ? _theme.accent : _theme.textMuted,
+                semanticLabel: _copied ? 'Copied' : 'Copy document id',
               ),
             ],
           ),

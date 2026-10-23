@@ -2,10 +2,14 @@ import 'dart:convert';
 
 import 'package:flutter/widgets.dart';
 import '../theme/compass_colors.dart';
+import '../theme/compass_density.dart';
 import '../theme/compass_theme.dart';
 import '../theme/compass_typography.dart';
 import '../icons/compass_svg_icons.dart';
 import '../models/mongo_models.dart';
+import 'compass_hover.dart';
+import 'compass_icon_button.dart';
+import 'compass_text_menu.dart';
 
 /// Converted from src/components/QueryBar.tsx
 /// Adheres strictly to:
@@ -23,6 +27,22 @@ class CompassQueryBar extends StatefulWidget {
   final double? executionTimeMs;
   final int? totalResultsCount;
 
+  /// Whether the options panel (project / sort / skip / limit) is expanded.
+  ///
+  /// The state lives in the host so that the overflow action sheet — which
+  /// is a *root-level* overlay, see [CompassActionSheet] — can toggle it.
+  final bool optionsExpanded;
+
+  /// Toggles the options panel.
+  final VoidCallback onToggleOptions;
+
+  /// Opens the host's overflow action sheet.
+  ///
+  /// The sheet cannot be rendered from inside this widget: it is a
+  /// `Positioned.fill` child of the root `Stack` in `main.dart`, so it has
+  /// to be hosted there.
+  final VoidCallback onOpenOverflow;
+
   const CompassQueryBar({
     super.key,
     required this.options,
@@ -30,6 +50,9 @@ class CompassQueryBar extends StatefulWidget {
     required this.onExecuteQuery,
     required this.onResetQuery,
     required this.onExportToLanguage,
+    required this.optionsExpanded,
+    required this.onToggleOptions,
+    required this.onOpenOverflow,
     this.executionTimeMs,
     this.totalResultsCount,
   });
@@ -39,7 +62,6 @@ class CompassQueryBar extends StatefulWidget {
 }
 
 class _CompassQueryBarState extends State<CompassQueryBar> {
-  bool _isOptionsExpanded = false;
   bool _filterError = false;
 
   late final TextEditingController _filterController;
@@ -53,6 +75,16 @@ class _CompassQueryBarState extends State<CompassQueryBar> {
   final FocusNode _sortFocus = FocusNode(debugLabel: 'query-sort');
   final FocusNode _skipFocus = FocusNode(debugLabel: 'query-skip');
   final FocusNode _limitFocus = FocusNode(debugLabel: 'query-limit');
+
+  /// Anchors the text context menu to each input box.
+  ///
+  /// Every field needs its own link: the menu is positioned relative to the
+  /// [CompositedTransformTarget] that wraps the box the user is editing.
+  late final LayerLink _filterMenuAnchor = LayerLink();
+  late final LayerLink _projectMenuAnchor = LayerLink();
+  late final LayerLink _sortMenuAnchor = LayerLink();
+  late final LayerLink _skipMenuAnchor = LayerLink();
+  late final LayerLink _limitMenuAnchor = LayerLink();
 
   @override
   void initState() {
@@ -179,6 +211,17 @@ class _CompassQueryBarState extends State<CompassQueryBar> {
   @override
   Widget build(BuildContext context) {
     final theme = CompassTheme.of(context);
+    final density = CompassDensity.of(context);
+
+    // Keyboard hints are pointless without a keyboard, and the stats ribbon
+    // is the one row that cannot shrink.
+    final windowWidth = MediaQuery.maybeOf(context)?.size.width ?? 1440.0;
+    final showKeyboardHint = windowWidth >= 900.0 && !density.isTouch;
+
+    // On very small phones, collapse everything except filter + Find into an
+    // overflow sheet to reclaim vertical space.
+    final isTiny = density.isTouch && windowWidth < 440.0;
+
     return Container(
       decoration: BoxDecoration(
         color: theme.bgPanel,
@@ -186,288 +229,120 @@ class _CompassQueryBarState extends State<CompassQueryBar> {
           bottom: BorderSide(color: theme.border, width: 1.0),
         ),
       ),
-      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 10.0),
+      padding: EdgeInsets.symmetric(horizontal: 16.0, vertical: isTiny ? 6.0 : 10.0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           // Primary Query Row
-          Row(
-            children: [
-              // Main Filter Input
-              Expanded(
-                child: Container(
-                  height: 36.0,
-                  decoration: BoxDecoration(
-                    color: theme.bgInput,
-                    borderRadius: BorderRadius.circular(8.0),
-                    border:
-                        Border.all(color: theme.border, width: 1.0),
-                  ),
-                  padding: const EdgeInsets.symmetric(horizontal: 10.0),
-                  child: Row(
-                    children: [
-                      CompassSvg(
-                        svgString: CompassSvgIcons.search,
-                        size: 14.0,
-                        color: theme.textMuted,
-                      ),
-                      const SizedBox(width: 6.0),
-                      Text(
-                        'FILTER',
-                        style: CompassTypography.monoBold(
-                          color: theme.accent,
-                          size: 11.0,
+          LayoutBuilder(
+            builder: (context, constraints) {
+              if (isTiny) {
+                // One row: filter + Find + overflow. Everything else lives
+                // in the host's action sheet.
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(child: _buildFilterInput(theme, compact: true)),
+                        const SizedBox(width: 6.0),
+                        _buildFindButtonCompact(theme, density),
+                        const SizedBox(width: 4.0),
+                        SizedBox(
+                          width: density.minTapTarget,
+                          height: density.minTapTarget,
+                          child: Semantics(
+                            button: true,
+                            label: 'More query actions',
+                            child: GestureDetector(
+                              behavior: HitTestBehavior.opaque,
+                              onTap: widget.onOpenOverflow,
+                              child: Container(
+                                decoration: BoxDecoration(
+                                  color: theme.bgSubtle,
+                                  borderRadius: BorderRadius.circular(8.0),
+                                  border: Border.all(color: theme.border, width: 1.0),
+                                ),
+                                alignment: Alignment.center,
+                                child: CompassSvg(
+                                  svgString: CompassSvgIcons.moreVertical,
+                                  size: 14.0,
+                                  color: theme.textMuted,
+                                ),
+                              ),
+                            ),
+                          ),
                         ),
-                      ),
-                      const SizedBox(width: 8.0),
-                      Expanded(
-                        child: _buildEditable(
-                          theme: theme,
-                          controller: _filterController,
-                          focusNode: _filterFocus,
-                          placeholder:
-                              "{ field: 'value', year: { \$gte: 1990 } }",
-                          onChanged: _handleFilterChange,
-                          onSubmitted: (_) => widget.onExecuteQuery(),
-                          fontSize: 12.0,
-                        ),
-                      ),
-                      if (_filterError)
-                        const CompassSvg(
-                          svgString: CompassSvgIcons.activity,
-                          size: 14.0,
-                          color: CompassColors.warningAmber,
-                        )
-                      else if (widget.options.filter.trim().isNotEmpty)
-                        CompassSvg(
-                          svgString: CompassSvgIcons.check,
-                          size: 14.0,
-                          color: theme.accent,
-                        ),
-                    ],
-                  ),
-                ),
-              ),
-
-              const SizedBox(width: 8.0),
-
-              // Options Toggle Button
-              GestureDetector(
-                onTap: () {
-                  setState(() {
-                    _isOptionsExpanded = !_isOptionsExpanded;
-                  });
-                },
-                child: Container(
-                  height: 36.0,
-                  padding: const EdgeInsets.symmetric(horizontal: 12.0),
-                  decoration: BoxDecoration(
-                    color: _isOptionsExpanded
-                        ? theme.greenBadgeBg
-                        : theme.bgSubtle,
-                    borderRadius: BorderRadius.circular(8.0),
-                    border: Border.all(
-                      color: _isOptionsExpanded
-                          ? theme.greenBadgeBorder
-                          : theme.border,
-                      width: 1.0,
+                      ],
                     ),
-                  ),
-                  child: Row(
-                    children: [
-                      CompassSvg(
-                        svgString: CompassSvgIcons.sliders,
-                        size: 14.0,
-                        color: _isOptionsExpanded
-                            ? theme.accent
-                            : theme.textSecondary,
-                      ),
-                      const SizedBox(width: 6.0),
-                      Text(
-                        'Options',
-                        style: CompassTypography.bodyMedium(
-                          color: _isOptionsExpanded
-                              ? theme.accent
-                              : theme.textSecondary,
-                        ),
-                      ),
-                      const SizedBox(width: 4.0),
-                      CompassSvg(
-                        svgString: _isOptionsExpanded
-                            ? CompassSvgIcons.chevronUp
-                            : CompassSvgIcons.chevronDown,
-                        size: 12.0,
-                        color: theme.textMuted,
-                      ),
+                    if (widget.optionsExpanded) ...[
+                      const SizedBox(height: 6.0),
+                      _buildOptionsPanel(theme, density),
                     ],
-                  ),
-                ),
-              ),
+                  ],
+                );
+              }
+              final stackActions =
+                  density.isTouch || constraints.maxWidth < 640.0;
+              if (stackActions) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    _buildFilterInput(theme),
+                    const SizedBox(height: 8.0),
+                    Wrap(
+                      alignment: WrapAlignment.end,
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      spacing: 8.0,
+                      runSpacing: 8.0,
+                      children: [
+                        _buildOptionsButton(theme, density),
+                        _buildResetButton(theme),
+                        _buildShowCodeButton(theme, density),
+                        _buildFindButton(theme, density),
+                      ],
+                    ),
+                  ],
+                );
+              }
+              return Row(
+                children: [
+                  // Main Filter Input
+                  Expanded(child: _buildFilterInput(theme)),
 
-              const SizedBox(width: 6.0),
+                  const SizedBox(width: 8.0),
 
-              // Reset Button
-              GestureDetector(
-                onTap: widget.onResetQuery,
-                child: Container(
-                  height: 36.0,
-                  width: 36.0,
-                  decoration: BoxDecoration(
-                    color: theme.bgSubtle,
-                    borderRadius: BorderRadius.circular(8.0),
-                    border:
-                        Border.all(color: theme.border, width: 1.0),
-                  ),
-                  alignment: Alignment.center,
-                  child: CompassSvg(
-                    svgString: CompassSvgIcons.rotateCcw,
-                    size: 14.0,
-                    color: theme.textMuted,
-                  ),
-                ),
-              ),
+                  // Options Toggle Button
+                  _buildOptionsButton(theme, density),
 
-              const SizedBox(width: 6.0),
+                  const SizedBox(width: 6.0),
 
-              // Export to Language
-              GestureDetector(
-                onTap: widget.onExportToLanguage,
-                child: Container(
-                  height: 36.0,
-                  padding: const EdgeInsets.symmetric(horizontal: 12.0),
-                  decoration: BoxDecoration(
-                    color: theme.bgSubtle,
-                    borderRadius: BorderRadius.circular(8.0),
-                    border:
-                        Border.all(color: theme.border, width: 1.0),
-                  ),
-                  child: Row(
-                    children: [
-                      CompassSvg(
-                        svgString: CompassSvgIcons.code,
-                        size: 14.0,
-                        color: theme.accent,
-                      ),
-                      const SizedBox(width: 6.0),
-                      Text(
-                        'Show Code',
-                        style: CompassTypography.bodyMedium(
-                          color: theme.textSecondary,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
+                  // Reset Button
+                  _buildResetButton(theme),
 
-              const SizedBox(width: 8.0),
+                  const SizedBox(width: 6.0),
 
-              // Find Button (Primary)
-              GestureDetector(
-                onTap: widget.onExecuteQuery,
-                child: Container(
-                  height: 36.0,
-                  padding: const EdgeInsets.symmetric(horizontal: 20.0),
-                  decoration: BoxDecoration(
-                    color: theme.accent,
-                    borderRadius: BorderRadius.circular(8.0),
-                    boxShadow: const [
-                      BoxShadow(
-                        color: Color(0x3300ED64),
-                        blurRadius: 4.0,
-                        offset: Offset(0, 1),
-                      ),
-                    ],
-                  ),
-                  alignment: Alignment.center,
-                  child: Text(
-                    'Find',
-                    style: CompassTypography.header(
-                        color: theme.onAccent),
-                  ),
-                ),
-              ),
-            ],
+                  // Export to Language
+                  _buildShowCodeButton(theme, density),
+
+                  const SizedBox(width: 8.0),
+
+                  // Find Button (Primary)
+                  _buildFindButton(theme, density),
+                ],
+              );
+            },
           ),
 
           // Expanded Query Options Panel
-          if (_isOptionsExpanded) ...[
+          if (!isTiny && widget.optionsExpanded) ...[
             const SizedBox(height: 10.0),
-            Container(
-              padding: const EdgeInsets.only(top: 10.0),
-              decoration: BoxDecoration(
-                border: Border(
-                  top: BorderSide(color: theme.border, width: 1.0),
-                ),
-              ),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // PROJECT
-                  Expanded(
-                    flex: 2,
-                    child: _buildOptionField(
-                      theme: theme,
-                      title: 'PROJECT',
-                      subtitle: '1 or 0',
-                      placeholder: "{ title: 1, year: 1, _id: 0 }",
-                      controller: _projectController,
-                      focusNode: _projectFocus,
-                      onChanged: (v) => widget
-                          .onChangeOptions(widget.options.copyWith(project: v)),
-                    ),
-                  ),
-                  const SizedBox(width: 8.0),
-                  // SORT
-                  Expanded(
-                    flex: 2,
-                    child: _buildOptionField(
-                      theme: theme,
-                      title: 'SORT',
-                      subtitle: '1 (asc) / -1 (desc)',
-                      placeholder: "{ year: -1, rating: -1 }",
-                      controller: _sortController,
-                      focusNode: _sortFocus,
-                      onChanged: (v) => widget
-                          .onChangeOptions(widget.options.copyWith(sort: v)),
-                    ),
-                  ),
-                  const SizedBox(width: 8.0),
-                  // SKIP
-                  Expanded(
-                    flex: 1,
-                    child: _buildOptionField(
-                      theme: theme,
-                      title: 'SKIP',
-                      placeholder: "0",
-                      controller: _skipController,
-                      focusNode: _skipFocus,
-                      keyboardType: TextInputType.number,
-                      onChanged: _handleSkipChange,
-                    ),
-                  ),
-                  const SizedBox(width: 8.0),
-                  // LIMIT
-                  Expanded(
-                    flex: 1,
-                    child: _buildOptionField(
-                      theme: theme,
-                      title: 'LIMIT',
-                      placeholder: "20",
-                      controller: _limitController,
-                      focusNode: _limitFocus,
-                      keyboardType: TextInputType.number,
-                      onChanged: _handleLimitChange,
-                    ),
-                  ),
-                ],
-              ),
-            ),
+            _buildOptionsPanel(theme, density),
           ],
 
           // Query Stats Ribbon
-          if (widget.totalResultsCount != null ||
-              widget.executionTimeMs != null) ...[
+          if (!isTiny && (widget.totalResultsCount != null ||
+              widget.executionTimeMs != null)) ...[
             const SizedBox(height: 6.0),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -491,11 +366,14 @@ class _CompassQueryBarState extends State<CompassQueryBar> {
                     ),
                   ],
                 ),
-                Text(
-                  'Tip: Press Enter to find',
-                  style: CompassTypography.caption(
-                      color: theme.textMuted),
-                ),
+                // The "press Enter" hint is a keyboard affordance; on touch
+                // there is no Enter key to press.
+                if (showKeyboardHint)
+                  Text(
+                    'Tip: Press Enter to find',
+                    style: CompassTypography.caption(
+                        color: theme.textMuted),
+                  ),
               ],
             ),
           ],
@@ -512,6 +390,7 @@ class _CompassQueryBarState extends State<CompassQueryBar> {
     required TextEditingController controller,
     required FocusNode focusNode,
     required ValueChanged<String> onChanged,
+    required LayerLink anchorLink,
     TextInputType keyboardType = TextInputType.text,
   }) {
     return Column(
@@ -534,23 +413,27 @@ class _CompassQueryBarState extends State<CompassQueryBar> {
           ],
         ),
         const SizedBox(height: 4.0),
-        Container(
-          height: 30.0,
-          padding: const EdgeInsets.symmetric(horizontal: 8.0),
-          decoration: BoxDecoration(
-            color: theme.bgInput,
-            borderRadius: BorderRadius.circular(4.0),
-            border: Border.all(color: theme.border, width: 1.0),
-          ),
-          alignment: Alignment.centerLeft,
-          child: _buildEditable(
-            theme: theme,
-            controller: controller,
-            focusNode: focusNode,
-            placeholder: placeholder,
-            onChanged: onChanged,
-            keyboardType: keyboardType,
-            fontSize: 11.0,
+        CompositedTransformTarget(
+          link: anchorLink,
+          child: Container(
+            height: 30.0,
+            padding: const EdgeInsets.symmetric(horizontal: 8.0),
+            decoration: BoxDecoration(
+              color: theme.bgInput,
+              borderRadius: BorderRadius.circular(4.0),
+              border: Border.all(color: theme.border, width: 1.0),
+            ),
+            alignment: Alignment.centerLeft,
+            child: _buildEditable(
+              theme: theme,
+              controller: controller,
+              focusNode: focusNode,
+              placeholder: placeholder,
+              onChanged: onChanged,
+              keyboardType: keyboardType,
+              fontSize: 11.0,
+              anchorLink: anchorLink,
+            ),
           ),
         ),
       ],
@@ -568,12 +451,14 @@ class _CompassQueryBarState extends State<CompassQueryBar> {
     required FocusNode focusNode,
     required String placeholder,
     required ValueChanged<String> onChanged,
+    required LayerLink anchorLink,
     ValueChanged<String>? onSubmitted,
     TextInputType keyboardType = TextInputType.text,
     double fontSize = 11.0,
   }) {
     final style = CompassTypography.monoRegular(
         color: theme.textPrimary, size: fontSize);
+    final CompassDensity density = CompassDensity.of(context);
     return ValueListenableBuilder<TextEditingValue>(
       valueListenable: controller,
       builder: (context, value, _) {
@@ -601,10 +486,333 @@ class _CompassQueryBarState extends State<CompassQueryBar> {
               maxLines: 1,
               onChanged: onChanged,
               onSubmitted: onSubmitted,
+              onTapOutside: (event) =>
+                  compassHandleTapOutside(event, focusNode),
+              contextMenuBuilder: compassTextContextMenuBuilderFor(
+                anchorLink,
+                density: density,
+              ),
             ),
           ],
         );
       },
+    );
+  }
+
+  /// The expanded query options panel (project / sort / skip / limit).
+  ///
+  /// On a phone the four fields are stacked: side by side they would each be
+  /// ~80 px wide, which is unusable for a JSON payload.
+  Widget _buildOptionsPanel(CompassTheme theme, CompassDensity density) {
+    final projectField = _buildOptionField(
+      theme: theme,
+      title: 'PROJECT',
+      subtitle: '1 or 0',
+      placeholder: "{ title: 1, year: 1, _id: 0 }",
+      controller: _projectController,
+      focusNode: _projectFocus,
+      onChanged: (v) =>
+          widget.onChangeOptions(widget.options.copyWith(project: v)),
+      anchorLink: _projectMenuAnchor,
+    );
+
+    final sortField = _buildOptionField(
+      theme: theme,
+      title: 'SORT',
+      subtitle: '1 (asc) / -1 (desc)',
+      placeholder: "{ year: -1, rating: -1 }",
+      controller: _sortController,
+      focusNode: _sortFocus,
+      onChanged: (v) =>
+          widget.onChangeOptions(widget.options.copyWith(sort: v)),
+      anchorLink: _sortMenuAnchor,
+    );
+
+    final skipField = _buildOptionField(
+      theme: theme,
+      title: 'SKIP',
+      placeholder: "0",
+      controller: _skipController,
+      focusNode: _skipFocus,
+      keyboardType: TextInputType.number,
+      onChanged: _handleSkipChange,
+      anchorLink: _skipMenuAnchor,
+    );
+
+    final limitField = _buildOptionField(
+      theme: theme,
+      title: 'LIMIT',
+      placeholder: "20",
+      controller: _limitController,
+      focusNode: _limitFocus,
+      keyboardType: TextInputType.number,
+      onChanged: _handleLimitChange,
+      anchorLink: _limitMenuAnchor,
+    );
+
+    return Container(
+      padding: const EdgeInsets.only(top: 10.0),
+      decoration: BoxDecoration(
+        border: Border(
+          top: BorderSide(color: theme.border, width: 1.0),
+        ),
+      ),
+      child: density.isTouch
+          ? Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                projectField,
+                const SizedBox(height: 8.0),
+                sortField,
+                const SizedBox(height: 8.0),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(child: skipField),
+                    const SizedBox(width: 8.0),
+                    Expanded(child: limitField),
+                  ],
+                ),
+              ],
+            )
+          : Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(flex: 2, child: projectField),
+                const SizedBox(width: 8.0),
+                Expanded(flex: 2, child: sortField),
+                const SizedBox(width: 8.0),
+                Expanded(flex: 1, child: skipField),
+                const SizedBox(width: 8.0),
+                Expanded(flex: 1, child: limitField),
+              ],
+            ),
+    );
+  }
+
+  Widget _buildFindButtonCompact(CompassTheme theme, CompassDensity density) {
+    return ConstrainedBox(
+      constraints: BoxConstraints(minHeight: density.minTapTarget),
+      child: CompassHover(
+        onTap: widget.onExecuteQuery,
+        semanticLabel: 'Run query',
+        builder: (hovered) => Container(
+          height: 34.0,
+          padding: const EdgeInsets.symmetric(horizontal: 12.0),
+          decoration: BoxDecoration(
+            color: hovered ? CompassColors.greenHover : theme.accent,
+            borderRadius: BorderRadius.circular(8.0),
+          ),
+          alignment: Alignment.center,
+          child: Text(
+            'Find',
+            style: CompassTypography.header(color: theme.onAccent),
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// The filter input box of the query bar.
+  Widget _buildFilterInput(CompassTheme theme, {bool compact = false}) {
+    return CompositedTransformTarget(
+      link: _filterMenuAnchor,
+      child: Container(
+        height: compact ? 34.0 : 36.0,
+        decoration: BoxDecoration(
+          color: theme.bgInput,
+          borderRadius: BorderRadius.circular(8.0),
+          border:
+              Border.all(color: theme.border, width: 1.0),
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 10.0),
+        child: Row(
+          children: [
+            CompassSvg(
+              svgString: CompassSvgIcons.search,
+              size: 14.0,
+              color: theme.textMuted,
+            ),
+            const SizedBox(width: 6.0),
+            Text(
+              'FILTER',
+              style: CompassTypography.monoBold(
+                color: theme.accent,
+                size: 11.0,
+              ),
+            ),
+            const SizedBox(width: 8.0),
+            Expanded(
+              child: _buildEditable(
+                theme: theme,
+                controller: _filterController,
+                focusNode: _filterFocus,
+                placeholder:
+                    "{ field: 'value', year: { \$gte: 1990 } }",
+                onChanged: _handleFilterChange,
+                onSubmitted: (_) => widget.onExecuteQuery(),
+                fontSize: 12.0,
+                anchorLink: _filterMenuAnchor,
+              ),
+            ),
+            if (_filterError)
+              const CompassSvg(
+                svgString: CompassSvgIcons.activity,
+                size: 14.0,
+                color: CompassColors.warningAmber,
+              )
+            else if (widget.options.filter.trim().isNotEmpty)
+              CompassSvg(
+                svgString: CompassSvgIcons.check,
+                size: 14.0,
+                color: theme.accent,
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Toggles the expanded query options panel.
+  Widget _buildOptionsButton(CompassTheme theme, CompassDensity density) {
+    final expanded = widget.optionsExpanded;
+    return ConstrainedBox(
+      constraints: BoxConstraints(minHeight: density.minTapTarget),
+      child: CompassHover(
+        onTap: widget.onToggleOptions,
+        semanticLabel: 'Query options',
+        builder: (hovered) => Container(
+          height: 36.0,
+          padding: const EdgeInsets.symmetric(horizontal: 12.0),
+          decoration: BoxDecoration(
+            color: expanded
+                ? theme.greenBadgeBg
+                : (hovered ? theme.bgHover : theme.bgSubtle),
+            borderRadius: BorderRadius.circular(8.0),
+            border: Border.all(
+              color: expanded
+                  ? theme.greenBadgeBorder
+                  : (hovered ? theme.borderHover : theme.border),
+              width: 1.0,
+            ),
+          ),
+          child: Row(
+            children: [
+              CompassSvg(
+                svgString: CompassSvgIcons.sliders,
+                size: 14.0,
+                color: expanded
+                    ? theme.accent
+                    : theme.textSecondary,
+              ),
+              const SizedBox(width: 6.0),
+              Text(
+                'Options',
+                style: CompassTypography.bodyMedium(
+                  color: expanded
+                      ? theme.accent
+                      : theme.textSecondary,
+                ),
+              ),
+              const SizedBox(width: 4.0),
+              CompassSvg(
+                svgString: expanded
+                    ? CompassSvgIcons.chevronUp
+                    : CompassSvgIcons.chevronDown,
+                size: 12.0,
+                color: theme.textMuted,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Clears the current filter / sort / projection.
+  Widget _buildResetButton(CompassTheme theme) {
+    return CompassIconButton(
+      svgString: CompassSvgIcons.rotateCcw,
+      onTap: widget.onResetQuery,
+      size: 14.0,
+      padding: 4.0,
+      boxSize: 36.0,
+      borderRadius: 8.0,
+      background: theme.bgSubtle,
+      borderColor: theme.border,
+      color: theme.textMuted,
+      semanticLabel: 'Reset query',
+    );
+  }
+
+  /// Opens the "export query to language" modal.
+  Widget _buildShowCodeButton(CompassTheme theme, CompassDensity density) {
+    return ConstrainedBox(
+      constraints: BoxConstraints(minHeight: density.minTapTarget),
+      child: CompassHover(
+        onTap: widget.onExportToLanguage,
+        semanticLabel: 'Show generated code',
+        builder: (hovered) => Container(
+          height: 36.0,
+          padding: const EdgeInsets.symmetric(horizontal: 12.0),
+          decoration: BoxDecoration(
+            color: hovered ? theme.bgHover : theme.bgSubtle,
+            borderRadius: BorderRadius.circular(8.0),
+            border: Border.all(
+              color: hovered ? theme.borderHover : theme.border,
+              width: 1.0,
+            ),
+          ),
+          child: Row(
+            children: [
+              CompassSvg(
+                svgString: CompassSvgIcons.code,
+                size: 14.0,
+                color: theme.accent,
+              ),
+              const SizedBox(width: 6.0),
+              Text(
+                'Show Code',
+                style: CompassTypography.bodyMedium(
+                  color: theme.textSecondary,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Runs the query.
+  Widget _buildFindButton(CompassTheme theme, CompassDensity density) {
+    return ConstrainedBox(
+      constraints: BoxConstraints(minHeight: density.minTapTarget),
+      child: CompassHover(
+        onTap: widget.onExecuteQuery,
+        semanticLabel: 'Run query',
+        builder: (hovered) => Container(
+          height: 36.0,
+          padding: const EdgeInsets.symmetric(horizontal: 20.0),
+          decoration: BoxDecoration(
+            color: hovered ? CompassColors.greenHover : theme.accent,
+            borderRadius: BorderRadius.circular(8.0),
+            boxShadow: const [
+              BoxShadow(
+                color: Color(0x3300ED64),
+                blurRadius: 4.0,
+                offset: Offset(0, 1),
+              ),
+            ],
+          ),
+          alignment: Alignment.center,
+          child: Text(
+            'Find',
+            style: CompassTypography.header(
+                color: theme.onAccent),
+          ),
+        ),
+      ),
     );
   }
 }

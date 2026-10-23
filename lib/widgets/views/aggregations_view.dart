@@ -8,6 +8,7 @@ import '../../services/mongo_engine.dart';
 import '../../theme/compass_colors.dart';
 import '../../theme/compass_theme.dart';
 import '../../theme/compass_typography.dart';
+import '../compass_icon_button.dart';
 import '../modals/compass_modal.dart';
 
 class AggregationPreset {
@@ -807,147 +808,142 @@ class _AggregationsViewState extends State<AggregationsView> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                // Left: Stage number, Operator Selector, and Enable Toggle
-                Row(
-                  children: [
-                    Text(
-                      'Stage ${index + 1}:',
-                      style: CompassTypography.monoSmall(color: _theme.textMuted),
-                    ),
-                    const SizedBox(width: 8.0),
+                // Left: Stage number, Operator Selector, and Enable Toggle.
+                // Flexible so the finger-sized action buttons on the right
+                // never push this side off the card on a narrow screen.
+                Flexible(
+                  fit: FlexFit.loose,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        'Stage ${index + 1}:',
+                        style: CompassTypography.monoSmall(color: _theme.textMuted),
+                      ),
+                      const SizedBox(width: 8.0),
 
-                    // Clickable Operator Selector Badge
-                    GestureDetector(
-                      onTap: () {
-                        setState(() {
-                          _operatorPickerStageId = isPickerOpen ? null : stage.id;
-                        });
-                      },
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
-                        decoration: BoxDecoration(
-                          color: _theme.bgInput,
-                          borderRadius: BorderRadius.circular(4.0),
-                          border: Border.all(
-                            color: isPickerOpen ? _theme.accent : _theme.border,
-                            width: 1.0,
-                          ),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              stage.operator,
-                              style: CompassTypography.monoBold(
-                                color: stage.enabled ? _theme.accent : _theme.textMuted,
-                                size: 12.0,
+                        // Clickable Operator Selector Badge
+                        GestureDetector(
+                          onTap: () {
+                            setState(() {
+                              _operatorPickerStageId = isPickerOpen ? null : stage.id;
+                            });
+                          },
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
+                            decoration: BoxDecoration(
+                              color: _theme.bgInput,
+                              borderRadius: BorderRadius.circular(4.0),
+                              border: Border.all(
+                                color: isPickerOpen ? _theme.accent : _theme.border,
+                                width: 1.0,
                               ),
                             ),
-                            const SizedBox(width: 4.0),
-                            CompassSvg(
-                              svgString: isPickerOpen ? CompassSvgIcons.chevronUp : CompassSvgIcons.chevronDown,
-                              size: 11.0,
-                              color: _theme.textMuted,
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  stage.operator,
+                                  style: CompassTypography.monoBold(
+                                    color: stage.enabled ? _theme.accent : _theme.textMuted,
+                                    size: 12.0,
+                                  ),
+                                ),
+                                const SizedBox(width: 4.0),
+                                CompassSvg(
+                                  svgString: isPickerOpen ? CompassSvgIcons.chevronUp : CompassSvgIcons.chevronDown,
+                                  size: 11.0,
+                                  color: _theme.textMuted,
+                                ),
+                              ],
                             ),
-                          ],
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 10.0),
-
-                    // Enable / Disable Checkbox Button
-                    GestureDetector(
-                      onTap: () => _toggleStageEnabled(stage),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
-                        decoration: BoxDecoration(
-                          color: stage.enabled
-                              ? _theme.greenBadgeBg
-                              : _theme.bgSubtle,
-                          borderRadius: BorderRadius.circular(4.0),
-                          border: Border.all(
-                            color: stage.enabled
-                                ? _theme.greenBadgeBorder
-                                : _theme.border,
-                            width: 1.0,
                           ),
                         ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            CompassSvg(
-                              svgString: stage.enabled ? CompassSvgIcons.check : CompassSvgIcons.close,
-                              size: 10.0,
-                              color: stage.enabled ? _theme.accent : _theme.textMuted,
-                            ),
-                            const SizedBox(width: 4.0),
-                            Text(
-                              stage.enabled ? 'Enabled' : 'Disabled',
-                              style: CompassTypography.caption(
-                                color: stage.enabled ? _theme.accent : _theme.textMuted,
+                        const SizedBox(width: 10.0),
+
+                        // Enable / Disable Checkbox Button
+                        GestureDetector(
+                          onTap: () => _toggleStageEnabled(stage),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
+                            decoration: BoxDecoration(
+                              color: stage.enabled
+                                  ? _theme.greenBadgeBg
+                                  : _theme.bgSubtle,
+                              borderRadius: BorderRadius.circular(4.0),
+                              border: Border.all(
+                                color: stage.enabled
+                                    ? _theme.greenBadgeBorder
+                                    : _theme.border,
+                                width: 1.0,
                               ),
                             ),
-                          ],
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                CompassSvg(
+                                  svgString: stage.enabled ? CompassSvgIcons.check : CompassSvgIcons.close,
+                                  size: 10.0,
+                                  color: stage.enabled ? _theme.accent : _theme.textMuted,
+                                ),
+                                const SizedBox(width: 4.0),
+                                Text(
+                                  stage.enabled ? 'Enabled' : 'Disabled',
+                                  style: CompassTypography.caption(
+                                    color: stage.enabled ? _theme.accent : _theme.textMuted,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
                         ),
-                      ),
+                      ],
                     ),
-                  ],
-                ),
+                  ),
 
                 // Right: Reorder, Duplicate, and Delete buttons
                 Row(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
                     // Move Up
                     if (index > 0)
-                      GestureDetector(
+                      CompassIconButton(
+                        svgString: CompassSvgIcons.chevronUp,
                         onTap: () => _moveStageUp(index),
-                        child: Container(
-                          padding: const EdgeInsets.all(5.0),
-                          child: CompassSvg(
-                            svgString: CompassSvgIcons.chevronUp,
-                            size: 13.0,
-                            color: _theme.textMuted,
-                          ),
-                        ),
+                        size: 13.0,
+                        padding: 5.0,
+                        color: _theme.textMuted,
+                        semanticLabel: 'Move stage up',
                       ),
                     // Move Down
                     if (index < _stages.length - 1)
-                      GestureDetector(
+                      CompassIconButton(
+                        svgString: CompassSvgIcons.chevronDown,
                         onTap: () => _moveStageDown(index),
-                        child: Container(
-                          padding: const EdgeInsets.all(5.0),
-                          child: CompassSvg(
-                            svgString: CompassSvgIcons.chevronDown,
-                            size: 13.0,
-                            color: _theme.textMuted,
-                          ),
-                        ),
+                        size: 13.0,
+                        padding: 5.0,
+                        color: _theme.textMuted,
+                        semanticLabel: 'Move stage down',
                       ),
                     const SizedBox(width: 4.0),
                     // Duplicate Stage
-                    GestureDetector(
+                    CompassIconButton(
+                      svgString: CompassSvgIcons.copy,
                       onTap: () => _duplicateStage(stage, index),
-                      child: Container(
-                        padding: const EdgeInsets.all(5.0),
-                        child: CompassSvg(
-                          svgString: CompassSvgIcons.copy,
-                          size: 13.0,
-                          color: _theme.textMuted,
-                        ),
-                      ),
+                      size: 13.0,
+                      padding: 5.0,
+                      color: _theme.textMuted,
+                      semanticLabel: 'Duplicate stage',
                     ),
                     const SizedBox(width: 4.0),
                     // Delete Stage
-                    GestureDetector(
+                    CompassIconButton(
+                      svgString: CompassSvgIcons.trash,
                       onTap: () => _removeStage(stage.id),
-                      child: Container(
-                        padding: const EdgeInsets.all(5.0),
-                        child: const CompassSvg(
-                          svgString: CompassSvgIcons.trash,
-                          size: 13.0,
-                          color: CompassColors.errorRed,
-                        ),
-                      ),
+                      size: 13.0,
+                      padding: 5.0,
+                      color: CompassColors.errorRed,
+                      semanticLabel: 'Delete stage',
                     ),
                   ],
                 ),

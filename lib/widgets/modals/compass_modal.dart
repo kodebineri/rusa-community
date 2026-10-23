@@ -1,8 +1,12 @@
 import 'package:flutter/widgets.dart';
 import '../../icons/compass_svg_icons.dart';
 import '../../theme/compass_colors.dart';
+import '../../theme/compass_density.dart';
 import '../../theme/compass_theme.dart';
 import '../../theme/compass_typography.dart';
+import '../../widgets/compass_hover.dart';
+import '../../widgets/compass_icon_button.dart';
+import '../../widgets/compass_text_menu.dart';
 
 /// Shared modal primitives for the MongoDB Compass Flutter client.
 ///
@@ -152,16 +156,13 @@ class CompassModalHeader extends StatelessWidget {
               ],
             ),
           ),
-          GestureDetector(
+          CompassIconButton(
+            svgString: CompassSvgIcons.close,
             onTap: onClose,
-            child: Container(
-              padding: const EdgeInsets.all(4.0),
-              child: CompassSvg(
-                svgString: CompassSvgIcons.close,
-                size: 14.0,
-                color: theme.textMuted,
-              ),
-            ),
+            size: 14.0,
+            padding: 4.0,
+            color: theme.textMuted,
+            semanticLabel: 'Close',
           ),
         ],
       ),
@@ -237,6 +238,9 @@ class CompassInput extends StatefulWidget {
 class _CompassInputState extends State<CompassInput> {
   late final FocusNode _focusNode = FocusNode();
 
+  /// Anchors the text context menu to the input box.
+  late final LayerLink _menuAnchor = LayerLink();
+
   CompassTheme get _theme => CompassTheme.of(context);
 
   @override
@@ -254,44 +258,55 @@ class _CompassInputState extends State<CompassInput> {
     final int resolvedMinLines =
         widget.minLines ?? (widget.minLinesAuto && widget.maxLines > 1 ? widget.maxLines : 1);
 
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10.0, vertical: 8.0),
-      decoration: BoxDecoration(
-        color: _theme.bgInput,
-        borderRadius: BorderRadius.circular(6.0),
-        border: Border.all(color: _theme.border, width: 1.0),
-      ),
-      child: ValueListenableBuilder<TextEditingValue>(
-        valueListenable: widget.controller,
-        builder: (context, value, _) {
-          return Stack(
-            alignment: Alignment.topLeft,
-            children: [
-              if (value.text.isEmpty && widget.placeholder.isNotEmpty)
-                Padding(
-                  padding: const EdgeInsets.only(top: 1.0),
-                  child: Text(
-                    widget.placeholder,
-                    style: style.copyWith(color: _theme.textMuted),
+    final CompassDensity density = CompassDensity.of(context);
+
+    return CompositedTransformTarget(
+      link: _menuAnchor,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10.0, vertical: 8.0),
+        decoration: BoxDecoration(
+          color: _theme.bgInput,
+          borderRadius: BorderRadius.circular(6.0),
+          border: Border.all(color: _theme.border, width: 1.0),
+        ),
+        child: ValueListenableBuilder<TextEditingValue>(
+          valueListenable: widget.controller,
+          builder: (context, value, _) {
+            return Stack(
+              alignment: Alignment.topLeft,
+              children: [
+                if (value.text.isEmpty && widget.placeholder.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 1.0),
+                    child: Text(
+                      widget.placeholder,
+                      style: style.copyWith(color: _theme.textMuted),
+                    ),
+                  ),
+                EditableText(
+                  controller: widget.controller,
+                  focusNode: _focusNode,
+                  autofocus: widget.autofocus,
+                  style: style,
+                  cursorColor: _theme.accent,
+                  backgroundCursorColor: _theme.bgInput,
+                  selectionColor: _theme.greenBadgeBg,
+                  maxLines: widget.maxLines,
+                  minLines: resolvedMinLines,
+                  obscureText: widget.obscureText,
+                  onChanged: widget.onChanged,
+                  onSubmitted: widget.onSubmitted,
+                  onTapOutside: (event) =>
+                      compassHandleTapOutside(event, _focusNode),
+                  contextMenuBuilder: compassTextContextMenuBuilderFor(
+                    _menuAnchor,
+                    density: density,
                   ),
                 ),
-              EditableText(
-                controller: widget.controller,
-                focusNode: _focusNode,
-                autofocus: widget.autofocus,
-                style: style,
-                cursorColor: _theme.accent,
-                backgroundCursorColor: _theme.bgInput,
-                selectionColor: _theme.greenBadgeBg,
-                maxLines: widget.maxLines,
-                minLines: resolvedMinLines,
-                obscureText: widget.obscureText,
-                onChanged: widget.onChanged,
-                onSubmitted: widget.onSubmitted,
-              ),
-            ],
-          );
-        },
+              ],
+            );
+          },
+        ),
       ),
     );
   }
@@ -315,34 +330,41 @@ class CompassPrimaryButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = CompassTheme.of(context);
+    final density = CompassDensity.of(context);
 
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-        decoration: BoxDecoration(
-          color: onTap == null ? theme.greenBadgeBg : theme.accent,
-          borderRadius: BorderRadius.circular(6.0),
-        ),
-        child: Row(
-          mainAxisSize: fullWidth ? MainAxisSize.max : MainAxisSize.min,
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            if (iconSvg != null) ...[
-              CompassSvg(
-                svgString: iconSvg!,
-                size: 13.0,
-                color: onTap == null ? theme.textMuted : theme.onAccent,
+    return ConstrainedBox(
+      constraints: BoxConstraints(minHeight: density.minTapTarget),
+      child: CompassHover(
+        onTap: onTap,
+        semanticLabel: label,
+        builder: (hovered) => Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+          decoration: BoxDecoration(
+            color: onTap == null
+                ? theme.greenBadgeBg
+                : (hovered ? CompassColors.greenHover : theme.accent),
+            borderRadius: BorderRadius.circular(6.0),
+          ),
+          child: Row(
+            mainAxisSize: fullWidth ? MainAxisSize.max : MainAxisSize.min,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              if (iconSvg != null) ...[
+                CompassSvg(
+                  svgString: iconSvg!,
+                  size: 13.0,
+                  color: onTap == null ? theme.textMuted : theme.onAccent,
+                ),
+                const SizedBox(width: 6.0),
+              ],
+              Text(
+                label,
+                style: CompassTypography.header(
+                  color: onTap == null ? theme.textMuted : theme.onAccent,
+                ),
               ),
-              const SizedBox(width: 6.0),
             ],
-            Text(
-              label,
-              style: CompassTypography.header(
-                color: onTap == null ? theme.textMuted : theme.onAccent,
-              ),
-            ),
-          ],
+          ),
         ),
       ),
     );
@@ -365,25 +387,33 @@ class CompassSecondaryButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = CompassTheme.of(context);
+    final density = CompassDensity.of(context);
 
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14.0, vertical: 8.0),
-        decoration: BoxDecoration(
-          color: theme.bgSubtle,
-          borderRadius: BorderRadius.circular(6.0),
-          border: Border.all(color: theme.border, width: 1.0),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (iconSvg != null) ...[
-              CompassSvg(svgString: iconSvg!, size: 13.0, color: theme.textSecondary),
-              const SizedBox(width: 6.0),
+    return ConstrainedBox(
+      constraints: BoxConstraints(minHeight: density.minTapTarget),
+      child: CompassHover(
+        onTap: onTap,
+        semanticLabel: label,
+        builder: (hovered) => Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14.0, vertical: 8.0),
+          decoration: BoxDecoration(
+            color: hovered ? theme.bgHover : theme.bgSubtle,
+            borderRadius: BorderRadius.circular(6.0),
+            border: Border.all(
+              color: hovered ? theme.borderHover : theme.border,
+              width: 1.0,
+            ),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (iconSvg != null) ...[
+                CompassSvg(svgString: iconSvg!, size: 13.0, color: theme.textSecondary),
+                const SizedBox(width: 6.0),
+              ],
+              Text(label, style: CompassTypography.bodyMedium(color: theme.textSecondary)),
             ],
-            Text(label, style: CompassTypography.bodyMedium(color: theme.textSecondary)),
-          ],
+          ),
         ),
       ),
     );
@@ -401,28 +431,36 @@ class CompassDangerButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final enabled = onTap != null;
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-        decoration: BoxDecoration(
-          color: enabled ? CompassColors.errorRed : const Color(0x4DF43F5E),
-          borderRadius: BorderRadius.circular(6.0),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (iconSvg != null) ...[
-              const CompassSvg(svgString: CompassSvgIcons.trash, size: 13.0, color: Color(0xFFFFFFFF)),
-              const SizedBox(width: 6.0),
-            ],
-            Text(
-              label,
-              style: CompassTypography.header(
-                color: enabled ? const Color(0xFFFFFFFF) : const Color(0x80FFFFFF),
+    final density = CompassDensity.of(context);
+
+    return ConstrainedBox(
+      constraints: BoxConstraints(minHeight: density.minTapTarget),
+      child: CompassHover(
+        onTap: onTap,
+        semanticLabel: label,
+        builder: (hovered) => Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+          decoration: BoxDecoration(
+            color: enabled
+                ? (hovered ? const Color(0xFFFF6B85) : CompassColors.errorRed)
+                : const Color(0x4DF43F5E),
+            borderRadius: BorderRadius.circular(6.0),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (iconSvg != null) ...[
+                const CompassSvg(svgString: CompassSvgIcons.trash, size: 13.0, color: Color(0xFFFFFFFF)),
+                const SizedBox(width: 6.0),
+              ],
+              Text(
+                label,
+                style: CompassTypography.header(
+                  color: enabled ? const Color(0xFFFFFFFF) : const Color(0x80FFFFFF),
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -465,6 +503,7 @@ class CompassModalFooter extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = CompassTheme.of(context);
+    final density = CompassDensity.of(context);
 
     return Container(
       padding: const EdgeInsets.only(top: 12.0),
@@ -472,15 +511,24 @@ class CompassModalFooter extends StatelessWidget {
       decoration: BoxDecoration(
         border: Border(top: BorderSide(color: theme.border, width: 1.0)),
       ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.end,
-        children: [
-          for (int i = 0; i < children.length; i++) ...[
-            if (i > 0) const SizedBox(width: 8.0),
-            children[i],
-          ],
-        ],
-      ),
+      // A phone cannot fit three side-by-side footer buttons, so the row
+      // becomes a wrapping stack of the same buttons instead of overflowing.
+      child: density.isTouch
+          ? Wrap(
+              alignment: WrapAlignment.end,
+              spacing: 8.0,
+              runSpacing: 8.0,
+              children: children,
+            )
+          : Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                for (int i = 0; i < children.length; i++) ...[
+                  if (i > 0) const SizedBox(width: 8.0),
+                  children[i],
+                ],
+              ],
+            ),
     );
   }
 }

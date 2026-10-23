@@ -4,6 +4,7 @@ import '../../icons/compass_svg_icons.dart';
 import '../../theme/compass_colors.dart';
 import '../../theme/compass_theme.dart';
 import '../../theme/compass_typography.dart';
+import '../compass_icon_button.dart';
 
 /// Details of a risky mongosh operation awaiting confirmation.
 /// Mirrors `RiskyOperationDetails` from MongoshConfirmationModal.tsx.
@@ -273,16 +274,13 @@ class _MongoshConfirmationModalState extends State<MongoshConfirmationModal> {
                 ],
               ),
             ),
-            GestureDetector(
+            CompassIconButton(
+              svgString: CompassSvgIcons.close,
               onTap: widget.onCancel,
-              child: Padding(
-                padding: const EdgeInsets.all(4.0),
-                child: CompassSvg(
-                  svgString: CompassSvgIcons.close,
-                  size: 14.0,
-                  color: _theme.textMuted,
-                ),
-              ),
+              size: 14.0,
+              padding: 4.0,
+              color: _theme.textMuted,
+              semanticLabel: 'Cancel',
             ),
           ],
         ),

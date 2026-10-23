@@ -1,7 +1,10 @@
 import 'package:flutter/widgets.dart';
 import '../theme/compass_colors.dart';
+import '../theme/compass_density.dart';
 import '../theme/compass_typography.dart';
 import '../icons/compass_svg_icons.dart';
+import 'compass_icon_button.dart';
+import 'compass_text_menu.dart';
 import 'modals/mongosh_confirmation_modal.dart';
 
 /// Converted from src/components/MongoshTerminal.tsx
@@ -35,6 +38,10 @@ class _CompassTerminalState extends State<CompassTerminal> {
   bool _isExpanded = false;
   final TextEditingController _inputController = TextEditingController();
   final FocusNode _inputFocus = FocusNode(debugLabel: 'mongosh-input');
+
+  /// Anchors the text context menu to the prompt row.
+  late final LayerLink _menuAnchor = LayerLink();
+
   final List<Map<String, String>> _history = [
     {
       'prompt': 'mongosh',
@@ -174,6 +181,8 @@ class _CompassTerminalState extends State<CompassTerminal> {
   Widget build(BuildContext context) {
     if (!widget.isOpen) return const SizedBox.shrink();
 
+    final CompassDensity density = CompassDensity.of(context);
+
     return Container(
       height: _isExpanded ? 380.0 : 220.0,
       decoration: const BoxDecoration(
@@ -227,48 +236,42 @@ class _CompassTerminalState extends State<CompassTerminal> {
                 // Terminal Header Controls
                 Row(
                   children: [
-                    GestureDetector(
+                    CompassIconButton(
+                      svgString: CompassSvgIcons.trash,
                       onTap: () {
                         setState(() {
                           _history.clear();
                         });
                       },
-                      child: Container(
-                        padding: const EdgeInsets.all(4.0),
-                        child: const CompassSvg(
-                          svgString: CompassSvgIcons.trash,
-                          size: 13.0,
-                          color: CompassColors.darkTextMuted,
-                        ),
-                      ),
+                      size: 13.0,
+                      padding: 4.0,
+                      color: CompassColors.darkTextMuted,
+                      hoverBackground: const Color(0x14FFFFFF),
+                      semanticLabel: 'Clear terminal history',
                     ),
                     const SizedBox(width: 6.0),
-                    GestureDetector(
+                    CompassIconButton(
+                      svgString: _isExpanded ? CompassSvgIcons.chevronDown : CompassSvgIcons.chevronUp,
                       onTap: () {
                         setState(() {
                           _isExpanded = !_isExpanded;
                         });
                       },
-                      child: Container(
-                        padding: const EdgeInsets.all(4.0),
-                        child: CompassSvg(
-                          svgString: _isExpanded ? CompassSvgIcons.chevronDown : CompassSvgIcons.chevronUp,
-                          size: 13.0,
-                          color: CompassColors.darkTextMuted,
-                        ),
-                      ),
+                      size: 13.0,
+                      padding: 4.0,
+                      color: CompassColors.darkTextMuted,
+                      hoverBackground: const Color(0x14FFFFFF),
+                      semanticLabel: _isExpanded ? 'Collapse terminal' : 'Expand terminal',
                     ),
                     const SizedBox(width: 6.0),
-                    GestureDetector(
+                    CompassIconButton(
+                      svgString: CompassSvgIcons.close,
                       onTap: widget.onClose,
-                      child: Container(
-                        padding: const EdgeInsets.all(4.0),
-                        child: const CompassSvg(
-                          svgString: CompassSvgIcons.close,
-                          size: 13.0,
-                          color: CompassColors.darkTextMuted,
-                        ),
-                      ),
+                      size: 13.0,
+                      padding: 4.0,
+                      color: CompassColors.darkTextMuted,
+                      hoverBackground: const Color(0x14FFFFFF),
+                      semanticLabel: 'Close terminal',
                     ),
                   ],
                 ),
@@ -309,44 +312,51 @@ class _CompassTerminalState extends State<CompassTerminal> {
           ),
 
           // Input Line
-          Container(
-            height: 38.0,
-            padding: const EdgeInsets.symmetric(horizontal: 12.0),
-            decoration: const BoxDecoration(
-              color: Color(0xFF080B0E),
-              border: Border(
-                top: BorderSide(color: Color(0xFF21313C), width: 1.0),
+          CompositedTransformTarget(
+            link: _menuAnchor,
+            child: Container(
+              height: 38.0,
+              padding: const EdgeInsets.symmetric(horizontal: 12.0),
+              decoration: const BoxDecoration(
+                color: Color(0xFF080B0E),
+                border: Border(
+                  top: BorderSide(color: Color(0xFF21313C), width: 1.0),
+                ),
               ),
-            ),
-            child: Row(
-              children: [
-                Text(
-                  '${widget.activeDbName}> ',
-                  style: CompassTypography.monoBold(color: CompassColors.greenAccent, size: 12.0),
-                ),
-                Expanded(
-                  child: EditableText(
-                    controller: _inputController,
-                    focusNode: _inputFocus,
-                    style: CompassTypography.monoRegular(color: const Color(0xFFF1F5F9), size: 12.0),
-                    cursorColor: CompassColors.greenAccent,
-                    backgroundCursorColor: const Color(0xFF080B0E),
-                    selectionColor: CompassColors.greenBadgeBg,
-                    onSubmitted: (_) => _submitInput(),
+              child: Row(
+                children: [
+                  Text(
+                    '${widget.activeDbName}> ',
+                    style: CompassTypography.monoBold(color: CompassColors.greenAccent, size: 12.0),
                   ),
-                ),
-                GestureDetector(
-                  onTap: _submitInput,
-                  child: const Padding(
-                    padding: EdgeInsets.all(4.0),
-                    child: CompassSvg(
-                      svgString: CompassSvgIcons.play,
-                      size: 12.0,
-                      color: CompassColors.greenAccent,
+                  Expanded(
+                    child: EditableText(
+                      controller: _inputController,
+                      focusNode: _inputFocus,
+                      style: CompassTypography.monoRegular(color: const Color(0xFFF1F5F9), size: 12.0),
+                      cursorColor: CompassColors.greenAccent,
+                      backgroundCursorColor: const Color(0xFF080B0E),
+                      selectionColor: CompassColors.greenBadgeBg,
+                      onSubmitted: (_) => _submitInput(),
+                      onTapOutside: (event) =>
+                          compassHandleTapOutside(event, _inputFocus),
+                      contextMenuBuilder: compassTextContextMenuBuilderFor(
+                        _menuAnchor,
+                        density: density,
+                      ),
                     ),
                   ),
-                ),
-              ],
+                  CompassIconButton(
+                    svgString: CompassSvgIcons.play,
+                    onTap: _submitInput,
+                    size: 12.0,
+                    padding: 4.0,
+                    color: CompassColors.greenAccent,
+                    hoverBackground: const Color(0x14FFFFFF),
+                    semanticLabel: 'Run command',
+                  ),
+                ],
+              ),
             ),
           ),
         ],

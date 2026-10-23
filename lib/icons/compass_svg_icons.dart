@@ -310,4 +310,39 @@ class CompassSvgIcons {
   <path d="M7 4v16"></path>
 </svg>
 ''';
+
+  // MoreVertical / overflow menu icon
+  static const String moreVertical = '''
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" xmlns="http://www.w3.org/2000/svg">
+  <circle cx="12" cy="12" r="1"></circle>
+  <circle cx="12" cy="5" r="1"></circle>
+  <circle cx="12" cy="19" r="1"></circle>
+</svg>
+''';
+
+  // Cut / scissors icon (text context menu)
+  static const String cut = '''
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" xmlns="http://www.w3.org/2000/svg">
+  <circle cx="6" cy="6" r="3"></circle>
+  <circle cx="6" cy="18" r="3"></circle>
+  <line x1="20" y1="4" x2="8.12" y2="15.88"></line>
+  <line x1="14.47" y1="14.48" x2="20" y2="20"></line>
+  <line x1="8.12" y1="8.12" x2="12" y2="12"></line>
+</svg>
+''';
+
+  // Paste / clipboard icon (text context menu)
+  static const String paste = '''
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" xmlns="http://www.w3.org/2000/svg">
+  <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path>
+  <rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect>
+</svg>
+''';
+
+  // Select all / dashed box icon (text context menu)
+  static const String selectAll = '''
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="4 3" xmlns="http://www.w3.org/2000/svg">
+  <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+</svg>
+''';
 }

@@ -5,6 +5,7 @@ import '../icons/compass_svg_icons.dart';
 import '../models/collection_tab.dart';
 import '../theme/compass_theme.dart';
 import '../theme/compass_typography.dart';
+import 'compass_icon_button.dart';
 
 /// Horizontal strip of open collection tabs at the top of the main pane
 /// (mirrors MongoDB Compass / a browser tab bar): each collection opened from
@@ -191,17 +192,13 @@ class _CollectionTabBarState extends State<CollectionTabBar> {
               ),
             ),
             const SizedBox(width: 6.0),
-            GestureDetector(
-              behavior: HitTestBehavior.opaque,
+            CompassIconButton(
+              svgString: CompassSvgIcons.close,
               onTap: () => widget.onClose(index),
-              child: Container(
-                padding: const EdgeInsets.all(5.0),
-                child: CompassSvg(
-                  svgString: CompassSvgIcons.close,
-                  size: 11.0,
-                  color: isActive ? _theme.textSecondary : _theme.textMuted,
-                ),
-              ),
+              size: 11.0,
+              padding: 5.0,
+              color: isActive ? _theme.textSecondary : _theme.textMuted,
+              semanticLabel: 'Close tab',
             ),
           ],
         ),

@@ -4,6 +4,7 @@ import '../../theme/compass_theme.dart';
 import '../../theme/compass_typography.dart';
 import '../../icons/compass_svg_icons.dart';
 import '../../models/mongo_models.dart';
+import '../compass_icon_button.dart';
 import 'compass_modal.dart';
 
 /// Converted from src/components/ConnectionModal.tsx
@@ -308,16 +309,13 @@ class _ConnectionModalState extends State<ConnectionModal> {
               ],
             ),
           ),
-          GestureDetector(
+          CompassIconButton(
+            svgString: CompassSvgIcons.close,
             onTap: widget.onClose,
-            child: Container(
-              padding: const EdgeInsets.all(4.0),
-              child: CompassSvg(
-                svgString: CompassSvgIcons.close,
-                size: 14.0,
-                color: _theme.textMuted,
-              ),
-            ),
+            size: 14.0,
+            padding: 4.0,
+            color: _theme.textMuted,
+            semanticLabel: 'Close',
           ),
         ],
       ),
@@ -598,16 +596,13 @@ class _ConnectionModalState extends State<ConnectionModal> {
           ),
           const SizedBox(width: 8.0),
           // Delete saved connection
-          GestureDetector(
+          CompassIconButton(
+            svgString: CompassSvgIcons.trash,
             onTap: () => widget.onDeleteConnection(profile.id),
-            child: Container(
-              padding: const EdgeInsets.all(4.0),
-              child: const CompassSvg(
-                svgString: CompassSvgIcons.trash,
-                size: 14.0,
-                color: CompassColors.errorRed,
-              ),
-            ),
+            size: 14.0,
+            padding: 4.0,
+            color: CompassColors.errorRed,
+            semanticLabel: 'Delete saved connection',
           ),
         ],
       ),

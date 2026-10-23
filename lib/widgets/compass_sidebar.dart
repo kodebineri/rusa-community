@@ -1,9 +1,12 @@
 import 'package:flutter/widgets.dart';
 import '../theme/compass_colors.dart';
+import '../theme/compass_density.dart';
 import '../theme/compass_theme.dart';
 import '../theme/compass_typography.dart';
 import '../icons/compass_svg_icons.dart';
 import '../models/mongo_models.dart';
+import 'compass_hover.dart';
+import 'compass_icon_button.dart';
 
 /// Converted from src/components/Sidebar.tsx
 /// Adheres strictly to:
@@ -63,6 +66,7 @@ class _CompassSidebarState extends State<CompassSidebar> {
 
   @override
   Widget build(BuildContext context) {
+    final density = CompassDensity.of(context);
     final filtered = widget.databases.where((db) {
       if (_searchQuery.trim().isEmpty) return true;
       final q = _searchQuery.toLowerCase();
@@ -70,8 +74,14 @@ class _CompassSidebarState extends State<CompassSidebar> {
       return db.collections.keys.any((c) => c.toLowerCase().contains(q));
     }).toList();
 
+    // On a phone the drawer takes most of the screen: the tree of databases
+    // and collections needs room for finger-sized action buttons.
+    final drawerWidth = density.isTouch
+        ? (MediaQuery.maybeOf(context)?.size.width ?? 360.0) * 0.85
+        : 256.0;
+
     return Container(
-      width: 256.0, // CSS w-64
+      width: drawerWidth.clamp(0.0, 320.0), // CSS w-64
       decoration: BoxDecoration(
         color: _theme.bgSidebar,
         border: Border(
@@ -115,28 +125,22 @@ class _CompassSidebarState extends State<CompassSidebar> {
                     ),
                     Row(
                       children: [
-                        GestureDetector(
+                        CompassIconButton(
+                          svgString: CompassSvgIcons.rotateCcw,
                           onTap: widget.onRefresh,
-                          child: Container(
-                            padding: const EdgeInsets.all(4.0),
-                            child: CompassSvg(
-                              svgString: CompassSvgIcons.rotateCcw,
-                              size: 14.0,
-                              color: _theme.textMuted,
-                            ),
-                          ),
+                          size: 14.0,
+                          padding: 4.0,
+                          color: _theme.textMuted,
+                          semanticLabel: 'Refresh databases',
                         ),
                         const SizedBox(width: 4.0),
-                        GestureDetector(
+                        CompassIconButton(
+                          svgString: CompassSvgIcons.plus,
                           onTap: widget.onOpenCreateDb,
-                          child: Container(
-                            padding: const EdgeInsets.all(4.0),
-                            child: CompassSvg(
-                              svgString: CompassSvgIcons.plus,
-                              size: 16.0,
-                              color: _theme.accent,
-                            ),
-                          ),
+                          size: 16.0,
+                          padding: 4.0,
+                          color: _theme.accent,
+                          semanticLabel: 'Create database',
                         ),
                       ],
                     ),
@@ -145,7 +149,7 @@ class _CompassSidebarState extends State<CompassSidebar> {
                 const SizedBox(height: 8.0),
                 // Search input container
                 Container(
-                  height: 32.0,
+                  height: density.isTouch ? 44.0 : 32.0,
                   padding: const EdgeInsets.symmetric(horizontal: 8.0),
                   decoration: BoxDecoration(
                     color: _theme.bgInput,
@@ -247,16 +251,18 @@ class _CompassSidebarState extends State<CompassSidebar> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           // Database Row
-          GestureDetector(
+          CompassHover(
             onTap: () {
               widget.onSelectDatabase(db.name);
               if (!isExpanded) _toggleDb(db.name);
             },
-            child: Container(
+            builder: (hovered) => Container(
               padding:
                   const EdgeInsets.symmetric(horizontal: 8.0, vertical: 6.0),
               decoration: BoxDecoration(
-                color: isSelected ? _theme.bgSubtle : const Color(0x00000000),
+                color: isSelected
+                    ? _theme.bgSubtle
+                    : (hovered ? _theme.bgHover : const Color(0x00000000)),
                 borderRadius: BorderRadius.circular(6.0),
               ),
               child: Row(
@@ -265,15 +271,17 @@ class _CompassSidebarState extends State<CompassSidebar> {
                   Expanded(
                     child: Row(
                       children: [
-                        GestureDetector(
+                        CompassIconButton(
+                          svgString: isExpanded
+                              ? CompassSvgIcons.chevronDown
+                              : CompassSvgIcons.chevronRight,
                           onTap: () => _toggleDb(db.name),
-                          child: CompassSvg(
-                            svgString: isExpanded
-                                ? CompassSvgIcons.chevronDown
-                                : CompassSvgIcons.chevronRight,
-                            size: 13.0,
-                            color: _theme.textMuted,
-                          ),
+                          size: 13.0,
+                          padding: 0.0,
+                          color: _theme.textMuted,
+                          semanticLabel: isExpanded
+                              ? 'Collapse ${db.name}'
+                              : 'Expand ${db.name}',
                         ),
                         const SizedBox(width: 6.0),
                         CompassSvg(
@@ -302,31 +310,31 @@ class _CompassSidebarState extends State<CompassSidebar> {
                   Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      GestureDetector(
+                      CompassIconButton(
+                        svgString: CompassSvgIcons.plus,
                         onTap: () => widget.onOpenCreateColl(db.name),
-                        child: CompassSvg(
-                          svgString: CompassSvgIcons.plus,
-                          size: 13.0,
-                          color: _theme.textMuted,
-                        ),
+                        size: 13.0,
+                        padding: 0.0,
+                        color: _theme.textMuted,
+                        semanticLabel: 'Create collection in ${db.name}',
                       ),
                       const SizedBox(width: 6.0),
-                      GestureDetector(
+                      CompassIconButton(
+                        svgString: CompassSvgIcons.pencil,
                         onTap: () => widget.onRenameDb(db.name),
-                        child: CompassSvg(
-                          svgString: CompassSvgIcons.pencil,
-                          size: 12.0,
-                          color: _theme.textMuted,
-                        ),
+                        size: 12.0,
+                        padding: 0.0,
+                        color: _theme.textMuted,
+                        semanticLabel: 'Rename ${db.name}',
                       ),
                       const SizedBox(width: 6.0),
-                      GestureDetector(
+                      CompassIconButton(
+                        svgString: CompassSvgIcons.trash,
                         onTap: () => widget.onDropDb(db.name),
-                        child: CompassSvg(
-                          svgString: CompassSvgIcons.trash,
-                          size: 13.0,
-                          color: _theme.textMuted,
-                        ),
+                        size: 13.0,
+                        padding: 0.0,
+                        color: _theme.textMuted,
+                        semanticLabel: 'Drop ${db.name}',
                       ),
                     ],
                   ),
@@ -401,13 +409,15 @@ class _CompassSidebarState extends State<CompassSidebar> {
     final isSelected =
         widget.selectedDb == dbName && widget.selectedColl == coll.name;
 
-    return GestureDetector(
+    return CompassHover(
       onTap: () => widget.onSelectCollection(dbName, coll.name),
-      child: Container(
+      builder: (hovered) => Container(
         margin: const EdgeInsets.only(bottom: 2.0),
         padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 5.0),
         decoration: BoxDecoration(
-          color: isSelected ? _theme.greenBadgeBg : const Color(0x00000000),
+          color: isSelected
+              ? _theme.greenBadgeBg
+              : (hovered ? _theme.bgHover : const Color(0x00000000)),
           borderRadius: BorderRadius.circular(6.0),
           border: isSelected
               ? Border.all(color: _theme.greenBadgeBorder, width: 1.0)
@@ -452,23 +462,22 @@ class _CompassSidebarState extends State<CompassSidebar> {
                   style: CompassTypography.monoSmall(color: _theme.textMuted),
                 ),
                 const SizedBox(width: 6.0),
-                GestureDetector(
-                  onTap: () =>
-                      widget.onRenameColl(dbName, coll.name, coll.isView),
-                  child: CompassSvg(
-                    svgString: CompassSvgIcons.pencil,
-                    size: 11.0,
-                    color: _theme.textMuted,
-                  ),
+                CompassIconButton(
+                  svgString: CompassSvgIcons.pencil,
+                  onTap: () => widget.onRenameColl(dbName, coll.name, coll.isView),
+                  size: 11.0,
+                  padding: 0.0,
+                  color: _theme.textMuted,
+                  semanticLabel: 'Rename ${coll.name}',
                 ),
                 const SizedBox(width: 4.0),
-                GestureDetector(
+                CompassIconButton(
+                  svgString: CompassSvgIcons.trash,
                   onTap: () => widget.onDropColl(dbName, coll.name),
-                  child: CompassSvg(
-                    svgString: CompassSvgIcons.trash,
-                    size: 12.0,
-                    color: _theme.textMuted,
-                  ),
+                  size: 12.0,
+                  padding: 0.0,
+                  color: _theme.textMuted,
+                  semanticLabel: 'Drop ${coll.name}',
                 ),
               ],
             ),

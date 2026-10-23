@@ -56,17 +56,26 @@ void main() {
     QueryFilterOptions? last;
 
     await tester.pumpWidget(
-      MediaQuery(
-        data: const MediaQueryData(size: Size(1920.0, 1080.0)),
-        child: Directionality(
-          textDirection: TextDirection.ltr,
-          child: CompassQueryBar(
-            options: QueryFilterOptions(),
-            onChangeOptions: (updated) => last = updated,
-            onExecuteQuery: () {},
-            onResetQuery: () {},
-            onExportToLanguage: () {},
-          ),
+      Directionality(
+        textDirection: TextDirection.ltr,
+        child: Overlay(
+          initialEntries: [
+            OverlayEntry(
+              builder: (context) => MediaQuery(
+                data: const MediaQueryData(size: Size(1920.0, 1080.0)),
+                child: CompassQueryBar(
+                  options: QueryFilterOptions(),
+                  onChangeOptions: (updated) => last = updated,
+                  onExecuteQuery: () {},
+                  onResetQuery: () {},
+                  onExportToLanguage: () {},
+                  optionsExpanded: false,
+                  onToggleOptions: () {},
+                  onOpenOverflow: () {},
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -109,18 +118,24 @@ void main() {
     // Mirrors main(): the app is wrapped in DefaultTextEditingShortcuts so
     // bare EditableText fields honour Backspace / arrow keys.
     await tester.pumpWidget(
-      MediaQuery(
-        data: const MediaQueryData(size: Size(800.0, 600.0)),
-        child: Directionality(
-          textDirection: TextDirection.ltr,
-          child: DefaultTextEditingShortcuts(
-            child: Center(
-              child: SizedBox(
-                width: 400.0,
-                child: CompassInput(controller: controller, placeholder: 'type'),
+      Directionality(
+        textDirection: TextDirection.ltr,
+        child: Overlay(
+          initialEntries: [
+            OverlayEntry(
+              builder: (context) => MediaQuery(
+                data: const MediaQueryData(size: Size(800.0, 600.0)),
+                child: DefaultTextEditingShortcuts(
+                  child: Center(
+                    child: SizedBox(
+                      width: 400.0,
+                      child: CompassInput(controller: controller, placeholder: 'type'),
+                    ),
+                  ),
+                ),
               ),
             ),
-          ),
+          ],
         ),
       ),
     );

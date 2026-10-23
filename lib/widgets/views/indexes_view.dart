@@ -4,6 +4,7 @@ import '../../theme/compass_theme.dart';
 import '../../theme/compass_typography.dart';
 import '../../icons/compass_svg_icons.dart';
 import '../../models/mongo_models.dart';
+import '../compass_icon_button.dart';
 
 /// Converted from src/components/IndexesView.tsx
 /// Adheres strictly to:
@@ -216,16 +217,13 @@ class IndexesView extends StatelessWidget {
                         alignment: Alignment.centerRight,
                         child: idx.name == '_id_'
                             ? Text('Protected', style: CompassTypography.caption(color: theme.textMuted))
-                            : GestureDetector(
+                            : CompassIconButton(
+                                svgString: CompassSvgIcons.trash,
                                 onTap: () => onDropIndex(idx.name),
-                                child: Container(
-                                  padding: const EdgeInsets.all(4.0),
-                                  child: const CompassSvg(
-                                    svgString: CompassSvgIcons.trash,
-                                    size: 13.0,
-                                    color: CompassColors.errorRed,
-                                  ),
-                                ),
+                                size: 13.0,
+                                padding: 4.0,
+                                color: CompassColors.errorRed,
+                                semanticLabel: 'Drop index ${idx.name}',
                               ),
                       ),
                     ],
