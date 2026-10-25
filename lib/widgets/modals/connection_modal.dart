@@ -38,6 +38,10 @@ class ConnectionModal extends StatefulWidget {
   /// `social_networks`) and loads them into the workspace.
   final VoidCallback onConnectSampleData;
 
+  /// Tests the connection without saving or navigating. Returns `null` on
+  /// success or a human-readable error message on failure.
+  final Future<String?> Function(ConnectionProfile profile)? onTestConnection;
+
   const ConnectionModal({
     super.key,
     required this.isOpen,
@@ -47,6 +51,7 @@ class ConnectionModal extends StatefulWidget {
     required this.onSaveConnection,
     required this.onDeleteConnection,
     required this.onConnectSampleData,
+    this.onTestConnection,
   });
 
   @override
@@ -66,7 +71,9 @@ class _ConnectionModalState extends State<ConnectionModal> {
   bool _showAdvanced = false;
   bool _syncingUri = false;
   bool _isConnecting = false;
+  bool _isTesting = false;
   String? _connectError;
+  String? _testMessage;
 
   @override
   void initState() {
@@ -91,7 +98,9 @@ class _ConnectionModalState extends State<ConnectionModal> {
     _passwordController.text = '';
     _showAdvanced = false;
     _isConnecting = false;
+    _isTesting = false;
     _connectError = null;
+    _testMessage = null;
     _syncingUri = false;
   }
 
@@ -173,6 +182,62 @@ class _ConnectionModalState extends State<ConnectionModal> {
     await _attemptConnect(profile);
   }
 
+  Future<void> _testConnection() async {
+    if (_isConnecting || _isTesting) return;
+    final tester = widget.onTestConnection;
+    if (tester == null) {
+      final profile = _buildProfile();
+      setState(() {
+        _isTesting = true;
+        _testMessage = null;
+        _connectError = null;
+      });
+      try {
+        final error = await widget.onConnect(profile).timeout(const Duration(seconds: 45));
+        if (!mounted) return;
+        setState(() {
+          _isTesting = false;
+          if (error == null) {
+            _testMessage = 'Connection successful';
+          } else {
+            _connectError = error;
+          }
+        });
+      } catch (e) {
+        if (!mounted) return;
+        setState(() {
+          _isTesting = false;
+          _connectError = e.toString().replaceFirst('Exception: ', '').replaceFirst('TimeoutException after ', 'Timeout after ');
+        });
+      }
+      return;
+    }
+    final profile = _buildProfile();
+    setState(() {
+      _isTesting = true;
+      _testMessage = null;
+      _connectError = null;
+    });
+    try {
+      final error = await tester(profile).timeout(const Duration(seconds: 45));
+      if (!mounted) return;
+      setState(() {
+        _isTesting = false;
+        if (error == null) {
+          _testMessage = 'Connection successful';
+        } else {
+          _connectError = error;
+        }
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _isTesting = false;
+        _connectError = e.toString().replaceFirst('Exception: ', '').replaceFirst('TimeoutException after ', 'Timeout after ');
+      });
+    }
+  }
+
   /// Attempts to open a connection. [ConnectionModal.onConnect] resolves to a
   /// failure message (or `null` on success), so the dialog can stay open and
   /// show the error instead of silently closing.
@@ -181,17 +246,26 @@ class _ConnectionModalState extends State<ConnectionModal> {
     setState(() {
       _isConnecting = true;
       _connectError = null;
+      _testMessage = null;
     });
-    final error = await widget.onConnect(profile);
-    if (!mounted) return;
-    if (error == null) {
-      widget.onClose();
-      return;
+    try {
+      final error = await widget.onConnect(profile).timeout(const Duration(seconds: 45));
+      if (!mounted) return;
+      if (error == null) {
+        widget.onClose();
+        return;
+      }
+      setState(() {
+        _isConnecting = false;
+        _connectError = error;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _isConnecting = false;
+        _connectError = e.toString().replaceFirst('Exception: ', '').replaceFirst('TimeoutException after ', 'Timeout after ');
+      });
     }
-    setState(() {
-      _isConnecting = false;
-      _connectError = error;
-    });
   }
 
   void _connectToSampleData() {
@@ -239,6 +313,33 @@ class _ConnectionModalState extends State<ConnectionModal> {
                         if (_connectError != null) ...[
                           const SizedBox(height: 12.0),
                           CompassErrorBanner(message: _connectError!),
+                        ],
+                        if (_testMessage != null) ...[
+                          const SizedBox(height: 12.0),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 10.0),
+                            decoration: BoxDecoration(
+                              color: _theme.greenBadgeBg,
+                              borderRadius: BorderRadius.circular(8.0),
+                              border: Border.all(color: _theme.greenBadgeBorder, width: 1.0),
+                            ),
+                            child: Row(
+                              children: [
+                                CompassSvg(
+                                  svgString: CompassSvgIcons.check,
+                                  size: 16.0,
+                                  color: _theme.accent,
+                                ),
+                                const SizedBox(width: 8.0),
+                                Expanded(
+                                  child: Text(
+                                    _testMessage!,
+                                    style: CompassTypography.bodyMedium(color: _theme.accent),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
                         ],
                         const SizedBox(height: 16.0),
                         _buildNameSection(),
@@ -610,6 +711,7 @@ class _ConnectionModalState extends State<ConnectionModal> {
   }
 
   Widget _buildFooter() {
+    final busy = _isConnecting || _isTesting;
     return Container(
       padding: const EdgeInsets.fromLTRB(20.0, 12.0, 20.0, 12.0),
       decoration: BoxDecoration(
@@ -625,6 +727,11 @@ class _ConnectionModalState extends State<ConnectionModal> {
           ),
           Row(
             children: [
+              CompassSecondaryButton(
+                label: _isTesting ? 'Testing…' : 'Test Connection',
+                onTap: busy ? null : _testConnection,
+              ),
+              const SizedBox(width: 8.0),
               CompassSecondaryButton(
                 label: 'Save & Connect',
                 onTap: _isConnecting ? null : _saveAndConnect,

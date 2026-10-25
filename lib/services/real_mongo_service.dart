@@ -19,11 +19,16 @@ import 'local_mongo_engine.dart';
 /// `DateTime` → ISO string, binaries → base64) so the existing views can render
 /// them with `jsonEncode`.
 class RealMongoService extends LocalMongoEngine {
-  RealMongoService._(this.uri, this._primary);
+  RealMongoService._(this.uri, this._primary) {
+    final primaryDb = _primary.databaseName;
+    if (primaryDb != null && primaryDb.isNotEmpty) {
+      _handles[primaryDb] = _primary;
+    }
+  }
 
   /// Maximum number of documents mirrored per collection, to keep very large
   /// collections (e.g. an oplog) from freezing the UI.
-  static const int maxDocsPerCollection = 20000;
+  static const int maxDocsPerCollection = 5000;
 
   final String uri;
   final mdb.Db _primary;
@@ -44,59 +49,316 @@ class RealMongoService extends LocalMongoEngine {
 
   bool _disposed = false;
 
+  /// Quick connectivity test without mirroring all collections/documents.
+  static Future<void> test(String uri) async {
+    final trimmed = uri.trim();
+    final safeUri = _ensureDbPath(trimmed);
+    final primary = await mdb.Db.create(safeUri);
+    try {
+      await primary.open().timeout(const Duration(seconds: 15));
+      try {
+        await primary.pingCommand().timeout(const Duration(seconds: 5));
+      } catch (_) {
+        await primary.listDatabases().timeout(const Duration(seconds: 5));
+      }
+    } finally {
+      try {
+        await primary.close();
+      } catch (_) {}
+    }
+  }
+
   /// Connects to [uri], verifies the server is reachable, then mirrors it.
   ///
   /// Throws (with the driver error) when the URI is invalid, the server is
   /// unreachable, or authentication fails.
   static Future<RealMongoService> connect(String uri) async {
-    final safeUri = _ensureDbPath(uri);
+    final trimmed = uri.trim();
+    final safeUri = _ensureDbPath(trimmed);
     final primary = await mdb.Db.create(safeUri);
-    await primary.open();
-    await primary.pingCommand();
+    try {
+      await primary.open().timeout(const Duration(seconds: 20));
+    } catch (e) {
+      try {
+        await primary.close();
+      } catch (_) {}
+      rethrow;
+    }
 
-    final service = RealMongoService._(uri, primary);
-    await service.reload();
+    final service = RealMongoService._(trimmed, primary);
+    try {
+      await service.reloadFast().timeout(const Duration(seconds: 20));
+    } catch (e) {
+      try {
+        await service.dispose();
+      } catch (_) {}
+      rethrow;
+    }
     return service;
+  }
+
+  /// Fast reload: list DBs and collection names immediately so the UI tree
+  /// accurately represents every database right away, then defer loading
+  /// documents/indexes to the background.
+  Future<void> reloadFast() async {
+    try {
+      final names = await _primary.listDatabases().timeout(const Duration(seconds: 10));
+      final result = <MongoDatabase>[];
+      final dbNames = <String>[];
+
+      for (final raw in names) {
+        String dbName = '';
+        if (raw is Map) {
+          dbName = raw['name']?.toString() ?? raw.toString();
+        } else if (raw is String) {
+          dbName = raw;
+        } else {
+          dbName = raw.toString();
+        }
+        if (dbName.isEmpty || dbName.startsWith('{')) {
+          // Fallback attempt to extract name from string representation
+          final match = RegExp(r'name\s*:\s*([^\s,}]+)').firstMatch(dbName);
+          if (match != null) {
+            dbName = match.group(1)!;
+          } else {
+            continue;
+          }
+        }
+        if (dbName.isEmpty) continue;
+        dbNames.add(dbName);
+      }
+
+      // For faster first connect, create DB entries immediately with empty collections
+      // and load collections in background
+      for (final dbName in dbNames) {
+        result.add(MongoDatabase(name: dbName, collections: const {}));
+      }
+
+      databases = result;
+      if (!_disposed) onDataChanged?.call();
+
+      // Load collection names and documents in background (non-blocking)
+      unawaited(_loadCollectionsFast(dbNames));
+      unawaited(_loadAllDataInBackground());
+    } catch (e) {
+      rethrow;
+    }
+  }
+
+  Future<void> _loadCollectionsFast(List<String> dbNames) async {
+    if (_disposed) return;
+    for (final dbName in dbNames) {
+      if (_disposed) break;
+      try {
+        final infos = await _getCollectionInfos(dbName).timeout(const Duration(seconds: 5));
+        final colls = <String, MongoCollection>{};
+        for (final info in infos) {
+          final collName = info['name']?.toString() ?? '';
+          if (collName.isEmpty || collName.startsWith('system.')) continue;
+          final isView = info['type']?.toString() == 'view';
+          final options = info['options'];
+          final optionsMap = options is Map
+              ? options.map((k, v) => MapEntry(k.toString(), v))
+              : const <String, dynamic>{};
+          colls[collName] = MongoCollection(
+            name: collName,
+            documents: const [],
+            indexes: [MongoIndex(name: '_id_', keys: const {'_id': 1})],
+            isView: isView,
+            viewOn: isView ? optionsMap['viewOn']?.toString() : null,
+            pipeline: isView ? (optionsMap['pipeline'] as List?)?.toList() : null,
+          );
+        }
+        final idx = databases.indexWhere((d) => d.name == dbName);
+        if (idx >= 0 && !_disposed) {
+          databases[idx] = MongoDatabase(name: dbName, collections: colls);
+          onDataChanged?.call();
+        }
+      } catch (_) {
+        continue;
+      }
+    }
+  }
+
+  /// Retrieves collection metadata for [dbName].
+  ///
+  /// Uses `modernListCollections` targeting `$db: dbName` on the existing
+  /// primary connection if possible (fastest: 0 extra connection overhead),
+  /// falling back to a dedicated database handle.
+  Future<List<Map<String, dynamic>>> _getCollectionInfos(String dbName) async {
+    try {
+      if (_primary.masterConnection.serverCapabilities.supportsOpMsg) {
+        final stream = _primary.modernListCollections(rawOptions: {'dbName': dbName});
+        return await stream.toList().timeout(const Duration(seconds: 6));
+      }
+    } catch (_) {
+      // Fallback below
+    }
+
+    final dbHandle = await _openDb(dbName);
+    return await dbHandle.getCollectionInfos().timeout(const Duration(seconds: 8));
+  }
+
+  Future<void> _loadAllDataInBackground() async {
+    if (_disposed) return;
+    for (final db in List<MongoDatabase>.from(databases)) {
+      if (_disposed) break;
+      // Skip system databases to prevent slow scans or permission errors
+      if (db.name == 'admin' || db.name == 'config' || db.name == 'local') continue;
+
+      try {
+        final dbHandle = await _openDb(db.name);
+        if (_disposed) break;
+
+        final currentDb = databases.firstWhere((d) => d.name == db.name, orElse: () => db);
+        final updatedColls = Map<String, MongoCollection>.from(currentDb.collections);
+
+        // If collections were not populated during reloadFast, get them now
+        if (updatedColls.isEmpty) {
+          final infos = await _getCollectionInfos(db.name).timeout(const Duration(seconds: 10));
+          for (final info in infos) {
+            final collName = info['name']?.toString() ?? '';
+            if (collName.isEmpty || collName.startsWith('system.')) continue;
+            final isView = info['type']?.toString() == 'view';
+            final options = info['options'];
+            final optionsMap = options is Map
+                ? options.map((k, v) => MapEntry(k.toString(), v))
+                : const <String, dynamic>{};
+            updatedColls[collName] = MongoCollection(
+              name: collName,
+              documents: const [],
+              indexes: [MongoIndex(name: '_id_', keys: const {'_id': 1})],
+              isView: isView,
+              viewOn: isView ? optionsMap['viewOn']?.toString() : null,
+              pipeline: isView ? (optionsMap['pipeline'] as List?)?.toList() : null,
+            );
+          }
+        }
+
+        for (final collEntry in updatedColls.entries) {
+          if (_disposed) break;
+          final collName = collEntry.key;
+          final meta = collEntry.value;
+
+          try {
+            final coll = dbHandle.collection(collName);
+            final docs = await _loadDocuments(coll).timeout(const Duration(seconds: 10));
+            final indexes = meta.isView
+                ? [MongoIndex(name: '_id_', keys: const {'_id': 1})]
+                : await _loadIndexes(coll).timeout(const Duration(seconds: 8));
+
+            updatedColls[collName] = MongoCollection(
+              name: collName,
+              documents: docs,
+              indexes: indexes,
+              isView: meta.isView,
+              viewOn: meta.viewOn,
+              pipeline: meta.pipeline,
+            );
+          } catch (_) {
+            // Keep collection as-is if loading documents fails
+          }
+        }
+
+        final idx = databases.indexWhere((d) => d.name == db.name);
+        if (idx >= 0) {
+          databases[idx] = MongoDatabase(name: db.name, collections: updatedColls);
+          if (!_disposed) onDataChanged?.call();
+        }
+      } catch (_) {
+        continue;
+      }
+    }
+    if (!_disposed) onDataChanged?.call();
+  }
+
+  /// Loads documents and indexes for a specific collection on-demand.
+  Future<void> loadCollectionData(String dbName, String collName) async {
+    final coll = getCollection(dbName, collName);
+    if (coll == null) return;
+    try {
+      final dbHandle = await _openDb(dbName);
+      final c = dbHandle.collection(collName);
+      final docs = await _loadDocuments(c).timeout(const Duration(seconds: 10));
+      final indexes = coll.isView
+          ? [MongoIndex(name: '_id_', keys: const {'_id': 1})]
+          : await _loadIndexes(c).timeout(const Duration(seconds: 8));
+
+      coll.documents = docs;
+      coll.indexes = indexes;
+      if (!_disposed) onDataChanged?.call();
+    } catch (_) {}
   }
 
   /// Re-reads every database, collection, document and index from the server.
   Future<void> reload() async {
-    final names = await _primary.listDatabases();
+    final names = await _primary.listDatabases().timeout(const Duration(seconds: 15));
     final result = <MongoDatabase>[];
 
     for (final raw in names) {
-      final dbName = raw.toString();
-
-      final db = await _openDb(dbName);
-      final infos = await db.getCollectionInfos();
-      final colls = <String, MongoCollection>{};
-
-      for (final info in infos) {
-        final collName = info['name']?.toString() ?? '';
-        if (collName.isEmpty || collName.startsWith('system.')) continue;
-
-        final isView = info['type']?.toString() == 'view';
-        final options = info['options'];
-        final optionsMap =
-            options is Map ? options.map((k, v) => MapEntry(k.toString(), v)) : const <String, dynamic>{};
-
-        final coll = db.collection(collName);
-        final docs = await _loadDocuments(coll);
-        final indexes = isView
-            ? [MongoIndex(name: '_id_', keys: const {'_id': 1})]
-            : await _loadIndexes(coll);
-
-        colls[collName] = MongoCollection(
-          name: collName,
-          documents: docs,
-          indexes: indexes,
-          isView: isView,
-          viewOn: isView ? optionsMap['viewOn']?.toString() : null,
-          pipeline: isView ? (optionsMap['pipeline'] as List?)?.toList() : null,
-        );
+      String dbName = '';
+      if (raw is Map) {
+        dbName = raw['name']?.toString() ?? raw.toString();
+      } else if (raw is String) {
+        dbName = raw;
+      } else {
+        dbName = raw.toString();
       }
+      if (dbName.isEmpty || dbName.startsWith('{')) {
+        final match = RegExp(r'name\s*:\s*([^\s,}]+)').firstMatch(dbName);
+        if (match != null) {
+          dbName = match.group(1)!;
+        } else {
+          continue;
+        }
+      }
+      if (dbName.isEmpty) continue;
+      try {
+        final db = await _openDb(dbName);
+        final infos = await _getCollectionInfos(dbName).timeout(const Duration(seconds: 15));
+        final colls = <String, MongoCollection>{};
 
-      result.add(MongoDatabase(name: dbName, collections: colls));
+        for (final info in infos) {
+          final collName = info['name']?.toString() ?? '';
+          if (collName.isEmpty || collName.startsWith('system.')) continue;
+
+          final isView = info['type']?.toString() == 'view';
+          final options = info['options'];
+          final optionsMap = options is Map
+              ? options.map((k, v) => MapEntry(k.toString(), v))
+              : const <String, dynamic>{};
+
+          try {
+            final coll = db.collection(collName);
+            final docs = await _loadDocuments(coll);
+            final indexes = isView
+                ? [MongoIndex(name: '_id_', keys: const {'_id': 1})]
+                : await _loadIndexes(coll);
+
+            colls[collName] = MongoCollection(
+              name: collName,
+              documents: docs,
+              indexes: indexes,
+              isView: isView,
+              viewOn: isView ? optionsMap['viewOn']?.toString() : null,
+              pipeline: isView ? (optionsMap['pipeline'] as List?)?.toList() : null,
+            );
+          } catch (_) {
+            colls[collName] = MongoCollection(
+              name: collName,
+              documents: const [],
+              indexes: [MongoIndex(name: '_id_', keys: const {'_id': 1})],
+              isView: isView,
+              viewOn: isView ? optionsMap['viewOn']?.toString() : null,
+              pipeline: isView ? (optionsMap['pipeline'] as List?)?.toList() : null,
+            );
+          }
+        }
+
+        result.add(MongoDatabase(name: dbName, collections: colls));
+      } catch (_) {
+        result.add(MongoDatabase(name: dbName, collections: const {}));
+      }
     }
 
     databases = result;
@@ -107,9 +369,11 @@ class RealMongoService extends LocalMongoEngine {
     if (_disposed) return;
     _disposed = true;
     for (final db in _handles.values) {
-      try {
-        await db.close();
-      } catch (_) {/* ignore */}
+      if (!identical(db, _primary)) {
+        try {
+          await db.close();
+        } catch (_) {/* ignore */}
+      }
     }
     _handles.clear();
     try {
@@ -125,19 +389,37 @@ class RealMongoService extends LocalMongoEngine {
     final existing = _handles[dbName];
     if (existing != null) return existing;
 
-    // Re-use the (possibly SRV-resolved) host list of the primary connection.
+    if (_primary.databaseName == dbName) {
+      _handles[dbName] = _primary;
+      return _primary;
+    }
+
+    // Try opening via primary's resolved URIs with target database path.
+    // _primary.uriList already contains resolved 'mongodb://' URIs (even for mongodb+srv),
+    // so no DNS seedlist lookup is needed again.
     final uris = _primary.uriList.map((u) => _withDatabase(u, dbName)).toList();
-    final db = uris.length > 1
-        ? mdb.Db.pool(uris)
-        : mdb.Db(uris.isEmpty ? _withDatabase(uri, dbName) : uris.first);
-    await db.open();
+    if (uris.isNotEmpty) {
+      try {
+        final db = uris.length > 1 ? mdb.Db.pool(uris) : mdb.Db(uris.first);
+        await db.open().timeout(const Duration(seconds: 15));
+        _handles[dbName] = db;
+        return db;
+      } catch (_) {
+        // Fallback below
+      }
+    }
+
+    // Fallback: If uri is SRV or standard, create and open
+    final dbUri = _withDatabase(uri, dbName);
+    final db = await mdb.Db.create(dbUri);
+    await db.open().timeout(const Duration(seconds: 15));
     _handles[dbName] = db;
     return db;
   }
 
   Future<List<MongoDocument>> _loadDocuments(mdb.DbCollection coll) async {
     final docs = <MongoDocument>[];
-    final stream = coll.find();
+    final stream = coll.find(mdb.where.limit(maxDocsPerCollection));
     await for (final raw in stream) {
       docs.add(MongoDocument.fromMap(_normalizeMap(raw)));
       if (docs.length >= maxDocsPerCollection) break;
@@ -294,8 +576,15 @@ class RealMongoService extends LocalMongoEngine {
     final ok = super.dropDatabase(dbName);
     if (ok) {
       final handle = _handles.remove(dbName);
-      final target = handle ?? _primary;
-      _fire(() => target.drop());
+      if (handle != null) {
+        _fire(() => handle.drop());
+      } else {
+        _fire(() async {
+          final db = await _openDb(dbName);
+          _handles.remove(dbName);
+          await db.drop();
+        });
+      }
     }
     return ok;
   }
@@ -304,14 +593,15 @@ class RealMongoService extends LocalMongoEngine {
   bool renameCollection(String dbName, String oldName, String newName) {
     final ok = super.renameCollection(dbName, oldName, newName);
     if (ok) {
-      _fireDb(
-        dbName,
-        (db) => db.runCommand({
+      // In MongoDB, renameCollection command must be run against admin database
+      _fire(() async {
+        final adminDb = await _openDb('admin');
+        await adminDb.runCommand({
           'renameCollection': '$dbName.$oldName',
           'to': '$dbName.${newName.trim()}',
           'dropTarget': false,
-        }),
-      );
+        });
+      });
     }
     return ok;
   }
@@ -322,16 +612,18 @@ class RealMongoService extends LocalMongoEngine {
     final ok = super.renameDatabase(oldName, newName);
     if (ok && oldDb != null) {
       final clean = newName.trim();
-      for (final collName in oldDb.collections.keys) {
-        _fireDb(
-          oldName,
-          (db) => db.runCommand({
-            'renameCollection': '$oldName.$collName',
-            'to': '$clean.$collName',
-            'dropTarget': false,
-          }),
-        );
-      }
+      _fire(() async {
+        final adminDb = await _openDb('admin');
+        for (final collName in oldDb.collections.keys) {
+          try {
+            await adminDb.runCommand({
+              'renameCollection': '$oldName.$collName',
+              'to': '$clean.$collName',
+              'dropTarget': false,
+            });
+          } catch (_) {}
+        }
+      });
     }
     return ok;
   }
@@ -507,16 +799,41 @@ class RealMongoService extends LocalMongoEngine {
   // ---------------------------------------------------------------------------
 
   static String _ensureDbPath(String uri) {
-    final parsed = Uri.parse(uri.trim());
-    if (parsed.path.isEmpty || parsed.path == '/') {
-      return parsed.replace(path: '/test').toString();
+    final trimmed = uri.trim();
+    try {
+      final questionMarkIndex = trimmed.indexOf('?');
+      final pathEnd = questionMarkIndex == -1 ? trimmed.length : questionMarkIndex;
+      final schemeEnd = trimmed.indexOf('://');
+      if (schemeEnd == -1) return trimmed;
+      final slashAfterHost = trimmed.indexOf('/', schemeEnd + 3);
+
+      if (slashAfterHost == -1 || slashAfterHost >= pathEnd - 1) {
+        return _withDatabase(trimmed, 'test');
+      }
+      return trimmed;
+    } catch (_) {
+      return trimmed;
     }
-    return uri.trim();
   }
 
   static String _withDatabase(String uri, String dbName) {
     try {
-      return Uri.parse(uri).replace(path: '/$dbName').toString();
+      final cleanDb = Uri.encodeComponent(dbName.trim());
+      final questionMarkIndex = uri.indexOf('?');
+      final pathEnd = questionMarkIndex == -1 ? uri.length : questionMarkIndex;
+      final schemeEnd = uri.indexOf('://');
+      if (schemeEnd == -1) return uri;
+      final slashAfterHost = uri.indexOf('/', schemeEnd + 3);
+
+      final query = questionMarkIndex != -1 ? uri.substring(questionMarkIndex) : '';
+
+      if (slashAfterHost == -1 || slashAfterHost > pathEnd) {
+        final prefix = questionMarkIndex != -1 ? uri.substring(0, questionMarkIndex) : uri;
+        return '$prefix/$cleanDb$query';
+      } else {
+        final prefix = uri.substring(0, slashAfterHost);
+        return '$prefix/$cleanDb$query';
+      }
     } catch (_) {
       return uri;
     }
@@ -558,10 +875,10 @@ class RealMongoService extends LocalMongoEngine {
   }
 
   Map<String, dynamic> _toServerUpdate(Map fields) {
-    final hasOperator = fields.keys.any((k) => k.toString().startsWith('\$'));
+    final hasOperator = fields.keys.any((k) => k.toString().startsWith(r'$'));
     if (hasOperator) return fields.map((k, v) => MapEntry(k.toString(), v));
     return {
-      '\$set': fields.map((k, v) => MapEntry(k.toString(), v)),
+      r'$set': fields.map((k, v) => MapEntry(k.toString(), v)),
     };
   }
 

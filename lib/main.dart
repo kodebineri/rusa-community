@@ -288,7 +288,8 @@ class _CompassAppState extends State<CompassApp> {
   Future<String?> _handleConnectProfile(ConnectionProfile profile) async {
     RealMongoService connected;
     try {
-      connected = await RealMongoService.connect(profile.uri);
+      connected = await RealMongoService.connect(profile.uri)
+          .timeout(const Duration(seconds: 45));
     } catch (err) {
       return _formatConnectError(err);
     }
@@ -337,10 +338,11 @@ class _CompassAppState extends State<CompassApp> {
     if (text.contains('Connection refused') ||
         text.contains('SocketException') ||
         text.contains('Failed host lookup') ||
-        text.contains('Connection timed out')) {
-      return 'Could not reach the MongoDB server. Make sure it is running and reachable from this machine.';
+        text.contains('Connection timed out') ||
+        text.contains('TimeoutException')) {
+      return 'Could not reach the MongoDB server. Check network, DNS (SRV), IP allowlist, and credentials.';
     }
-    if (text.contains('Authentication failed') || text.contains('auth')) {
+    if (text.contains('Authentication failed') || text.contains('auth') || text.contains('bad auth')) {
       return 'Authentication failed. Check the username, password and auth source.';
     }
     return text.replaceFirst('MongoDartError: ', '').replaceFirst('Exception: ', '');
@@ -928,6 +930,14 @@ class _CompassAppState extends State<CompassApp> {
                 onSaveConnection: _handleSaveConnection,
                 onDeleteConnection: _handleDeleteConnection,
                 onConnectSampleData: _handleConnectSampleData,
+                onTestConnection: (profile) async {
+                  try {
+                    await RealMongoService.test(profile.uri);
+                    return null;
+                  } catch (err) {
+                    return _formatConnectError(err);
+                  }
+                },
               ),
 
               // ---- Popup / modal overlays (mirrors src/App.tsx) ----
