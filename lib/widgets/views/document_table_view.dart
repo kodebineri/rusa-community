@@ -297,6 +297,24 @@ class _DocumentTableViewState extends State<DocumentTableView> {
         style: CompassTypography.monoSmall(color: _theme.textMuted),
       );
     }
+    if (val is String) {
+      // Check if it's a date
+      if (RegExp(r'^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:?\d{2})?$').hasMatch(val)) {
+        return Text(
+          'ISODate("$val")',
+          style: CompassTypography.monoMedium(color: _theme.bsonDate, size: 11.0),
+          overflow: TextOverflow.ellipsis,
+        );
+      }
+      // Check if ObjectId
+      if (val.length == 24 && RegExp(r'^[a-fA-F0-9]{24}$').hasMatch(val)) {
+        return Text(
+          'ObjectId("$val")',
+          style: CompassTypography.monoBold(color: _theme.accent, size: 11.0),
+          overflow: TextOverflow.ellipsis,
+        );
+      }
+    }
     return Text(
       val.toString(),
       style: CompassTypography.bodyRegular(color: _theme.textSecondary),

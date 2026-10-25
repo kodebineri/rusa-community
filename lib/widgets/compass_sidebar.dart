@@ -54,7 +54,8 @@ class _CompassSidebarState extends State<CompassSidebar> {
     'library': true,
     'social_networks': true,
   };
-  final String _searchQuery = '';
+  String _searchQuery = '';
+  final TextEditingController _searchController = TextEditingController();
 
   CompassTheme get _theme => CompassTheme.of(context);
 
@@ -62,6 +63,12 @@ class _CompassSidebarState extends State<CompassSidebar> {
     setState(() {
       _expandedDbs[dbName] = !(_expandedDbs[dbName] ?? false);
     });
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
   }
 
   @override
@@ -165,15 +172,19 @@ class _CompassSidebarState extends State<CompassSidebar> {
                       ),
                       const SizedBox(width: 8.0),
                       Expanded(
-                        child: Text(
-                          _searchQuery.isEmpty
-                              ? 'Filter databases...'
-                              : _searchQuery,
+                        child: EditableText(
+                          controller: _searchController,
+                          focusNode: FocusNode(),
                           style: CompassTypography.bodyRegular(
-                            color: _searchQuery.isEmpty
-                                ? _theme.textMuted
-                                : _theme.textPrimary,
+                            color: _theme.textPrimary,
                           ),
+                          cursorColor: _theme.accent,
+                          backgroundCursorColor: _theme.bgInput,
+                          onChanged: (value) {
+                            setState(() {
+                              _searchQuery = value;
+                            });
+                          },
                         ),
                       ),
                     ],

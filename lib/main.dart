@@ -220,11 +220,24 @@ class _CompassAppState extends State<CompassApp> {
     final existing = _openTabs.indexWhere((t) => t.isSameTarget(dbName, collName));
     if (existing >= 0) {
       _activateTabIndex(existing);
+      // Try to load data if it's a real service
+      final service = mongoEngine;
+      if (service is RealMongoService) {
+        unawaited(service.loadCollectionData(dbName, collName).then((_) {
+          if (mounted) setState(() {});
+        }));
+      }
       return;
     }
     _saveActiveTabState();
     _openTabs.add(CollectionTab(dbName: dbName, collName: collName));
     _activateTabIndex(_openTabs.length - 1);
+    final service = mongoEngine;
+    if (service is RealMongoService) {
+      unawaited(service.loadCollectionData(dbName, collName).then((_) {
+        if (mounted) setState(() {});
+      }));
+    }
   }
 
   /// Closes the tab at [index]. An inactive tab is closed without touching the

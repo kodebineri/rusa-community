@@ -195,10 +195,15 @@ class _TreeNodeWidgetState extends State<_TreeNodeWidget> {
       if (val.length == 24 && RegExp(r'^[a-fA-F0-9]{24}$').hasMatch(val)) {
         return 'ObjectId';
       }
+      // Detect ISO 8601 date strings
+      if (RegExp(r'^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:?\d{2})?$').hasMatch(val)) {
+        return 'Date';
+      }
       return 'String';
     }
     if (val is List) return 'Array';
     if (val is Map) return 'Object';
+    if (val is DateTime) return 'Date';
     return 'unknown';
   }
 
@@ -328,7 +333,7 @@ class _TreeNodeWidgetState extends State<_TreeNodeWidget> {
                 if (!isExpandable)
                   Expanded(
                     child: Text(
-                      type == 'String' ? '"${widget.value}"' : '${widget.value}',
+                      type == 'String' ? '"${widget.value}"' : type == 'Date' ? 'ISODate("${widget.value}")' : '${widget.value}',
                       style: CompassTypography.monoRegular(
                         color: _getTypeColor(type, _theme),
                         size: 12.0,

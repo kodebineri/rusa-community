@@ -859,17 +859,77 @@ class RealMongoService extends LocalMongoEngine {
   }
 
   Map<String, dynamic> _denormalizeDoc(Map<String, dynamic> doc) {
-    final out = Map<String, dynamic>.from(doc);
-    final id = out['_id'];
-    if (id is String) out['_id'] = _toObjectId(id);
+    final out = _denormalizeValue(Map<String, dynamic>.from(doc));
+    if (out is! Map<String, dynamic>) return <String, dynamic>{};
     return out;
+  }
+
+  dynamic _denormalizeValue(dynamic value) {
+    if (value == null) return null;
+    if (value is String) {
+      // Try to detect ISO date strings that should become DateTime for server
+      if (RegExp(r'^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:?\d{2})?$').hasMatch(value)) {
+        try {
+          return DateTime.parse(value);
+        } catch (_) {
+          return value;
+        }
+      }
+      return value;
+    }
+    if (value is Map) {
+      final map = Map<String, dynamic>.from(value);
+      // Extended JSON support
+      if (map.length == 1) {
+        if (map.containsKey('\$oid')) {
+          final oid = map['\$oid'];
+          if (oid is String) return _toObjectId(oid);
+        }
+        if (map.containsKey('\$date')) {
+          final date = map['\$date'];
+          if (date is String) {
+            try {
+              return DateTime.parse(date);
+            } catch (_) {
+              return date;
+            }
+          }
+          if (date is int) {
+            try {
+              return DateTime.fromMillisecondsSinceEpoch(date);
+            } catch (_) {
+              return date;
+            }
+          }
+        }
+        if (map.containsKey('\$timestamp')) {
+          final ts = map['\$timestamp'];
+          if (ts is Map && ts['t'] is int) {
+            try {
+              return DateTime.fromMillisecondsSinceEpoch((ts['t'] as int) * 1000);
+            } catch (_) {}
+          }
+        }
+      }
+      final out = <String, dynamic>{};
+      map.forEach((k, v) {
+        out[k.toString()] = _denormalizeValue(v);
+      });
+      return out;
+    }
+    if (value is List) {
+      return value.map(_denormalizeValue).toList();
+    }
+    if (value is int || value is double || value is bool) return value;
+    return value;
   }
 
   Map<String, dynamic> _denormalizeFilter(Map filter) {
     final out = <String, dynamic>{};
     filter.forEach((k, v) {
       final key = k.toString();
-      out[key] = key == '_id' && v is String ? _toObjectId(v) : v;
+      final denorm = _denormalizeValue(v);
+      out[key] = key == '_id' && denorm is String ? _toObjectId(denorm) : denorm;
     });
     return out;
   }
