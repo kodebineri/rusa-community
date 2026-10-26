@@ -167,9 +167,72 @@ class _CompassQueryBarState extends State<CompassQueryBar> {
     _sync(controller, value);
   }
 
+  String _lastFilterText = '';
+
   void _handleFilterChange(String value) {
-    widget.onChangeOptions(widget.options.copyWith(filter: value));
     if (!mounted) return;
+    // Completely empty
+    if (value.isEmpty) {
+      if (_filterError) setState(() => _filterError = false);
+      _lastFilterText = '';
+      if (_filterController.text != '') {
+        _filterController.text = '';
+      }
+      widget.onChangeOptions(widget.options.copyWith(filter: ''));
+      return;
+    }
+    // Auto-close only when adding a single opening bracket and cursor is at end (collapsed)
+    try {
+      final sel = _filterController.selection;
+      if (sel.isValid && sel.isCollapsed && value.length == _lastFilterText.length + 1) {
+        if (value.isNotEmpty) {
+          final last = value[value.length - 1];
+          if (last == '{') {
+            final newValue = '$value}';
+            _filterController.value = TextEditingValue(
+              text: newValue,
+              selection: TextSelection.collapsed(offset: value.length),
+            );
+            value = newValue;
+          } else if (last == '[') {
+            final newValue = '$value]';
+            _filterController.value = TextEditingValue(
+              text: newValue,
+              selection: TextSelection.collapsed(offset: value.length),
+            );
+            value = newValue;
+          } else if (last == '(') {
+            final newValue = '$value)';
+            _filterController.value = TextEditingValue(
+              text: newValue,
+              selection: TextSelection.collapsed(offset: value.length),
+            );
+            value = newValue;
+          }
+        }
+      } else if (sel.isValid && sel.isCollapsed && value.length > _lastFilterText.length) {
+        // Fallback for cases where length differs slightly
+        if (value.isNotEmpty) {
+          final last = value[value.length - 1];
+          if (last == '[') {
+            // Check if we just typed [ and need to close
+            if (_lastFilterText.isNotEmpty && _lastFilterText.endsWith('[') == false && value.endsWith('[') && !value.endsWith('[]')) {
+              final newValue = '$value]';
+              _filterController.value = TextEditingValue(
+                text: newValue,
+                selection: TextSelection.collapsed(offset: value.length),
+              );
+              value = newValue;
+            }
+          }
+        }
+      }
+    } catch (_) {}
+    _lastFilterText = value;
+    if (value.trim().isEmpty) {
+      if (_filterError) setState(() => _filterError = false);
+      return;
+    }
     if (value.trim().isEmpty) {
       if (_filterError) setState(() => _filterError = false);
       return;
@@ -189,6 +252,11 @@ class _CompassQueryBarState extends State<CompassQueryBar> {
     if (_filterError != !isValid) {
       setState(() => _filterError = !isValid);
     }
+  }
+
+  void _executeWithCurrentFilter() {
+    widget.onChangeOptions(widget.options.copyWith(filter: _filterController.text));
+    widget.onExecuteQuery();
   }
 
   void _handleSkipChange(String value) {
@@ -246,7 +314,7 @@ class _CompassQueryBarState extends State<CompassQueryBar> {
                       children: [
                         Expanded(child: _buildFilterInput(theme, compact: true)),
                         const SizedBox(width: 6.0),
-                        _buildFindButtonCompact(theme, density),
+                        _buildFindButtonCompact(theme, density, onTap: _executeWithCurrentFilter),
                         const SizedBox(width: 4.0),
                         SizedBox(
                           width: density.minTapTarget,
@@ -299,7 +367,7 @@ class _CompassQueryBarState extends State<CompassQueryBar> {
                         _buildOptionsButton(theme, density),
                         _buildResetButton(theme),
                         _buildShowCodeButton(theme, density),
-                        _buildFindButton(theme, density),
+                        _buildFindButton(theme, density, onTap: _executeWithCurrentFilter),
                       ],
                     ),
                   ],
@@ -328,7 +396,7 @@ class _CompassQueryBarState extends State<CompassQueryBar> {
                   const SizedBox(width: 8.0),
 
                   // Find Button (Primary)
-                  _buildFindButton(theme, density),
+                  _buildFindButton(theme, density, onTap: _executeWithCurrentFilter),
                 ],
               );
             },
@@ -457,7 +525,7 @@ class _CompassQueryBarState extends State<CompassQueryBar> {
     double fontSize = 11.0,
   }) {
     final style = CompassTypography.monoRegular(
-        color: theme.textPrimary, size: fontSize);
+        color: theme.textPrimary, size: fontSize).copyWith(fontFamily: 'JetBrains Mono');
     final CompassDensity density = CompassDensity.of(context);
     return ValueListenableBuilder<TextEditingValue>(
       valueListenable: controller,
@@ -482,8 +550,9 @@ class _CompassQueryBarState extends State<CompassQueryBar> {
               style: style,
               cursorColor: theme.accent,
               backgroundCursorColor: theme.bgInput,
-              keyboardType: keyboardType,
-              maxLines: 1,
+              keyboardType: TextInputType.multiline,
+              maxLines: null,
+              minLines: 1,
               onChanged: onChanged,
               onSubmitted: onSubmitted,
               onTapOutside: (event) =>
@@ -590,11 +659,11 @@ class _CompassQueryBarState extends State<CompassQueryBar> {
     );
   }
 
-  Widget _buildFindButtonCompact(CompassTheme theme, CompassDensity density) {
+  Widget _buildFindButtonCompact(CompassTheme theme, CompassDensity density, {VoidCallback? onTap}) {
     return ConstrainedBox(
       constraints: BoxConstraints(minHeight: density.minTapTarget),
       child: CompassHover(
-        onTap: widget.onExecuteQuery,
+        onTap: onTap ?? widget.onExecuteQuery,
         semanticLabel: 'Run query',
         builder: (hovered) => Container(
           height: 34.0,
@@ -618,27 +687,34 @@ class _CompassQueryBarState extends State<CompassQueryBar> {
     return CompositedTransformTarget(
       link: _filterMenuAnchor,
       child: Container(
-        height: compact ? 34.0 : 36.0,
+        constraints: BoxConstraints(minHeight: compact ? 34.0 : 36.0),
         decoration: BoxDecoration(
           color: theme.bgInput,
           borderRadius: BorderRadius.circular(8.0),
           border:
               Border.all(color: theme.border, width: 1.0),
         ),
-        padding: const EdgeInsets.symmetric(horizontal: 10.0),
+        padding: const EdgeInsets.symmetric(horizontal: 10.0, vertical: 6.0),
         child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            CompassSvg(
-              svgString: CompassSvgIcons.search,
-              size: 14.0,
-              color: theme.textMuted,
+            Padding(
+              padding: const EdgeInsets.only(top: 2.0),
+              child: CompassSvg(
+                svgString: CompassSvgIcons.search,
+                size: 14.0,
+                color: theme.textMuted,
+              ),
             ),
             const SizedBox(width: 6.0),
-            Text(
-              'FILTER',
-              style: CompassTypography.monoBold(
-                color: theme.accent,
-                size: 11.0,
+            Padding(
+              padding: const EdgeInsets.only(top: 2.0),
+              child: Text(
+                'FILTER',
+                style: CompassTypography.monoBold(
+                  color: theme.accent,
+                  size: 11.0,
+                ),
               ),
             ),
             const SizedBox(width: 8.0),
@@ -650,7 +726,9 @@ class _CompassQueryBarState extends State<CompassQueryBar> {
                 placeholder:
                     "{ field: 'value', year: { \$gte: 1990 } }",
                 onChanged: _handleFilterChange,
-                onSubmitted: (_) => widget.onExecuteQuery(),
+                onSubmitted: (value) {
+                  _executeWithCurrentFilter();
+                },
                 fontSize: 12.0,
                 anchorLink: _filterMenuAnchor,
               ),
@@ -785,11 +863,11 @@ class _CompassQueryBarState extends State<CompassQueryBar> {
   }
 
   /// Runs the query.
-  Widget _buildFindButton(CompassTheme theme, CompassDensity density) {
+  Widget _buildFindButton(CompassTheme theme, CompassDensity density, {VoidCallback? onTap}) {
     return ConstrainedBox(
       constraints: BoxConstraints(minHeight: density.minTapTarget),
       child: CompassHover(
-        onTap: widget.onExecuteQuery,
+        onTap: onTap ?? widget.onExecuteQuery,
         semanticLabel: 'Run query',
         builder: (hovered) => Container(
           height: 36.0,

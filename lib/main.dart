@@ -63,18 +63,13 @@ class CompassApp extends StatefulWidget {
 
 class _CompassAppState extends State<CompassApp> {
   bool _isDarkMode = true;
-  ConnectionProfile? _connection = ConnectionProfile(
-    id: 'default',
-    name: 'Local Standalone',
-    uri: 'mongodb://localhost:27017',
-    lastConnected: 'Just now',
-  );
+  ConnectionProfile? _connection;
 
   /// Non-null while the UI is backed by an actual MongoDB server (rather than
   /// the bundled sample data).
   RealMongoService? _realService;
 
-  bool _isConnectModalOpen = false;
+  bool _isConnectModalOpen = true;
   bool _isTerminalOpen = false;
   bool _isMobileSidebarOpen = false;
 
@@ -663,6 +658,10 @@ class _CompassAppState extends State<CompassApp> {
   void _executeTerminalCommand(String command) {
     final service = mongoEngine;
     final cmd = command.trim();
+    if (cmd == 'show dbs') {
+      setState(() {});
+      return;
+    }
 
     if (RegExp(r'db\.dropDatabase\s*\(\s*\)').hasMatch(cmd)) {
       final droppedDb = _selectedDbName;
@@ -925,7 +924,7 @@ class _CompassAppState extends State<CompassApp> {
                     onClose: () {
                       setState(() => _isTerminalOpen = false);
                     },
-                    activeDbName: _selectedDbName,
+                    activeDbName: _selectedDbName.isEmpty ? (mongoEngine.getDatabases().firstOrNull?.name ?? '') : _selectedDbName,
                     onExecuteCommand: (command) => _executeTerminalCommand(command),
                     onRequestConfirmation: _requestTerminalConfirmation,
                   ),

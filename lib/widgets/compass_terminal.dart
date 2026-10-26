@@ -91,7 +91,9 @@ class _CompassTerminalState extends State<CompassTerminal> {
           '  db.<coll>.deleteMany(filter) delete matching documents [Risky Confirmation]\n'
           '  db.dropDatabase()            drop current database [Risky Confirmation]';
     }
-    if (c == 'show dbs') return '(database list rendered in the sidebar)';
+    if (c == 'show dbs') {
+      return '(database list rendered in the sidebar)';
+    }
     if (c == 'show collections') return '(collection list rendered in the sidebar)';
     if (c.startsWith('db.') || c.startsWith('show ') || c.startsWith('use ')) {
       return 'Command acknowledged.';
