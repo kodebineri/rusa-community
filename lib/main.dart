@@ -12,6 +12,7 @@ import 'services/local_mongo_engine.dart';
 import 'services/mongo_engine.dart';
 import 'services/real_mongo_service.dart';
 import 'widgets/compass_header.dart';
+import 'widgets/compass_hover.dart';
 import 'widgets/compass_icon_button.dart';
 import 'widgets/collection_tab_bar.dart';
 import 'widgets/compass_sidebar.dart';
@@ -62,6 +63,77 @@ class CompassApp extends StatefulWidget {
 }
 
 class _CompassAppState extends State<CompassApp> {
+  void _showInfoDialog(String title, String message) {
+    final overlay = Overlay.of(context);
+    late OverlayEntry entry;
+    entry = OverlayEntry(
+      builder: (context) {
+        final theme = _theme;
+        return Stack(
+          children: [
+            Positioned.fill(
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: () => entry.remove(),
+                child: Container(color: const Color(0x80000000)),
+              ),
+            ),
+            Center(
+              child: Container(
+                width: 360,
+                decoration: BoxDecoration(
+                  color: theme.bgPanel,
+                  borderRadius: BorderRadius.circular(10.0),
+                  border: Border.all(color: theme.border, width: 1.0),
+                  boxShadow: const [
+                    BoxShadow(
+                      color: Color(0x33000000),
+                      blurRadius: 12.0,
+                      offset: Offset(0, 6),
+                    ),
+                  ],
+                ),
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Text(title,
+                        style: CompassTypography.header(color: theme.textPrimary)),
+                    const SizedBox(height: 8.0),
+                    Text(message,
+                        style:
+                            CompassTypography.bodyRegular(color: theme.textSecondary)),
+                    const SizedBox(height: 16.0),
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: CompassHover(
+                        onTap: () => entry.remove(),
+                        builder: (hovered) => Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 14.0, vertical: 6.0),
+                          decoration: BoxDecoration(
+                            color: hovered
+                                ? CompassColors.greenHover
+                                : theme.accent,
+                            borderRadius: BorderRadius.circular(6.0),
+                          ),
+                          child: Text('OK',
+                              style:
+                                  CompassTypography.header(color: theme.onAccent)),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+    overlay.insert(entry);
+  }
   bool _isDarkMode = true;
   ConnectionProfile? _connection;
 
@@ -824,6 +896,15 @@ class _CompassAppState extends State<CompassApp> {
                     onOpenActions: () {
                       setState(() => _isHeaderActionsOpen = true);
                     },
+                    onReportBug: () {
+                      _showInfoDialog('Report Bug', 'Please open an issue at https://github.com/mongodb-js/compass/issues or contact your administrator.');
+                    },
+                    onShowEula: () {
+                      _showInfoDialog('EULA', 'MongoDB Compass is licensed under the Server Side Public License (SSPL).');
+                    },
+                    onShowAbout: () {
+                      _showInfoDialog('About', 'MongoDB Compass (Flutter Port)\nVersion 7.0.8\n\nA MongoDB Compass clone written in Flutter.');
+                    },
                   ),
 
                   // Main Body: Side-by-side on desktop, or off-canvas sidebar
@@ -1114,6 +1195,33 @@ class _CompassAppState extends State<CompassApp> {
                       destructive: true,
                       onTap: _handleDisconnect,
                     ),
+                  CompassActionSheetItem(
+                    label: 'Report Bug',
+                    svg: CompassSvgIcons.activity,
+                    onTap: () {
+                      setState(() => _isHeaderActionsOpen = false);
+                      _showInfoDialog('Report Bug',
+                          'Please open an issue at https://github.com/mongodb-js/compass/issues or contact your administrator.');
+                    },
+                  ),
+                  CompassActionSheetItem(
+                    label: 'EULA',
+                    svg: CompassSvgIcons.file,
+                    onTap: () {
+                      setState(() => _isHeaderActionsOpen = false);
+                      _showInfoDialog('EULA',
+                          'MongoDB Compass is licensed under the Server Side Public License (SSPL).');
+                    },
+                  ),
+                  CompassActionSheetItem(
+                    label: 'About',
+                    svg: CompassSvgIcons.key,
+                    onTap: () {
+                      setState(() => _isHeaderActionsOpen = false);
+                      _showInfoDialog('About',
+                          'MongoDB Compass (Flutter Port)\nVersion 7.0.8\n\nA MongoDB Compass clone written in Flutter.');
+                    },
+                  ),
                 ],
               ),
 

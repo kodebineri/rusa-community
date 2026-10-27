@@ -36,6 +36,10 @@ class CompassHeader extends StatelessWidget {
   /// on touch layouts.
   final VoidCallback? onOpenActions;
 
+  final VoidCallback? onReportBug;
+  final VoidCallback? onShowEula;
+  final VoidCallback? onShowAbout;
+
   const CompassHeader({
     super.key,
     required this.connection,
@@ -50,6 +54,9 @@ class CompassHeader extends StatelessWidget {
     required this.onToggleMobileSidebar,
     this.isMobile = false,
     this.onOpenActions,
+    this.onReportBug,
+    this.onShowEula,
+    this.onShowAbout,
   });
 
   @override
@@ -406,6 +413,90 @@ class CompassHeader extends StatelessWidget {
                       ),
                     ),
                   ),
+
+                const SizedBox(width: 4.0),
+
+                // More menu (Report Bug, EULA, About) - rightmost
+                CompassIconButton(
+                  svgString: CompassSvgIcons.moreVertical,
+                  onTap: () {
+                    final overlay = Overlay.of(context);
+                    final RenderBox? button = context.findRenderObject() as RenderBox?;
+                    if (button == null) return;
+                    final offset = button.localToGlobal(Offset.zero);
+                    final size = button.size;
+                    late OverlayEntry entry;
+                    entry = OverlayEntry(
+                      builder: (context) {
+                        final themeMenu = CompassTheme.of(context);
+                        return Stack(
+                          children: [
+                            Positioned.fill(
+                              child: GestureDetector(
+                                behavior: HitTestBehavior.opaque,
+                                onTap: () => entry.remove(),
+                              ),
+                            ),
+                            Positioned(
+                              right: 8.0,
+                              top: offset.dy + size.height + 4.0,
+                              child: Container(
+                                width: 160.0,
+                                decoration: BoxDecoration(
+                                  color: themeMenu.bgPanel,
+                                  borderRadius: BorderRadius.circular(8.0),
+                                  border: Border.all(color: themeMenu.border, width: 1.0),
+                                  boxShadow: const [
+                                    BoxShadow(
+                                      color: Color(0x33000000),
+                                      blurRadius: 8.0,
+                                      offset: Offset(0, 4),
+                                    ),
+                                  ],
+                                ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    _buildHeaderMenuItem(
+                                      themeMenu,
+                                      label: 'Report Bug',
+                                      onTap: () {
+                                        entry.remove();
+                                        onReportBug?.call();
+                                      },
+                                    ),
+                                    _buildHeaderMenuItem(
+                                      themeMenu,
+                                      label: 'EULA',
+                                      onTap: () {
+                                        entry.remove();
+                                        onShowEula?.call();
+                                      },
+                                    ),
+                                    _buildHeaderMenuItem(
+                                      themeMenu,
+                                      label: 'About',
+                                      onTap: () {
+                                        entry.remove();
+                                        onShowAbout?.call();
+                                      },
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
+                        );
+                      },
+                    );
+                    overlay.insert(entry);
+                  },
+                  size: 18.0,
+                  padding: 7.0,
+                  color: theme.textSecondary,
+                  semanticLabel: 'More menu',
+                ),
               ] else ...[
                 const SizedBox(width: 4.0),
 
@@ -426,5 +517,22 @@ class CompassHeader extends StatelessWidget {
     ),
   ),
 );
+
+  }
+
+  Widget _buildHeaderMenuItem(CompassTheme theme, {required String label, required VoidCallback onTap}) {
+    return CompassHover(
+      onTap: onTap,
+      builder: (hovered) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),
+        decoration: BoxDecoration(
+          color: hovered ? theme.bgHover : null,
+        ),
+        child: Text(
+          label,
+          style: CompassTypography.bodyRegular(color: theme.textPrimary),
+        ),
+      ),
+    );
   }
 }
