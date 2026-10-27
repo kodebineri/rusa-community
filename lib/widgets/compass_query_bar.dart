@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import '../theme/compass_colors.dart';
 import '../theme/compass_density.dart';
@@ -494,11 +495,13 @@ class _CompassQueryBarState extends State<CompassQueryBar> {
     ValueChanged<String>? onSubmitted,
     TextInputType keyboardType = TextInputType.text,
     double fontSize = 11.0,
+    String indentString = '  ', // 2 spaces (or '\t' for tab)
   }) {
     final style =
         CompassTypography.monoRegular(color: theme.textPrimary, size: fontSize)
             .copyWith(fontFamily: 'JetBrains Mono');
     final CompassDensity density = CompassDensity.of(context);
+
     return ValueListenableBuilder<TextEditingValue>(
       valueListenable: controller,
       builder: (context, value, _) {
@@ -516,26 +519,43 @@ class _CompassQueryBarState extends State<CompassQueryBar> {
                 overflow: TextOverflow.ellipsis,
               ),
             ),
-            EditableText(
-              controller: controller,
-              focusNode: focusNode,
-              style: style,
-              cursorColor: theme.accent,
-              selectionColor: theme.accent.withOpacity(0.4),
-              selectionControls: getPlatformSelectionControls(),
-              backgroundCursorColor: theme.bgInput,
-              keyboardType: TextInputType.multiline,
-              maxLines: null,
-              minLines: 1,
-              onChanged: onChanged,
-              onSubmitted: onSubmitted,
-              onTapOutside: (event) =>
-                  compassHandleTapOutside(event, focusNode),
-              contextMenuBuilder:
-                  (BuildContext context, EditableTextState editableTextState) {
-                return compassTextContextMenuBuilderFor(anchorLink,
-                    density: density)(context, editableTextState);
+            Focus(
+              onKeyEvent: (FocusNode node, KeyEvent event) {
+                if (event is KeyDownEvent &&
+                    (event.logicalKey == LogicalKeyboardKey.enter ||
+                        event.logicalKey == LogicalKeyboardKey.numpadEnter)) {
+                  // If enter was pressed between matching brackets, format and consume key
+                  if (_handleEnterFormatting(controller, indentString)) {
+                    onChanged(controller.text);
+                    return KeyEventResult.handled;
+                  }
+                }
+                return KeyEventResult.ignored;
               },
+              child: EditableText(
+                controller: controller,
+                focusNode: focusNode,
+                style: style,
+                cursorColor: theme.accent,
+                selectionColor: theme.accent.withOpacity(0.4),
+                selectionControls: getPlatformSelectionControls(),
+                backgroundCursorColor: theme.bgInput,
+                keyboardType: TextInputType.multiline,
+                maxLines: null,
+                minLines: 1,
+                onChanged: (text) {
+                  _handleAutoClosePairs(controller);
+                  onChanged(controller.text);
+                },
+                onSubmitted: onSubmitted,
+                onTapOutside: (event) =>
+                    compassHandleTapOutside(event, focusNode),
+                contextMenuBuilder: (BuildContext context,
+                    EditableTextState editableTextState) {
+                  return compassTextContextMenuBuilderFor(anchorLink,
+                      density: density)(context, editableTextState);
+                },
+              ),
             ),
           ],
         );
@@ -862,5 +882,133 @@ class _CompassQueryBarState extends State<CompassQueryBar> {
         ),
       ),
     );
+  }
+
+  // Map of opening to closing pairs
+  final Map<String, String> _bracketPairs = const {
+    '(': ')',
+    '[': ']',
+    '{': '}',
+    '"': '"',
+    "'": "'",
+  };
+
+  TextEditingValue? _previousValue;
+
+  void _handleAutoClosePairs(TextEditingController controller) {
+    final current = controller.value;
+    final previous = _previousValue ?? current;
+    _previousValue = current;
+
+    // Ensure change was an insertion at a single point or selection replacement
+    if (current.text.length <= previous.text.length) return;
+
+    final selection = current.selection;
+    if (!selection.isCollapsed || selection.start <= 0) return;
+
+    final typedCharIndex = selection.start - 1;
+    final typedChar = current.text[typedCharIndex];
+
+    // Case 1: Typing an opening bracket
+    if (_bracketPairs.containsKey(typedChar)) {
+      final closePair = _bracketPairs[typedChar]!;
+
+      // Check if the user is typing over an existing identical closing bracket
+      if (typedChar == closePair &&
+          typedCharIndex + 1 < current.text.length &&
+          current.text[typedCharIndex + 1] == closePair) {
+        // Over-type existing closing quote/bracket
+        final newText =
+            current.text.replaceRange(typedCharIndex, typedCharIndex + 1, '');
+        controller.value = TextEditingValue(
+          text: newText,
+          selection: TextSelection.collapsed(offset: typedCharIndex + 1),
+        );
+        _previousValue = controller.value;
+        return;
+      }
+
+      // Insert the closing pair right after the cursor
+      final newText = current.text.substring(0, selection.start) +
+          closePair +
+          current.text.substring(selection.start);
+
+      controller.value = TextEditingValue(
+        text: newText,
+        selection: TextSelection.collapsed(offset: selection.start),
+      );
+      _previousValue = controller.value;
+      return;
+    }
+
+    // Case 2: User typed a closing bracket that already exists right after cursor
+    if (_bracketPairs.containsValue(typedChar)) {
+      if (selection.start < current.text.length &&
+          current.text[selection.start] == typedChar) {
+        // Skip over existing closing bracket instead of duplicating it
+        final newText = current.text.substring(0, typedCharIndex) +
+            current.text.substring(selection.start);
+
+        controller.value = TextEditingValue(
+          text: newText,
+          selection: TextSelection.collapsed(offset: selection.start),
+        );
+        _previousValue = controller.value;
+      }
+    }
+  }
+
+  final Map<String, String> _matchingPairs = const {
+    '(': ')',
+    '[': ']',
+    '{': '}',
+  };
+
+  bool _handleEnterFormatting(TextEditingController controller, String indent) {
+    final value = controller.value;
+    final selection = value.selection;
+
+    if (!selection.isCollapsed ||
+        selection.start <= 0 ||
+        selection.start >= value.text.length) {
+      return false;
+    }
+
+    final charBefore = value.text[selection.start - 1];
+    final charAfter = value.text[selection.start];
+
+    // Check if cursor is directly between a matching pair (e.g., {|} or [|] or (|))
+    if (_matchingPairs.containsKey(charBefore) &&
+        _matchingPairs[charBefore] == charAfter) {
+      // Detect existing line indentation leading up to charBefore
+      final textBeforeCursor = value.text.substring(0, selection.start - 1);
+      final lastNewlineIndex = textBeforeCursor.lastIndexOf('\n');
+      final currentLine = lastNewlineIndex == -1
+          ? textBeforeCursor
+          : textBeforeCursor.substring(lastNewlineIndex + 1);
+
+      final baseIndent = RegExp(r'^\s*').stringMatch(currentLine) ?? '';
+      final innerIndent = baseIndent + indent;
+
+      // Construct expanded block:
+      // {
+      //   | <- cursor here
+      // }
+      final prefix =
+          value.text.substring(0, selection.start) + '\n' + innerIndent;
+      final suffix = '\n' + baseIndent + value.text.substring(selection.start);
+
+      final newText = prefix + suffix;
+      final cursorOffset = prefix.length;
+
+      controller.value = TextEditingValue(
+        text: newText,
+        selection: TextSelection.collapsed(offset: cursorOffset),
+      );
+
+      return true; // Key event handled
+    }
+
+    return false;
   }
 }
