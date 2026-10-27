@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
+import 'package:mongodb_compass_flutter/utils/json_syntax_text_controller.dart';
 import '../theme/compass_colors.dart';
 import '../theme/compass_density.dart';
 import '../theme/compass_theme.dart';
@@ -68,11 +69,13 @@ class CompassQueryBar extends StatefulWidget {
 class _CompassQueryBarState extends State<CompassQueryBar> {
   bool _filterError = false;
 
-  late final TextEditingController _filterController;
-  late final TextEditingController _projectController;
-  late final TextEditingController _sortController;
+  late final JsonSyntaxTextController _filterController;
+  late final JsonSyntaxTextController _projectController;
+  late final JsonSyntaxTextController _sortController;
   late final TextEditingController _skipController;
   late final TextEditingController _limitController;
+
+  bool _initializedControllers = false;
 
   final FocusNode _filterFocus = FocusNode(debugLabel: 'query-filter');
   final FocusNode _projectFocus = FocusNode(debugLabel: 'query-project');
@@ -93,9 +96,6 @@ class _CompassQueryBarState extends State<CompassQueryBar> {
   @override
   void initState() {
     super.initState();
-    _filterController = TextEditingController(text: widget.options.filter);
-    _projectController = TextEditingController(text: widget.options.project);
-    _sortController = TextEditingController(text: widget.options.sort);
     _skipController =
         TextEditingController(text: widget.options.skip.toString());
     _limitController =
@@ -112,6 +112,33 @@ class _CompassQueryBarState extends State<CompassQueryBar> {
         _sync(_limitController, widget.options.limit.toString());
       }
     });
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final theme = CompassTheme.of(context);
+
+    if (!_initializedControllers) {
+      _filterController = JsonSyntaxTextController(
+        text: widget.options.filter,
+        theme: theme,
+      );
+      _projectController = JsonSyntaxTextController(
+        text: widget.options.project,
+        theme: theme,
+      );
+      _sortController = JsonSyntaxTextController(
+        text: widget.options.sort,
+        theme: theme,
+      );
+      _initializedControllers = true;
+    } else {
+      // Keep theme up-to-date if application dynamic theme changes
+      _filterController.theme = theme;
+      _projectController.theme = theme;
+      _sortController.theme = theme;
+    }
   }
 
   @override
@@ -495,7 +522,7 @@ class _CompassQueryBarState extends State<CompassQueryBar> {
     ValueChanged<String>? onSubmitted,
     TextInputType keyboardType = TextInputType.text,
     double fontSize = 11.0,
-    String indentString = '  ', // 2 spaces (or '\t' for tab)
+    String indentString = '    ', // 4 spaces (or '\t' for tab)
   }) {
     final style =
         CompassTypography.monoRegular(color: theme.textPrimary, size: fontSize)
