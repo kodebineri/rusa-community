@@ -1,8 +1,11 @@
+import 'dart:convert';
 import 'package:flutter/widgets.dart';
 import '../theme/compass_colors.dart';
 import '../theme/compass_density.dart';
 import '../theme/compass_typography.dart';
 import '../icons/compass_svg_icons.dart';
+import '../services/mongo_engine.dart';
+import '../models/mongo_models.dart';
 import 'compass_icon_button.dart';
 import 'compass_text_menu.dart';
 import 'modals/mongosh_confirmation_modal.dart';
@@ -74,27 +77,177 @@ class _CompassTerminalState extends State<CompassTerminal> {
     if (!mounted) return;
     setState(() {
       _history.add({
-        'prompt': widget.activeDbName,
+        'prompt': widget.activeDbName.isEmpty ? 'test' : widget.activeDbName,
         'command': command,
-        'output': _simulateOutput(command),
+        'output': _executeReal(command),
       });
     });
   }
 
-  String _simulateOutput(String command) {
+  (String, String) _splitArgsTerminal(String args) {
+    var depth = 0;
+    for (var i = 0; i < args.length; i++) {
+      final ch = args[i];
+      if (ch == '{' || ch == '[' || ch == '(') depth++;
+      if (ch == '}' || ch == ']' || ch == ')') depth--;
+      if (ch == ',' && depth == 0) {
+        return (args.substring(0, i), args.substring(i + 1));
+      }
+    }
+    return (args, '{}');
+  }
+
+  Map<String, dynamic> _parseMapTerminal(String text) {
+    try {
+      final parsed = mongoEngine.tolerantParse(text);
+      return parsed is Map ? Map<String, dynamic>.from(parsed) : <String, dynamic>{};
+    } catch (_) {
+      return <String, dynamic>{};
+    }
+  }
+
+  String _executeReal(String command) {
     final c = command.trim();
     if (c == 'help') {
       return '  show dbs                     show database names\n'
           '  show collections             show collections in current database\n'
           '  db.<coll>.find(filter)       query a collection\n'
           '  db.<coll>.insertOne(doc)     insert a document\n'
+          '  db.<coll>.updateOne(filter, update)\n'
+          '  db.<coll>.updateMany(filter, update)\n'
+          '  db.<coll>.deleteOne(filter)\n'
           '  db.<coll>.deleteMany(filter) delete matching documents [Risky Confirmation]\n'
           '  db.dropDatabase()            drop current database [Risky Confirmation]';
     }
     if (c == 'show dbs') {
-      return '(database list rendered in the sidebar)';
+      try {
+        final dbs = mongoEngine.getDatabases();
+        if (dbs.isEmpty) return '[]';
+        return dbs.map((d) => d.name).join('\n');
+      } catch (e) {
+        return '$e';
+      }
     }
-    if (c == 'show collections') return '(collection list rendered in the sidebar)';
+    if (c == 'show collections') {
+      try {
+        final dbName = widget.activeDbName;
+        if (dbName.isEmpty) return '[]';
+        final db = mongoEngine.getDatabase(dbName);
+        if (db == null) return '[]';
+        final cols = db.collections.keys.toList();
+        if (cols.isEmpty) return '[]';
+        return cols.join('\n');
+      } catch (e) {
+        return '$e';
+      }
+    }
+    if (c.startsWith('use ')) {
+      return 'switched to db ${c.substring(4).trim().replaceAll(RegExp(r';$'), '').trim()}';
+    }
+    // db.<coll>.find({...})
+    final findMatch = RegExp(r'db\.([A-Za-z0-9_]+)\.find\s*\((.*)\)\s*;?\s*$', dotAll: true).firstMatch(c);
+    if (findMatch != null) {
+      try {
+        final collName = findMatch.group(1)!;
+        final args = findMatch.group(2) ?? '';
+        Map<String, dynamic> filter = {};
+        if (args.trim().isNotEmpty) {
+          try {
+            final parsed = mongoEngine.tolerantParse(args);
+            if (parsed is Map) {
+              filter = Map<String, dynamic>.from(parsed);
+            }
+          } catch (_) {}
+        }
+        final res2 = mongoEngine.findDocuments(widget.activeDbName, collName, QueryFilterOptions(filter: filter.isEmpty ? '' : jsonEncode(filter)));
+        final docs = res2.documents;
+        final list = docs.map((d) => d.data).toList();
+        const encoder = JsonEncoder.withIndent('  ');
+        return encoder.convert(list);
+      } catch (e) {
+        return '$e';
+      }
+    }
+    // db.<coll>.updateOne(filter, update)
+    final updateOneMatch = RegExp(r'db\.([A-Za-z0-9_]+)\.updateOne\s*\((.*)\)\s*;?\s*$', dotAll: true).firstMatch(c);
+    if (updateOneMatch != null) {
+      try {
+        final collName = updateOneMatch.group(1)!;
+        final args = updateOneMatch.group(2) ?? '';
+        final split = _splitArgsTerminal(args);
+        final filter = _parseMapTerminal(split.$1);
+        final update = _parseMapTerminal(split.$2);
+        // Try to update first matching document
+        final res = mongoEngine.findDocuments(widget.activeDbName, collName, QueryFilterOptions(filter: filter.isEmpty ? '' : jsonEncode(filter)));
+        if (res.documents.isEmpty) {
+          return '{ "acknowledged": true, "matchedCount": 0, "modifiedCount": 0, "upsertedId": null }';
+        }
+        final docId = res.documents.first.id;
+        mongoEngine.updateDocument(widget.activeDbName, collName, docId, update);
+        return '{ "acknowledged": true, "matchedCount": 1, "modifiedCount": 1, "upsertedId": null }';
+      } catch (e) {
+        return '$e';
+      }
+    }
+    // db.<coll>.updateMany(filter, update)
+    final updateManyMatch = RegExp(r'db\.([A-Za-z0-9_]+)\.updateMany\s*\((.*)\)\s*;?\s*$', dotAll: true).firstMatch(c);
+    if (updateManyMatch != null) {
+      try {
+        final collName = updateManyMatch.group(1)!;
+        final args = updateManyMatch.group(2) ?? '';
+        final split = _splitArgsTerminal(args);
+        final filter = _parseMapTerminal(split.$1);
+        final update = _parseMapTerminal(split.$2);
+        final res = mongoEngine.findDocuments(widget.activeDbName, collName, QueryFilterOptions(filter: filter.isEmpty ? '' : jsonEncode(filter)));
+        int modified = 0;
+        for (final d in res.documents) {
+          try {
+            mongoEngine.updateDocument(widget.activeDbName, collName, d.id, update);
+            modified++;
+          } catch (_) {}
+        }
+        return '{ "acknowledged": true, "matchedCount": ${res.documents.length}, "modifiedCount": $modified, "upsertedId": null }';
+      } catch (e) {
+        return '$e';
+      }
+    }
+    // db.<coll>.deleteOne(filter)
+    final deleteOneMatch = RegExp(r'db\.([A-Za-z0-9_]+)\.deleteOne\s*\((.*)\)\s*;?\s*$', dotAll: true).firstMatch(c);
+    if (deleteOneMatch != null) {
+      try {
+        final collName = deleteOneMatch.group(1)!;
+        final args = deleteOneMatch.group(2) ?? '';
+        final filter = _parseMapTerminal(args);
+        final res = mongoEngine.findDocuments(widget.activeDbName, collName, QueryFilterOptions(filter: filter.isEmpty ? '' : jsonEncode(filter)));
+        if (res.documents.isEmpty) {
+          return '{ "acknowledged": true, "deletedCount": 0 }';
+        }
+        mongoEngine.deleteDocument(widget.activeDbName, collName, res.documents.first.id);
+        return '{ "acknowledged": true, "deletedCount": 1 }';
+      } catch (e) {
+        return '$e';
+      }
+    }
+    // db.<coll>.deleteMany(filter)
+    final deleteManyMatch = RegExp(r'db\.([A-Za-z0-9_]+)\.deleteMany\s*\((.*)\)\s*;?\s*$', dotAll: true).firstMatch(c);
+    if (deleteManyMatch != null) {
+      try {
+        final collName = deleteManyMatch.group(1)!;
+        final args = deleteManyMatch.group(2) ?? '';
+        final filter = _parseMapTerminal(args);
+        final res = mongoEngine.findDocuments(widget.activeDbName, collName, QueryFilterOptions(filter: filter.isEmpty ? '' : jsonEncode(filter)));
+        int deleted = 0;
+        for (final d in res.documents) {
+          try {
+            mongoEngine.deleteDocument(widget.activeDbName, collName, d.id);
+            deleted++;
+          } catch (_) {}
+        }
+        return '{ "acknowledged": true, "deletedCount": $deleted }';
+      } catch (e) {
+        return '$e';
+      }
+    }
     if (c.startsWith('db.') || c.startsWith('show ') || c.startsWith('use ')) {
       return 'Command acknowledged.';
     }

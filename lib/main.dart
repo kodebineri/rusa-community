@@ -662,6 +662,25 @@ class _CompassAppState extends State<CompassApp> {
       setState(() {});
       return;
     }
+    if (cmd == 'show collections') {
+      setState(() {});
+      return;
+    }
+    if (cmd.startsWith('use ')) {
+      final dbName = cmd.substring(4).trim().replaceAll(RegExp(r';$'), '').trim();
+      if (dbName.isNotEmpty && service.getDatabase(dbName) != null) {
+        setState(() {
+          _selectedDbName = dbName;
+          // Open first collection if exists
+          final db = service.getDatabase(dbName);
+          final coll = db?.collections.keys.firstOrNull;
+          if (coll != null) {
+            _openCollectionTab(dbName, coll);
+          }
+        });
+      }
+      return;
+    }
 
     if (RegExp(r'db\.dropDatabase\s*\(\s*\)').hasMatch(cmd)) {
       final droppedDb = _selectedDbName;
