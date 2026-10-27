@@ -293,7 +293,7 @@ class _TreeNodeWidgetState extends State<_TreeNodeWidget> {
                   Expanded(
                     flex: 5,
                     child: Text(
-                      type == 'String' ? '"${widget.value}"' : '${widget.value}',
+                      type == 'String' ? '"${widget.value}"' : type == 'Date' ? 'ISODate("${widget.value}")' : '${widget.value}',
                       overflow: TextOverflow.ellipsis,
                       maxLines: 1,
                       style: CompassTypography.monoRegular(

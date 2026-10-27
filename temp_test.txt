@@ -1,0 +1,96 @@
+  testWidgets('query bar filter stays editable across empty/non-empty', (WidgetTester tester) async {
+    tester.view.physicalSize = const Size(1920.0, 1080.0);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    QueryFilterOptions? last;
+
+    await tester.pumpWidget(
+      Directionality(
+        textDirection: TextDirection.ltr,
+        child: Overlay(
+          initialEntries: [
+            OverlayEntry(
+              builder: (context) => MediaQuery(
+                data: const MediaQueryData(size: Size(1920.0, 1080.0)),
+                child: CompassQueryBar(
+                  options: QueryFilterOptions(),
+                  onChangeOptions: (updated) => last = updated,
+                  onExecuteQuery: () {},
+                  onResetQuery: () {},
+                  onExportToLanguage: () {},
+                  optionsExpanded: false,
+                  onToggleOptions: () {},
+                  onOpenOverflow: () {},
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+    await tester.pump();
+    for (var i = 0; i < 50 && tester.takeException() != null; i++) {}
+
+    final filterField = find.byType(EditableText);
+    expect(filterField, findsOneWidget);
+
+    final elementBefore = tester.element(filterField);
+
+    await tester.enterText(filterField, 'abc');
+    await tester.pump();
+    expect(last?.filter, 'abc');
+    // The EditableText element must survive typing...
+    expect(identical(tester.element(filterField), elementBefore), isTrue);
+
+    // ...and clearing to empty (backspace to nothing) must NOT recreate it,
+    // otherwise the text-input connection is dropped and the field becomes
+    // uneditable.
+    await tester.enterText(filterField, '');
+    await tester.pump();
+    expect(last?.filter, '');
+    expect(identical(tester.element(filterField), elementBefore), isTrue);
+
+    // It must still accept input after having been emptied.
+    await tester.enterText(filterField, 'xy');
+    await tester.pump();
+    expect(last?.filter, 'xy');
+    expect(identical(tester.element(filterField), elementBefore), isTrue);
+
+    for (var i = 0; i < 50 && tester.takeException() != null; i++) {}
+  });
+
+  testWidgets('CompassInput handles Backspace and arrow keys (needs DefaultTextEditingShortcuts)',
+      (WidgetTester tester) async {
+    final controller = TextEditingController(text: 'abc');
+    addTearDown(controller.dispose);
+
+    // Mirrors main(): the app is wrapped in DefaultTextEditingShortcuts so
+    // bare EditableText fields honour Backspace / arrow keys.
+    await tester.pumpWidget(
+      Directionality(
+        textDirection: TextDirection.ltr,
+        child: Overlay(
+          initialEntries: [
+            OverlayEntry(
+              builder: (context) => MediaQuery(
+                data: const MediaQueryData(size: Size(800.0, 600.0)),
+                child: DefaultTextEditingShortcuts(
+                  child: Center(
+                    child: SizedBox(
+                      width: 400.0,
+                      child: CompassInput(controller: controller, placeholder: 'type'),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+    await tester.pump();
+
+    // Focus the field by tapping it.
+

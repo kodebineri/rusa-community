@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/widgets.dart';
 import '../theme/compass_colors.dart';
 import '../theme/compass_density.dart';
@@ -10,6 +11,8 @@ import '../models/mongo_models.dart';
 import 'compass_hover.dart';
 import 'compass_icon_button.dart';
 import 'compass_text_menu.dart';
+import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 
 /// Converted from src/components/QueryBar.tsx
 /// Adheres strictly to:
@@ -167,70 +170,11 @@ class _CompassQueryBarState extends State<CompassQueryBar> {
     _sync(controller, value);
   }
 
-  String _lastFilterText = '';
-
   void _handleFilterChange(String value) {
     if (!mounted) return;
-    // Completely empty
     if (value.isEmpty) {
       if (_filterError) setState(() => _filterError = false);
-      _lastFilterText = '';
-      if (_filterController.text != '') {
-        _filterController.text = '';
-      }
       widget.onChangeOptions(widget.options.copyWith(filter: ''));
-      return;
-    }
-    // Auto-close only when adding a single opening bracket and cursor is at end (collapsed)
-    try {
-      final sel = _filterController.selection;
-      if (sel.isValid && sel.isCollapsed && value.length == _lastFilterText.length + 1) {
-        if (value.isNotEmpty) {
-          final last = value[value.length - 1];
-          if (last == '{') {
-            final newValue = '$value}';
-            _filterController.value = TextEditingValue(
-              text: newValue,
-              selection: TextSelection.collapsed(offset: value.length),
-            );
-            value = newValue;
-          } else if (last == '[') {
-            final newValue = '$value]';
-            _filterController.value = TextEditingValue(
-              text: newValue,
-              selection: TextSelection.collapsed(offset: value.length),
-            );
-            value = newValue;
-          } else if (last == '(') {
-            final newValue = '$value)';
-            _filterController.value = TextEditingValue(
-              text: newValue,
-              selection: TextSelection.collapsed(offset: value.length),
-            );
-            value = newValue;
-          }
-        }
-      } else if (sel.isValid && sel.isCollapsed && value.length > _lastFilterText.length) {
-        // Fallback for cases where length differs slightly
-        if (value.isNotEmpty) {
-          final last = value[value.length - 1];
-          if (last == '[') {
-            // Check if we just typed [ and need to close
-            if (_lastFilterText.isNotEmpty && _lastFilterText.endsWith('[') == false && value.endsWith('[') && !value.endsWith('[]')) {
-              final newValue = '$value]';
-              _filterController.value = TextEditingValue(
-                text: newValue,
-                selection: TextSelection.collapsed(offset: value.length),
-              );
-              value = newValue;
-            }
-          }
-        }
-      }
-    } catch (_) {}
-    _lastFilterText = value;
-    if (value.trim().isEmpty) {
-      if (_filterError) setState(() => _filterError = false);
       return;
     }
     if (value.trim().isEmpty) {
@@ -255,7 +199,8 @@ class _CompassQueryBarState extends State<CompassQueryBar> {
   }
 
   void _executeWithCurrentFilter() {
-    widget.onChangeOptions(widget.options.copyWith(filter: _filterController.text));
+    widget.onChangeOptions(
+        widget.options.copyWith(filter: _filterController.text));
     widget.onExecuteQuery();
   }
 
@@ -297,7 +242,8 @@ class _CompassQueryBarState extends State<CompassQueryBar> {
           bottom: BorderSide(color: theme.border, width: 1.0),
         ),
       ),
-      padding: EdgeInsets.symmetric(horizontal: 16.0, vertical: isTiny ? 6.0 : 10.0),
+      padding:
+          EdgeInsets.symmetric(horizontal: 16.0, vertical: isTiny ? 6.0 : 10.0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -312,9 +258,11 @@ class _CompassQueryBarState extends State<CompassQueryBar> {
                   children: [
                     Row(
                       children: [
-                        Expanded(child: _buildFilterInput(theme, compact: true)),
+                        Expanded(
+                            child: _buildFilterInput(theme, compact: true)),
                         const SizedBox(width: 6.0),
-                        _buildFindButtonCompact(theme, density, onTap: _executeWithCurrentFilter),
+                        _buildFindButtonCompact(theme, density,
+                            onTap: _executeWithCurrentFilter),
                         const SizedBox(width: 4.0),
                         SizedBox(
                           width: density.minTapTarget,
@@ -329,7 +277,8 @@ class _CompassQueryBarState extends State<CompassQueryBar> {
                                 decoration: BoxDecoration(
                                   color: theme.bgSubtle,
                                   borderRadius: BorderRadius.circular(8.0),
-                                  border: Border.all(color: theme.border, width: 1.0),
+                                  border: Border.all(
+                                      color: theme.border, width: 1.0),
                                 ),
                                 alignment: Alignment.center,
                                 child: CompassSvg(
@@ -367,7 +316,8 @@ class _CompassQueryBarState extends State<CompassQueryBar> {
                         _buildOptionsButton(theme, density),
                         _buildResetButton(theme),
                         _buildShowCodeButton(theme, density),
-                        _buildFindButton(theme, density, onTap: _executeWithCurrentFilter),
+                        _buildFindButton(theme, density,
+                            onTap: _executeWithCurrentFilter),
                       ],
                     ),
                   ],
@@ -396,7 +346,8 @@ class _CompassQueryBarState extends State<CompassQueryBar> {
                   const SizedBox(width: 8.0),
 
                   // Find Button (Primary)
-                  _buildFindButton(theme, density, onTap: _executeWithCurrentFilter),
+                  _buildFindButton(theme, density,
+                      onTap: _executeWithCurrentFilter),
                 ],
               );
             },
@@ -409,24 +360,31 @@ class _CompassQueryBarState extends State<CompassQueryBar> {
           ],
 
           // Query Stats Ribbon
-          if (!isTiny && (widget.totalResultsCount != null ||
-              widget.executionTimeMs != null)) ...[
+          if (!isTiny &&
+              (widget.totalResultsCount != null ||
+                  widget.executionTimeMs != null)) ...[
             const SizedBox(height: 6.0),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Row(
                   children: [
-                    Text('Matches: ', style: CompassTypography.monoSmall(color: theme.textSecondary)),
+                    Text('Matches: ',
+                        style: CompassTypography.monoSmall(
+                            color: theme.textSecondary)),
                     Text(
                       '${widget.totalResultsCount ?? 0}',
                       style: CompassTypography.monoBold(
                           color: theme.textPrimary, size: 11.0),
                     ),
                     const SizedBox(width: 8.0),
-                    Text('·', style: CompassTypography.monoSmall(color: theme.textMuted)),
+                    Text('·',
+                        style: CompassTypography.monoSmall(
+                            color: theme.textMuted)),
                     const SizedBox(width: 8.0),
-                    Text('Time: ', style: CompassTypography.monoSmall(color: theme.textSecondary)),
+                    Text('Time: ',
+                        style: CompassTypography.monoSmall(
+                            color: theme.textSecondary)),
                     Text(
                       '${widget.executionTimeMs ?? 0.8}ms',
                       style: CompassTypography.monoBold(
@@ -439,8 +397,7 @@ class _CompassQueryBarState extends State<CompassQueryBar> {
                 if (showKeyboardHint)
                   Text(
                     'Tip: Press Enter to find',
-                    style: CompassTypography.caption(
-                        color: theme.textMuted),
+                    style: CompassTypography.caption(color: theme.textMuted),
                   ),
               ],
             ),
@@ -475,8 +432,7 @@ class _CompassQueryBarState extends State<CompassQueryBar> {
             if (subtitle != null)
               Text(
                 subtitle,
-                style: CompassTypography.caption(
-                    color: theme.textMuted),
+                style: CompassTypography.caption(color: theme.textMuted),
               ),
           ],
         ),
@@ -508,6 +464,21 @@ class _CompassQueryBarState extends State<CompassQueryBar> {
     );
   }
 
+  TextSelectionControls getPlatformSelectionControls() {
+    switch (defaultTargetPlatform) {
+      case TargetPlatform.iOS:
+      case TargetPlatform.macOS:
+        return cupertinoTextSelectionControls;
+      case TargetPlatform.windows:
+      case TargetPlatform.linux:
+        return desktopTextSelectionControls;
+      case TargetPlatform.android:
+      case TargetPlatform.fuchsia:
+      default:
+        return materialTextSelectionControls;
+    }
+  }
+
   /// Material-free single-line editable text with placeholder overlay.
   ///
   /// The placeholder is always in the tree (only its visibility toggles) so the
@@ -524,8 +495,9 @@ class _CompassQueryBarState extends State<CompassQueryBar> {
     TextInputType keyboardType = TextInputType.text,
     double fontSize = 11.0,
   }) {
-    final style = CompassTypography.monoRegular(
-        color: theme.textPrimary, size: fontSize).copyWith(fontFamily: 'JetBrains Mono');
+    final style =
+        CompassTypography.monoRegular(color: theme.textPrimary, size: fontSize)
+            .copyWith(fontFamily: 'JetBrains Mono');
     final CompassDensity density = CompassDensity.of(context);
     return ValueListenableBuilder<TextEditingValue>(
       valueListenable: controller,
@@ -549,6 +521,8 @@ class _CompassQueryBarState extends State<CompassQueryBar> {
               focusNode: focusNode,
               style: style,
               cursorColor: theme.accent,
+              selectionColor: theme.accent.withOpacity(0.4),
+              selectionControls: getPlatformSelectionControls(),
               backgroundCursorColor: theme.bgInput,
               keyboardType: TextInputType.multiline,
               maxLines: null,
@@ -557,10 +531,11 @@ class _CompassQueryBarState extends State<CompassQueryBar> {
               onSubmitted: onSubmitted,
               onTapOutside: (event) =>
                   compassHandleTapOutside(event, focusNode),
-              contextMenuBuilder: compassTextContextMenuBuilderFor(
-                anchorLink,
-                density: density,
-              ),
+              contextMenuBuilder:
+                  (BuildContext context, EditableTextState editableTextState) {
+                return compassTextContextMenuBuilderFor(anchorLink,
+                    density: density)(context, editableTextState);
+              },
             ),
           ],
         );
@@ -659,7 +634,8 @@ class _CompassQueryBarState extends State<CompassQueryBar> {
     );
   }
 
-  Widget _buildFindButtonCompact(CompassTheme theme, CompassDensity density, {VoidCallback? onTap}) {
+  Widget _buildFindButtonCompact(CompassTheme theme, CompassDensity density,
+      {VoidCallback? onTap}) {
     return ConstrainedBox(
       constraints: BoxConstraints(minHeight: density.minTapTarget),
       child: CompassHover(
@@ -691,8 +667,7 @@ class _CompassQueryBarState extends State<CompassQueryBar> {
         decoration: BoxDecoration(
           color: theme.bgInput,
           borderRadius: BorderRadius.circular(8.0),
-          border:
-              Border.all(color: theme.border, width: 1.0),
+          border: Border.all(color: theme.border, width: 1.0),
         ),
         padding: const EdgeInsets.symmetric(horizontal: 10.0, vertical: 6.0),
         child: Row(
@@ -723,8 +698,7 @@ class _CompassQueryBarState extends State<CompassQueryBar> {
                 theme: theme,
                 controller: _filterController,
                 focusNode: _filterFocus,
-                placeholder:
-                    "{ field: 'value', year: { \$gte: 1990 } }",
+                placeholder: "{ field: 'value', year: { \$gte: 1990 } }",
                 onChanged: _handleFilterChange,
                 onSubmitted: (value) {
                   _executeWithCurrentFilter();
@@ -779,17 +753,13 @@ class _CompassQueryBarState extends State<CompassQueryBar> {
               CompassSvg(
                 svgString: CompassSvgIcons.sliders,
                 size: 14.0,
-                color: expanded
-                    ? theme.accent
-                    : theme.textSecondary,
+                color: expanded ? theme.accent : theme.textSecondary,
               ),
               const SizedBox(width: 6.0),
               Text(
                 'Options',
                 style: CompassTypography.bodyMedium(
-                  color: expanded
-                      ? theme.accent
-                      : theme.textSecondary,
+                  color: expanded ? theme.accent : theme.textSecondary,
                 ),
               ),
               const SizedBox(width: 4.0),
@@ -863,7 +833,8 @@ class _CompassQueryBarState extends State<CompassQueryBar> {
   }
 
   /// Runs the query.
-  Widget _buildFindButton(CompassTheme theme, CompassDensity density, {VoidCallback? onTap}) {
+  Widget _buildFindButton(CompassTheme theme, CompassDensity density,
+      {VoidCallback? onTap}) {
     return ConstrainedBox(
       constraints: BoxConstraints(minHeight: density.minTapTarget),
       child: CompassHover(
@@ -886,8 +857,7 @@ class _CompassQueryBarState extends State<CompassQueryBar> {
           alignment: Alignment.center,
           child: Text(
             'Find',
-            style: CompassTypography.header(
-                color: theme.onAccent),
+            style: CompassTypography.header(color: theme.onAccent),
           ),
         ),
       ),

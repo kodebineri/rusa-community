@@ -151,11 +151,16 @@ class _ConnectionModalState extends State<ConnectionModal> {
   }
 
   String _composeUri() {
-    final host = _hostController.text.trim().isEmpty ? 'localhost' : _hostController.text.trim();
-    final port = _portController.text.trim().isEmpty ? '27017' : _portController.text.trim();
+    final host = _hostController.text.trim().isEmpty
+        ? 'localhost'
+        : _hostController.text.trim();
+    final port = _portController.text.trim().isEmpty
+        ? '27017'
+        : _portController.text.trim();
     final user = _usernameController.text.trim();
     final pass = _passwordController.text;
-    final credentials = user.isEmpty ? '' : '$user${pass.isEmpty ? '' : ':$pass'}@';
+    final credentials =
+        user.isEmpty ? '' : '$user${pass.isEmpty ? '' : ':$pass'}@';
     return 'mongodb://$credentials$host:$port';
   }
 
@@ -193,7 +198,9 @@ class _ConnectionModalState extends State<ConnectionModal> {
         _connectError = null;
       });
       try {
-        final error = await widget.onConnect(profile).timeout(const Duration(seconds: 45));
+        final error = await widget
+            .onConnect(profile)
+            .timeout(const Duration(seconds: 45));
         if (!mounted) return;
         setState(() {
           _isTesting = false;
@@ -207,7 +214,10 @@ class _ConnectionModalState extends State<ConnectionModal> {
         if (!mounted) return;
         setState(() {
           _isTesting = false;
-          _connectError = e.toString().replaceFirst('Exception: ', '').replaceFirst('TimeoutException after ', 'Timeout after ');
+          _connectError = e
+              .toString()
+              .replaceFirst('Exception: ', '')
+              .replaceFirst('TimeoutException after ', 'Timeout after ');
         });
       }
       return;
@@ -233,7 +243,10 @@ class _ConnectionModalState extends State<ConnectionModal> {
       if (!mounted) return;
       setState(() {
         _isTesting = false;
-        _connectError = e.toString().replaceFirst('Exception: ', '').replaceFirst('TimeoutException after ', 'Timeout after ');
+        _connectError = e
+            .toString()
+            .replaceFirst('Exception: ', '')
+            .replaceFirst('TimeoutException after ', 'Timeout after ');
       });
     }
   }
@@ -249,7 +262,8 @@ class _ConnectionModalState extends State<ConnectionModal> {
       _testMessage = null;
     });
     try {
-      final error = await widget.onConnect(profile).timeout(const Duration(seconds: 45));
+      final error =
+          await widget.onConnect(profile).timeout(const Duration(seconds: 45));
       if (!mounted) return;
       if (error == null) {
         widget.onClose();
@@ -263,7 +277,10 @@ class _ConnectionModalState extends State<ConnectionModal> {
       if (!mounted) return;
       setState(() {
         _isConnecting = false;
-        _connectError = e.toString().replaceFirst('Exception: ', '').replaceFirst('TimeoutException after ', 'Timeout after ');
+        _connectError = e
+            .toString()
+            .replaceFirst('Exception: ', '')
+            .replaceFirst('TimeoutException after ', 'Timeout after ');
       });
     }
   }
@@ -317,11 +334,13 @@ class _ConnectionModalState extends State<ConnectionModal> {
                         if (_testMessage != null) ...[
                           const SizedBox(height: 12.0),
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 10.0),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 12.0, vertical: 10.0),
                             decoration: BoxDecoration(
                               color: _theme.greenBadgeBg,
                               borderRadius: BorderRadius.circular(8.0),
-                              border: Border.all(color: _theme.greenBadgeBorder, width: 1.0),
+                              border: Border.all(
+                                  color: _theme.greenBadgeBorder, width: 1.0),
                             ),
                             child: Row(
                               children: [
@@ -334,7 +353,8 @@ class _ConnectionModalState extends State<ConnectionModal> {
                                 Expanded(
                                   child: Text(
                                     _testMessage!,
-                                    style: CompassTypography.bodyMedium(color: _theme.accent),
+                                    style: CompassTypography.bodyMedium(
+                                        color: _theme.accent),
                                   ),
                                 ),
                               ],
@@ -380,7 +400,10 @@ class _ConnectionModalState extends State<ConnectionModal> {
                   height: 32.0,
                   decoration: BoxDecoration(
                     gradient: const LinearGradient(
-                      colors: [CompassColors.greenAccent, CompassColors.greenForest],
+                      colors: [
+                        CompassColors.greenAccent,
+                        CompassColors.greenForest
+                      ],
                     ),
                     borderRadius: BorderRadius.circular(8.0),
                   ),
@@ -397,12 +420,14 @@ class _ConnectionModalState extends State<ConnectionModal> {
                     children: [
                       Text(
                         'Connect to MongoDB',
-                        style: CompassTypography.title(color: _theme.textPrimary),
+                        style:
+                            CompassTypography.title(color: _theme.textPrimary),
                       ),
                       const SizedBox(height: 2.0),
                       Text(
                         'Connect to a standalone instance, replica set, or Atlas cluster',
-                        style: CompassTypography.caption(color: _theme.textMuted),
+                        style:
+                            CompassTypography.caption(color: _theme.textMuted),
                       ),
                     ],
                   ),
@@ -451,7 +476,8 @@ class _ConnectionModalState extends State<ConnectionModal> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const CompassFieldLabel(label: 'Friendly Connection Name', hint: 'Optional'),
+        const CompassFieldLabel(
+            label: 'Friendly Connection Name', hint: 'Optional'),
         CompassInput(
           controller: _nameController,
           mono: false,
@@ -476,7 +502,9 @@ class _ConnectionModalState extends State<ConnectionModal> {
               ),
               const SizedBox(width: 4.0),
               CompassSvg(
-                svgString: _showAdvanced ? CompassSvgIcons.chevronUp : CompassSvgIcons.chevronDown,
+                svgString: _showAdvanced
+                    ? CompassSvgIcons.chevronUp
+                    : CompassSvgIcons.chevronDown,
                 size: 13.0,
                 color: _theme.accent,
               ),
@@ -527,7 +555,9 @@ class _ConnectionModalState extends State<ConnectionModal> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          const CompassFieldLabel(label: 'Authentication Username', hint: 'Optional'),
+                          const CompassFieldLabel(
+                              label: 'Authentication Username',
+                              hint: 'Optional'),
                           CompassInput(
                             controller: _usernameController,
                             mono: false,
@@ -541,7 +571,9 @@ class _ConnectionModalState extends State<ConnectionModal> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          const CompassFieldLabel(label: 'Authentication Password', hint: 'Optional'),
+                          const CompassFieldLabel(
+                              label: 'Authentication Password',
+                              hint: 'Optional'),
                           CompassInput(
                             controller: _passwordController,
                             mono: false,
@@ -581,7 +613,8 @@ class _ConnectionModalState extends State<ConnectionModal> {
                 decoration: BoxDecoration(
                   color: _theme.bgSubtle,
                   borderRadius: BorderRadius.circular(8.0),
-                  border: Border.all(color: _theme.greenBadgeBorder, width: 1.0),
+                  border:
+                      Border.all(color: _theme.greenBadgeBorder, width: 1.0),
                 ),
                 alignment: Alignment.center,
                 child: CompassSvg(
@@ -597,7 +630,8 @@ class _ConnectionModalState extends State<ConnectionModal> {
                   children: [
                     Text(
                       'Local Sample Datasets',
-                      style: CompassTypography.header(color: _theme.textPrimary),
+                      style:
+                          CompassTypography.header(color: _theme.textPrimary),
                     ),
                     const SizedBox(height: 2.0),
                     Text(
@@ -641,7 +675,8 @@ class _ConnectionModalState extends State<ConnectionModal> {
                 style: CompassTypography.bodyMedium(color: _theme.textMuted),
               ),
             ),
-          for (final profile in widget.savedConnections) _buildSavedItem(profile),
+          for (final profile in widget.savedConnections)
+            _buildSavedItem(profile),
         ],
       ),
     );
@@ -683,7 +718,8 @@ class _ConnectionModalState extends State<ConnectionModal> {
           GestureDetector(
             onTap: _isConnecting ? null : () => _attemptConnect(profile),
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10.0, vertical: 5.0),
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 10.0, vertical: 5.0),
               decoration: BoxDecoration(
                 color: _theme.bgPanel,
                 borderRadius: BorderRadius.circular(4.0),
@@ -728,7 +764,7 @@ class _ConnectionModalState extends State<ConnectionModal> {
           Row(
             children: [
               CompassSecondaryButton(
-                label: _isTesting ? 'Testing…' : 'Test Connection',
+                label: _isTesting ? 'Testing…' : 'Test',
                 onTap: busy ? null : _testConnection,
               ),
               const SizedBox(width: 8.0),
