@@ -104,11 +104,13 @@ class _CompassQueryBarState extends State<CompassQueryBar> {
     // value so an empty/partial entry doesn't linger.
     _skipFocus.addListener(() {
       if (!_skipFocus.hasFocus) {
+        _commitSkip();
         _sync(_skipController, widget.options.skip.toString());
       }
     });
     _limitFocus.addListener(() {
       if (!_limitFocus.hasFocus) {
+        _commitLimit();
         _sync(_limitController, widget.options.limit.toString());
       }
     });
@@ -227,26 +229,77 @@ class _CompassQueryBarState extends State<CompassQueryBar> {
   }
 
   void _executeWithCurrentFilter() {
-    widget.onChangeOptions(
-        widget.options.copyWith(filter: _filterController.text));
+    // Commit all query options (do not execute on type)
+    _commitSkip();
+    _commitLimit();
+    widget.onChangeOptions(widget.options.copyWith(
+      filter: _filterController.text,
+      project: _projectController.text,
+      sort: _sortController.text,
+      skip: _skipController.text.trim().isEmpty
+          ? 0
+          : (int.tryParse(_skipController.text.trim()) ?? widget.options.skip)
+              .clamp(0, 1000000000),
+      limit: _limitController.text.trim().isEmpty
+          ? 20
+          : ((int.tryParse(_limitController.text.trim()) ?? widget.options.limit)
+                  < 1
+              ? 1
+              : (int.tryParse(_limitController.text.trim()) ?? widget.options.limit)),
+    ));
     widget.onExecuteQuery();
   }
 
+  void _commitSkip() {
+    final text = _skipController.text;
+    if (text.trim().isEmpty) {
+      if (widget.options.skip != 0) {
+        widget.onChangeOptions(widget.options.copyWith(skip: 0));
+      }
+      return;
+    }
+    final parsed = int.tryParse(text.trim());
+    if (parsed == null) {
+      _sync(_skipController, widget.options.skip.toString());
+      return;
+    }
+    final committed = parsed < 0 ? 0 : parsed;
+    if (committed != widget.options.skip) {
+      widget.onChangeOptions(widget.options.copyWith(skip: committed));
+    } else {
+      _sync(_skipController, committed.toString());
+    }
+  }
+
+  void _commitLimit() {
+    final text = _limitController.text;
+    if (text.trim().isEmpty) {
+      if (widget.options.limit != 20) {
+        widget.onChangeOptions(widget.options.copyWith(limit: 20));
+      } else {
+        _sync(_limitController, '20');
+      }
+      return;
+    }
+    final parsed = int.tryParse(text.trim());
+    if (parsed == null) {
+      _sync(_limitController, widget.options.limit.toString());
+      return;
+    }
+    final committed = parsed < 1 ? 1 : parsed;
+    if (committed != widget.options.limit) {
+      widget.onChangeOptions(widget.options.copyWith(limit: committed));
+    } else {
+      _sync(_limitController, committed.toString());
+    }
+  }
+
   void _handleSkipChange(String value) {
-    // Allow the field to be momentarily empty while typing; only commit numbers.
-    if (value.trim().isEmpty) return;
-    final parsed = int.tryParse(value.trim());
-    if (parsed == null) return;
-    widget.onChangeOptions(
-        widget.options.copyWith(skip: parsed < 0 ? 0 : parsed));
+    // Do not execute on type; commit only on blur or explicit actions
   }
 
   void _handleLimitChange(String value) {
-    if (value.trim().isEmpty) return;
-    final parsed = int.tryParse(value.trim());
-    if (parsed == null) return;
-    widget.onChangeOptions(
-        widget.options.copyWith(limit: parsed < 1 ? 1 : parsed));
+    // Do not execute on type; commit only on blur or explicit actions
   }
 
   @override
@@ -445,6 +498,7 @@ class _CompassQueryBarState extends State<CompassQueryBar> {
     required ValueChanged<String> onChanged,
     required LayerLink anchorLink,
     TextInputType keyboardType = TextInputType.text,
+    ValueChanged<String>? onSubmitted,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -482,6 +536,13 @@ class _CompassQueryBarState extends State<CompassQueryBar> {
               focusNode: focusNode,
               placeholder: placeholder,
               onChanged: onChanged,
+              onSubmitted: (v) {
+                if (onSubmitted != null) {
+                  onSubmitted(v);
+                } else {
+                  _executeWithCurrentFilter();
+                }
+              },
               keyboardType: keyboardType,
               fontSize: 11.0,
               anchorLink: anchorLink,
@@ -602,8 +663,8 @@ class _CompassQueryBarState extends State<CompassQueryBar> {
       placeholder: "{ title: 1, year: 1, _id: 0 }",
       controller: _projectController,
       focusNode: _projectFocus,
-      onChanged: (v) =>
-          widget.onChangeOptions(widget.options.copyWith(project: v)),
+      onChanged: (v) {},
+      onSubmitted: (_) => _executeWithCurrentFilter(),
       anchorLink: _projectMenuAnchor,
     );
 
@@ -614,8 +675,8 @@ class _CompassQueryBarState extends State<CompassQueryBar> {
       placeholder: "{ year: -1, rating: -1 }",
       controller: _sortController,
       focusNode: _sortFocus,
-      onChanged: (v) =>
-          widget.onChangeOptions(widget.options.copyWith(sort: v)),
+      onChanged: (v) {},
+      onSubmitted: (_) => _executeWithCurrentFilter(),
       anchorLink: _sortMenuAnchor,
     );
 
@@ -627,6 +688,10 @@ class _CompassQueryBarState extends State<CompassQueryBar> {
       focusNode: _skipFocus,
       keyboardType: TextInputType.number,
       onChanged: _handleSkipChange,
+      onSubmitted: (_) {
+        _commitSkip();
+        _executeWithCurrentFilter();
+      },
       anchorLink: _skipMenuAnchor,
     );
 
@@ -638,6 +703,10 @@ class _CompassQueryBarState extends State<CompassQueryBar> {
       focusNode: _limitFocus,
       keyboardType: TextInputType.number,
       onChanged: _handleLimitChange,
+      onSubmitted: (_) {
+        _commitLimit();
+        _executeWithCurrentFilter();
+      },
       anchorLink: _limitMenuAnchor,
     );
 
