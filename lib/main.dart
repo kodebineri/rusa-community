@@ -5,6 +5,7 @@ import 'dart:async';
 import 'theme/compass_colors.dart';
 import 'theme/compass_density.dart';
 import 'theme/compass_theme.dart';
+import 'theme/compass_theme_presets.dart';
 import 'theme/compass_typography.dart';
 import 'icons/compass_svg_icons.dart';
 import 'models/mongo_models.dart';
@@ -155,7 +156,7 @@ class _CompassAppState extends State<CompassApp> {
                                       horizontal: 14.0, vertical: 6.0),
                                   decoration: BoxDecoration(
                                     color: hovered
-                                        ? CompassColors.greenHover
+                                        ? theme.accentHover
                                         : theme.accent,
                                     borderRadius: BorderRadius.circular(6.0),
                                   ),
@@ -216,7 +217,9 @@ class _CompassAppState extends State<CompassApp> {
       copyValue: _bugReportUri.toString(),
     );
   }
-  bool _isDarkMode = true;
+  /// Selected colour theme. Defaults to Dracula (dark); changed from the
+  /// header options menu or the touch action sheet.
+  CompassThemeVariant _themeVariant = CompassThemeVariant.defaultVariant;
   ConnectionProfile? _connection;
 
   /// Non-null while the UI is backed by an actual MongoDB server (rather than
@@ -911,12 +914,12 @@ class _CompassAppState extends State<CompassApp> {
     }
   }
 
-  /// Resolved theme palette for the current dark/light mode.
+  /// Resolved theme palette for the selected [CompassThemeVariant].
   ///
   /// NOTE: this state's own `context` sits *above* the root [CompassTheme]
   /// created in `build`, so `CompassTheme.of(context)` here would not find it
-  /// and silently fall back to dark. Use the palette-only instance instead.
-  CompassTheme get _theme => CompassTheme.palette(_isDarkMode);
+  /// and silently fall back to Dracula. Use the palette-only instance instead.
+  CompassTheme get _theme => CompassTheme.palette(_themeVariant);
 
   /// The app shell, hosted in an [OverlayEntry].
   ///
@@ -969,9 +972,9 @@ class _CompassAppState extends State<CompassApp> {
                     onToggleTerminal: () {
                       setState(() => _isTerminalOpen = !_isTerminalOpen);
                     },
-                    isDarkMode: _isDarkMode,
-                    onToggleDarkMode: () {
-                      setState(() => _isDarkMode = !_isDarkMode);
+                    themeVariant: _themeVariant,
+                    onSelectTheme: (variant) {
+                      setState(() => _themeVariant = variant);
                     },
                     onToggleMobileSidebar: () {
                       setState(() => _isMobileSidebarOpen = !_isMobileSidebarOpen);
@@ -1287,6 +1290,20 @@ class _CompassAppState extends State<CompassApp> {
                       destructive: true,
                       onTap: _handleDisconnect,
                     ),
+
+                  // Theme picker: one row per variant, above Report Bug.
+                  for (final variant in CompassThemeVariant.values)
+                    CompassActionSheetItem(
+                      label: '${variant.label} (${variant.isDark ? 'dark' : 'light'})',
+                      svg: _themeVariant == variant
+                          ? CompassSvgIcons.check
+                          : (variant.isDark ? CompassSvgIcons.moon : CompassSvgIcons.sun),
+                      color: _themeVariant == variant ? _theme.accent : null,
+                      onTap: () {
+                        setState(() => _themeVariant = variant);
+                      },
+                    ),
+
                   CompassActionSheetItem(
                     label: 'Report Bug',
                     svg: CompassSvgIcons.activity,
@@ -1396,17 +1413,18 @@ class _CompassAppState extends State<CompassApp> {
       }
     }
 
-    // Propagate the current theme mode to the whole tree so widgets can read
-    // it via `CompassTheme.of(context)` instead of taking an `isDarkMode`
-    // parameter. (See theme/compass_theme.dart.)
-    content = CompassTheme(isDarkMode: _isDarkMode, child: content);
+    // Propagate the selected theme to the whole tree so widgets can read it
+    // via `CompassTheme.of(context)` instead of taking a variant parameter.
+    // (See theme/compass_theme.dart.)
+    content = CompassTheme(variant: _themeVariant, child: content);
 
     final overlayStyle = SystemUiOverlayStyle(
       statusBarColor: const Color(0x00000000),
-      statusBarIconBrightness: _isDarkMode ? Brightness.light : Brightness.dark,
-      statusBarBrightness: _isDarkMode ? Brightness.dark : Brightness.light,
+      statusBarIconBrightness: _themeVariant.isDark ? Brightness.light : Brightness.dark,
+      statusBarBrightness: _themeVariant.isDark ? Brightness.dark : Brightness.light,
       systemNavigationBarColor: _theme.bgApp,
-      systemNavigationBarIconBrightness: _isDarkMode ? Brightness.light : Brightness.dark,
+      systemNavigationBarIconBrightness:
+          _themeVariant.isDark ? Brightness.light : Brightness.dark,
     );
 
     return AnnotatedRegion<SystemUiOverlayStyle>(

@@ -2,6 +2,7 @@ import 'package:flutter/widgets.dart';
 import '../theme/compass_colors.dart';
 import '../theme/compass_density.dart';
 import '../theme/compass_theme.dart';
+import '../theme/compass_theme_presets.dart';
 import '../theme/compass_typography.dart';
 import '../icons/compass_svg_icons.dart';
 import '../models/mongo_models.dart';
@@ -23,8 +24,8 @@ class CompassHeader extends StatelessWidget {
   final bool showResetSample;
   final bool isTerminalOpen;
   final VoidCallback onToggleTerminal;
-  final bool isDarkMode;
-  final VoidCallback onToggleDarkMode;
+  final CompassThemeVariant themeVariant;
+  final ValueChanged<CompassThemeVariant> onSelectTheme;
   final VoidCallback onToggleMobileSidebar;
 
   /// Whether the drawer toggle is offered. The sidebar is permanently docked
@@ -49,8 +50,8 @@ class CompassHeader extends StatelessWidget {
     this.showResetSample = true,
     required this.isTerminalOpen,
     required this.onToggleTerminal,
-    required this.isDarkMode,
-    required this.onToggleDarkMode,
+    required this.themeVariant,
+    required this.onSelectTheme,
     required this.onToggleMobileSidebar,
     this.isMobile = false,
     this.onOpenActions,
@@ -353,16 +354,6 @@ class CompassHeader extends StatelessWidget {
                 const SizedBox(width: 8.0),
               ],
 
-              // Theme toggle button
-              CompassIconButton(
-                svgString: isDarkMode ? CompassSvgIcons.sun : CompassSvgIcons.moon,
-                onTap: onToggleDarkMode,
-                size: 16.0,
-                padding: 7.0,
-                color: isDarkMode ? CompassColors.warningAmber : theme.textSecondary,
-                semanticLabel: isDarkMode ? 'Switch to light theme' : 'Switch to dark theme',
-              ),
-
               if (!compact) ...[
                 const SizedBox(width: 8.0),
 
@@ -403,7 +394,7 @@ class CompassHeader extends StatelessWidget {
                       builder: (hovered) => Container(
                         padding: const EdgeInsets.symmetric(horizontal: 14.0, vertical: 6.0),
                         decoration: BoxDecoration(
-                          color: hovered ? CompassColors.greenHover : theme.accent,
+                          color: hovered ? theme.accentHover : theme.accent,
                           borderRadius: BorderRadius.circular(6.0),
                         ),
                         child: Text(
@@ -441,7 +432,7 @@ class CompassHeader extends StatelessWidget {
                               right: 8.0,
                               top: offset.dy + size.height + 4.0,
                               child: Container(
-                                width: 160.0,
+                                width: 220.0,
                                 decoration: BoxDecoration(
                                   color: themeMenu.bgPanel,
                                   borderRadius: BorderRadius.circular(8.0),
@@ -458,6 +449,33 @@ class CompassHeader extends StatelessWidget {
                                   crossAxisAlignment: CrossAxisAlignment.stretch,
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
+                                    // Theme picker, grouped by brightness and
+                                    // placed above Report Bug.
+                                    _buildMenuSectionLabel(themeMenu, 'DARK THEMES'),
+                                    for (final variant in CompassThemeVariant.darkThemes)
+                                      _buildThemeMenuItem(
+                                        themeMenu,
+                                        variant: variant,
+                                        onTap: () {
+                                          entry.remove();
+                                          onSelectTheme(variant);
+                                        },
+                                      ),
+                                    _buildMenuSectionLabel(themeMenu, 'LIGHT THEMES'),
+                                    for (final variant in CompassThemeVariant.lightThemes)
+                                      _buildThemeMenuItem(
+                                        themeMenu,
+                                        variant: variant,
+                                        onTap: () {
+                                          entry.remove();
+                                          onSelectTheme(variant);
+                                        },
+                                      ),
+                                    Container(
+                                      height: 1.0,
+                                      margin: const EdgeInsets.symmetric(vertical: 4.0),
+                                      color: themeMenu.border,
+                                    ),
                                     _buildHeaderMenuItem(
                                       themeMenu,
                                       label: 'Report Bug',
@@ -531,6 +549,67 @@ class CompassHeader extends StatelessWidget {
         child: Text(
           label,
           style: CompassTypography.bodyRegular(color: theme.textPrimary),
+        ),
+      ),
+    );
+  }
+
+  /// Small all-caps heading that groups the dark and light theme lists.
+  Widget _buildMenuSectionLabel(CompassTheme theme, String label) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12.0, 10.0, 12.0, 4.0),
+      child: Text(
+        label,
+        style: CompassTypography.caption(color: theme.textMuted),
+      ),
+    );
+  }
+
+  /// One selectable theme row: a swatch, the name and a check for the active
+  /// variant. Selecting a row applies the theme and closes the menu.
+  Widget _buildThemeMenuItem(
+    CompassTheme theme, {
+    required CompassThemeVariant variant,
+    required VoidCallback onTap,
+  }) {
+    final selected = theme.variant == variant;
+    final swatch = variant.palette;
+    return CompassHover(
+      onTap: onTap,
+      semanticLabel: '${variant.label} theme',
+      builder: (hovered) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 7.0),
+        decoration: BoxDecoration(
+          color: hovered ? theme.bgHover : null,
+        ),
+        child: Row(
+          children: [
+            // Mini preview: the theme's app background ringed with its accent.
+            Container(
+              width: 14.0,
+              height: 14.0,
+              decoration: BoxDecoration(
+                color: swatch.bgApp,
+                borderRadius: BorderRadius.circular(4.0),
+                border: Border.all(color: swatch.accent, width: 2.0),
+              ),
+            ),
+            const SizedBox(width: 10.0),
+            Expanded(
+              child: Text(
+                variant.label,
+                style: CompassTypography.bodyRegular(
+                  color: selected ? theme.accent : theme.textPrimary,
+                ),
+              ),
+            ),
+            if (selected)
+              CompassSvg(
+                svgString: CompassSvgIcons.check,
+                size: 12.0,
+                color: theme.accent,
+              ),
+          ],
         ),
       ),
     );

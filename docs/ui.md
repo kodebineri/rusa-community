@@ -169,7 +169,7 @@ paragraph, so the parser never throws. The text is read from the bundled `EULA.m
 
 | Widget | Props & behavior |
 |---|---|
-| `CompassHeader` | `connection, onOpenConnectModal, onDisconnect, onResetData?, showResetSample = true, isTerminalOpen, onToggleTerminal, isDarkMode, onToggleDarkMode, onToggleMobileSidebar, isMobile = false, onOpenActions?`. 56px bar: hamburger (`isMobile` only — the sidebar is docked on desktop), mongoLeaf logo + "Compass Flutter" + 7.0.8 badge → connect modal, connection pill (or amber Connect), **Reset Samples** (only when `showResetSample` — passed as `_realService == null`), mongosh terminal toggle, **theme toggle showing `sun` when dark / `moon` when light**, Disconnect/Connect. Note: `isDarkMode` is a **constructor param**, not read from `CompassTheme`. **Below a 1100 px window the bar collapses**: the version badge, the divider and the connection pill are replaced by a status dot, the labelled actions move into the `CompassActionSheet` and a `⋮` (`moreVertical`) button opens it via `onOpenActions`. The `moreVertical` menu also hosts **Report Bug** (opens the GitHub issue tracker in the system browser via `url_launcher`, falling back to an info dialog with a **Copy link** button when no handler exists), **EULA** (`EulaModal`) and **About** (`AboutModal`) |
+| `CompassHeader` | `connection, onOpenConnectModal, onDisconnect, onResetData?, showResetSample = true, isTerminalOpen, onToggleTerminal, themeVariant, onSelectTheme, onToggleMobileSidebar, isMobile = false, onOpenActions?`. 56px bar: hamburger (`isMobile` only — the sidebar is docked on desktop), mongoLeaf logo + "Compass Flutter" + 7.0.8 badge → connect modal, connection pill (or amber Connect), **Reset Samples** (only when `showResetSample` — passed as `_realService == null`), mongosh terminal toggle, Disconnect/Connect. Note: the selected theme is passed in as `themeVariant` (the header does not read it from `CompassTheme`). **Below a 1100 px window the bar collapses**: the version badge, the divider and the connection pill are replaced by a status dot, the labelled actions move into the `CompassActionSheet` and a `⋮` (`moreVertical`) button opens it via `onOpenActions`. The `moreVertical` menu hosts the **theme picker above Report Bug** — a `DARK THEMES` section (`Dracula` / `Tokyo Night` / `Night Owl`) and a `LIGHT THEMES` section (`Monokai Light` / `Tokyo Night Light` / `Material Light`), each row a swatch + name + check for the active variant, selecting one calls `onSelectTheme(variant)`. Below a divider it also hosts **Report Bug** (opens the GitHub issue tracker in the system browser via `url_launcher`, falling back to an info dialog with a **Copy link** button when no handler exists), **EULA** (`EulaModal`) and **About** (`AboutModal`). The touch `CompassActionSheet` carries the same theme list (labelled `<name> (dark\|light)`) |
 | `CompassSidebar` | 256px. Props: `databases, selectedDb, selectedColl, onSelectCollection, onSelectDatabase, onOpenCreateDb, onOpenCreateColl, onRenameDb, onRenameColl, onDropDb, onDropColl, onRefresh`. Sections: header (refresh + create-DB icons, search box — ⚠ **display-only, `_searchQuery` is final `''` (dead code)**), DB tree (chevron toggles `_expandedDbs`, **pre-seeded `library:true`, `social_networks:true`**; row tap → `onSelectDatabase` + auto-expand; trailing plus/pencil/trash; collections show doc counts, amber eye for views), footer Create Database button. **On touch it becomes an overlay drawer** of `min(320, 85 % of the viewport)` and the search input grows to 44 px |
 | `CompassQueryBar` | `options: QueryFilterOptions, onChangeOptions(fn), onExecuteQuery, onResetQuery, onExportToLanguage, executionTimeMs?, totalResultsCount?`. **Uses its own `EditableText`** (not `CompassInput`) wrapped in `Visibility(maintainState/maintainSize)` so the element identity survives empty↔non-empty (documented fix for test 2). FILTER field with lenient auto-quoting validation + amber/green status icon, Enter → find; Options toggle expands PROJECT/SORT/SKIP/LIMIT fields (each reports `options.copyWith(...)`, skip clamps ≥0, limit ≥1); Reset / Show Code / **Find** buttons; stats ribbon `Matches: n · Time: xms`. **On touch (or below a 640 px query bar) the filter input takes the full width and the four buttons wrap onto a second row; the options panel stacks (PROJECT / SORT full width, SKIP + LIMIT side by side) and the "press Enter" hint disappears** |
 | `CollectionTabBar` | 36px strip. `tabs, activeIndex, onSelect(i), onClose(i)`. Tabs `minWidth 140/maxWidth 200`, active = `bgSubtle` + 2px accent bottom border; icon = `table` (or `database` when coll name empty); close = `CompassSvg(close, 11)`; right counter `'<n> open'`; active tab auto-revealed via `Scrollable.ensureVisible` post-frame |
@@ -191,26 +191,50 @@ paragraph, so the parser never throws. The text is read from the bundled `EULA.m
 
 ## Theme — `lib/theme/`
 
-`compass_theme.dart` (colors), `compass_colors.dart` (tokens), `compass_typography.dart`
-(styles) and **`compass_density.dart`** (touch metrics — see "Touch layer" above).
+`compass_theme_presets.dart` (the variant catalog + palettes), `compass_theme.dart`
+(the InheritedWidget that resolves a palette), `compass_colors.dart` (semantic tokens),
+`compass_typography.dart` (styles) and **`compass_density.dart`** (touch metrics — see
+"Touch layer" above).
+
+### `compass_theme_presets.dart` — `CompassThemeVariant` / `CompassPalette`
+
+The selectable themes, modelled after popular VS Code colour themes. `CompassPalette` is a
+`@immutable` holder of every resolved colour a widget can ask for (the same set the old
+dark/light getters returned, plus `accentHover`). `CompassThemeVariant` is an enum carrying
+`{ label, isDark, palette }` with six members:
+
+| Group | Variants |
+|---|---|
+| Dark | `dracula`, `tokyoNight`, `nightOwl` |
+| Light | `monokaiLight`, `tokyoNightLight`, `materialLight` |
+
+- `CompassThemeVariant.defaultVariant == dracula` (dark) — the app's default theme.
+- `CompassThemeVariant.darkThemes` / `.lightThemes` return the group in menu order
+  (`values.where((v) => v.isDark)`); the options menu iterates them.
+- `CompassColors` still owns the semantic tokens (error/warning/info, `modalOverlay`,
+  scrollbars) and the terminal's palette. The old `darkBg*`/`lightBg*` pairs in
+  `CompassColors` are now only referenced by `CompassTypography`'s default argument values.
 
 ### `compass_theme.dart` — `CompassTheme extends InheritedWidget`
 
-- Single field `final bool isDarkMode`. `static CompassTheme of(context)` →
-  `dependOnInheritedWidgetOfExactType<CompassTheme>() ?? const CompassTheme(isDarkMode:
-  true, child: SizedBox.shrink())` — **fail-safe dark fallback** (silently dark if asked
+- Single field `final CompassThemeVariant variant` (default `dracula`). `static
+  CompassTheme of(context)` → `dependOnInheritedWidgetOfExactType<CompassTheme>() ?? const
+  CompassTheme(child: SizedBox.shrink())` — **fail-safe dark fallback** (Dracula if asked
   above the provider — that's the `main.dart` trap, see AGENTS.md invariant 11).
-- Extra named ctor `const CompassTheme.palette(this.isDarkMode)` (child = shrink) for
+- Extra named ctor `const CompassTheme.palette(this.variant)` (child = shrink) for
   palette lookups above the provider: `main.dart` uses
-  `CompassTheme get _theme => CompassTheme.palette(_isDarkMode);`.
-- Propagation: `_CompassAppState._isDarkMode` (default `true`) → root wrap
-  `CompassTheme(isDarkMode: _isDarkMode, child: content)` → header toggle flips it in
-  `setState` (and updates `SystemUiOverlayStyle`).
-- Widgets read **resolved color getters** (never branch on the bool themselves):
+  `CompassTheme get _theme => CompassTheme.palette(_themeVariant);`.
+- Propagation: `_CompassAppState._themeVariant` (default `dracula`) → root wrap
+  `CompassTheme(variant: _themeVariant, child: content)` → selecting a theme in the header
+  options menu (or touch action sheet) calls `onSelectTheme` in `setState` (and updates
+  `SystemUiOverlayStyle` from `variant.isDark`).
+- `bool get isDarkMode => variant.isDark` is kept as a brightness convenience.
+- Widgets read **resolved color getters** (never branch on dark/light themselves):
   `bgApp, bgSidebar, bgPanel, bgSubtle, bgHover, bgInput, border, borderHover, textPrimary,
-  textSecondary, textMuted, accent` (greenAccent dark / greenForest light), `onAccent`,
-  `greenBadgeBg, greenBadgeBorder`, and BSON syntax colors `bsonObjectId, bsonString,
-  bsonNumber, bsonBoolean, bsonDate, bsonNull` — each `isDarkMode ? dark : light`.
+  textSecondary, textMuted, accent, accentHover, onAccent, greenBadgeBg, greenBadgeBorder`,
+  and BSON syntax colors `bsonObjectId, bsonString, bsonNumber, bsonBoolean, bsonDate,
+  bsonNull` — each forwards to `palette.*`, so adding a theme touches only the preset file.
+  Hover fills use `theme.accentHover` (not `CompassColors.greenHover`).
 
 ### `compass_colors.dart` — `CompassColors`
 

@@ -761,7 +761,7 @@ class _CompassQueryBarState extends State<CompassQueryBar> {
           height: 34.0,
           padding: const EdgeInsets.symmetric(horizontal: 12.0),
           decoration: BoxDecoration(
-            color: hovered ? CompassColors.greenHover : theme.accent,
+            color: hovered ? theme.accentHover : theme.accent,
             borderRadius: BorderRadius.circular(8.0),
           ),
           alignment: Alignment.center,
@@ -960,13 +960,13 @@ class _CompassQueryBarState extends State<CompassQueryBar> {
           height: 36.0,
           padding: const EdgeInsets.symmetric(horizontal: 20.0),
           decoration: BoxDecoration(
-            color: hovered ? CompassColors.greenHover : theme.accent,
+            color: hovered ? theme.accentHover : theme.accent,
             borderRadius: BorderRadius.circular(8.0),
-            boxShadow: const [
+            boxShadow: [
               BoxShadow(
-                color: Color(0x3300ED64),
+                color: theme.accent.withValues(alpha: 0.2),
                 blurRadius: 4.0,
-                offset: Offset(0, 1),
+                offset: const Offset(0, 1),
               ),
             ],
           ),

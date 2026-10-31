@@ -342,7 +342,7 @@ class CompassPrimaryButton extends StatelessWidget {
           decoration: BoxDecoration(
             color: onTap == null
                 ? theme.greenBadgeBg
-                : (hovered ? CompassColors.greenHover : theme.accent),
+                : (hovered ? theme.accentHover : theme.accent),
             borderRadius: BorderRadius.circular(6.0),
           ),
           child: Row(

@@ -78,10 +78,15 @@ the legacy `src/` React app; `npm` is not needed for Flutter work).
 10. **Icons are `CompassSvg` + `CompassSvgIcons.<name>`** (inline SVG string constants in
     `lib/icons/compass_svg_icons.dart`), never Material `Icon`. 34 icons exist; add new ones
     as new `static const String` SVG literals.
-11. **Theme:** colors come from `CompassTheme.of(context)` getters (a bool `isDarkMode`
-    InheritedWidget over static `CompassColors` tokens) or `CompassTypography` factories.
-    In `main.dart` State use `CompassTheme.palette(_isDarkMode)` — the State's context sits
-    *above* the provider, so `CompassTheme.of(context)` would silently fall back to dark.
+11. **Theme:** colors come from `CompassTheme.of(context)` getters, which resolve the
+    selected `CompassThemeVariant`'s `CompassPalette` (six VS Code-inspired themes in
+    `lib/theme/compass_theme_presets.dart`; default = `Dracula`, dark). The `CompassTheme`
+    InheritedWidget carries the `variant`; `CompassColors` still holds semantic tokens
+    (error/warning/info, `modalOverlay`, scrollbars). Styles come from `CompassTypography`
+    factories. In `main.dart` State use `CompassTheme.palette(_themeVariant)` — the State's
+    context sits *above* the provider, so `CompassTheme.of(context)` would silently fall
+    back to Dracula. Users pick a theme from the header options menu (above Report Bug) or
+    the touch action sheet; both call `onSelectTheme` → `setState(_themeVariant)`.
 12. **State field names (easy to get wrong):** section = `_activeTab`
     (`documents|aggregations|schema|indexes`), view mode = `_docViewMode`
     (`tree|json|table`), tab index = `_activeTabIndex` (`-1` = none sentinel). There is no
@@ -118,6 +123,6 @@ the legacy `src/` React app; `npm` is not needed for Flutter work).
 | `CompassMarkdownView` (dependency-free Markdown renderer) | `lib/widgets/compass_markdown_view.dart` |
 | `CompassActionSheet` (touch overflow sheet) | `lib/widgets/modals/compass_action_sheet.dart` |
 | `CompassIconButton`, `CompassHover` | `lib/widgets/compass_icon_button.dart`, `lib/widgets/compass_hover.dart` |
-| `CompassTheme`, `CompassColors`, `CompassTypography`, `CompassDensity` | `lib/theme/` |
+| `CompassTheme`, `CompassThemeVariant` / `CompassPalette`, `CompassColors`, `CompassTypography`, `CompassDensity` | `lib/theme/` |
 | `CompassSvg`, `CompassSvgIcons` | `lib/icons/compass_svg_icons.dart` |
 | Tests | `test/widget_test.dart` |

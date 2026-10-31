@@ -11,8 +11,8 @@ import 'package:mongodb_compass_flutter/icons/compass_svg_icons.dart';
 import 'package:mongodb_compass_flutter/models/collection_tab.dart';
 import 'package:mongodb_compass_flutter/models/mongo_models.dart';
 import 'package:mongodb_compass_flutter/services/mongo_engine.dart';
-import 'package:mongodb_compass_flutter/theme/compass_colors.dart';
 import 'package:mongodb_compass_flutter/theme/compass_theme.dart';
+import 'package:mongodb_compass_flutter/theme/compass_theme_presets.dart';
 import 'package:mongodb_compass_flutter/widgets/collection_tab_bar.dart';
 import 'package:mongodb_compass_flutter/widgets/compass_header.dart';
 import 'package:mongodb_compass_flutter/widgets/compass_query_bar.dart';
@@ -205,8 +205,8 @@ void main() {
             onResetData: () {},
             isTerminalOpen: false,
             onToggleTerminal: () {},
-            isDarkMode: true,
-            onToggleDarkMode: () {},
+            themeVariant: CompassThemeVariant.dracula,
+            onSelectTheme: (_) {},
             onToggleMobileSidebar: () {},
           ),
         ),
@@ -228,8 +228,8 @@ void main() {
             onResetData: () {},
             isTerminalOpen: false,
             onToggleTerminal: () {},
-            isDarkMode: true,
-            onToggleDarkMode: () {},
+            themeVariant: CompassThemeVariant.dracula,
+            onSelectTheme: (_) {},
             onToggleMobileSidebar: () {},
           ),
         ),
@@ -359,10 +359,13 @@ void main() {
     expect(find.text('1 open'), findsOneWidget);
   });
 
-  testWidgets('collection tab bar follows CompassTheme light mode', (WidgetTester tester) async {
+  testWidgets('collection tab bar follows the selected CompassTheme variant',
+      (WidgetTester tester) async {
+    const light = CompassThemeVariant.monokaiLight;
+
     await tester.pumpWidget(
       CompassTheme(
-        isDarkMode: false,
+        variant: light,
         child: Directionality(
           textDirection: TextDirection.ltr,
           child: MediaQuery(
@@ -380,20 +383,20 @@ void main() {
     await tester.pump();
     for (var i = 0; i < 50 && tester.takeException() != null; i++) {}
 
-    // The outer strip container picks the light panel background + border.
+    // The outer strip container picks the variant's panel background + border.
     final strip = tester.widget<Container>(
       find.descendant(of: find.byType(CollectionTabBar), matching: find.byType(Container)).first,
     );
     final decoration = strip.decoration as BoxDecoration;
-    expect(decoration.color, CompassColors.lightBgPanel);
-    expect((decoration.border as Border).bottom.color, CompassColors.lightBorder);
+    expect(decoration.color, light.palette.bgPanel);
+    expect((decoration.border as Border).bottom.color, light.palette.border);
 
     // And it still renders the tab contents.
     expect(find.text('books'), findsOneWidget);
     expect(find.text('library'), findsOneWidget);
   });
 
-  testWidgets('toggling the theme switches the chrome to light mode',
+  testWidgets('options menu lists every theme and applies the selected one',
       (WidgetTester tester) async {
     tester.view.physicalSize = const Size(1920.0, 1080.0);
     tester.view.devicePixelRatio = 1.0;
@@ -412,25 +415,45 @@ void main() {
       return (container.decoration as BoxDecoration).color;
     }
 
-    // Dark by default: the header uses the dark panel colour.
-    expect(headerColor(), CompassColors.darkBgPanel);
+    // Dracula (dark) is the default.
+    expect(tester.widget<CompassTheme>(find.byType(CompassTheme)).variant,
+        CompassThemeVariant.dracula);
+    expect(headerColor(), CompassThemeVariant.dracula.palette.bgPanel);
 
-    // The toggle shows a sun while dark (clicking it switches to light).
-    await tester.tap(
-      find.byWidgetPredicate(
-        (w) => w is CompassSvg && w.svgString == CompassSvgIcons.sun,
+    // Open the header options menu (the `⋮` button on desktop).
+    final moreButton = find.descendant(
+      of: find.byType(CompassHeader),
+      matching: find.byWidgetPredicate(
+        (w) => w is CompassSvg && w.svgString == CompassSvgIcons.moreVertical,
       ),
     );
+    expect(moreButton, findsOneWidget);
+    await tester.tap(moreButton);
+    await tester.pump();
+
+    // Every variant is offered, grouped under the dark / light headings.
+    for (final variant in CompassThemeVariant.values) {
+      expect(find.text(variant.label), findsOneWidget,
+          reason: '${variant.label} must be listed in the options menu');
+    }
+    expect(find.text('DARK THEMES'), findsOneWidget);
+    expect(find.text('LIGHT THEMES'), findsOneWidget);
+    // The menu sits above Report Bug.
+    expect(find.text('Report Bug'), findsOneWidget);
+
+    // Selecting a light theme applies it to the whole chrome.
+    await tester.tap(find.text(CompassThemeVariant.monokaiLight.label));
     await tester.pump();
     for (var i = 0; i < 50 && tester.takeException() != null; i++) {}
 
-    expect(tester.widget<CompassTheme>(find.byType(CompassTheme)).isDarkMode, isFalse,
-        reason: 'the root theme must flip to light');
-    expect(headerColor(), CompassColors.lightBgPanel,
-        reason: 'the header chrome must follow the light palette');
+    expect(tester.widget<CompassTheme>(find.byType(CompassTheme)).variant,
+        CompassThemeVariant.monokaiLight,
+        reason: 'the root theme must switch to the selected variant');
+    expect(headerColor(), CompassThemeVariant.monokaiLight.palette.bgPanel,
+        reason: 'the header chrome must follow the selected palette');
   });
 
-  testWidgets('content views follow light mode (documents, aggregations, schema, indexes)',
+  testWidgets('content views follow the selected light theme (documents, aggregations, schema, indexes)',
       (WidgetTester tester) async {
     tester.view.physicalSize = const Size(1920.0, 1080.0);
     tester.view.devicePixelRatio = 1.0;
@@ -441,24 +464,32 @@ void main() {
     await tester.pump();
     for (var i = 0; i < 50 && tester.takeException() != null; i++) {}
 
-    // Flip to light mode via the header toggle.
+    const light = CompassThemeVariant.materialLight;
+
+    // Switch to a light theme through the header options menu.
     await tester.tap(
-      find.byWidgetPredicate(
-        (w) => w is CompassSvg && w.svgString == CompassSvgIcons.sun,
+      find.descendant(
+        of: find.byType(CompassHeader),
+        matching: find.byWidgetPredicate(
+          (w) => w is CompassSvg && w.svgString == CompassSvgIcons.moreVertical,
+        ),
       ),
     );
     await tester.pump();
+    await tester.tap(find.text(light.label));
+    await tester.pump();
     for (var i = 0; i < 50 && tester.takeException() != null; i++) {}
-    expect(tester.widget<CompassTheme>(find.byType(CompassTheme)).isDarkMode, isFalse);
+    expect(tester.widget<CompassTheme>(find.byType(CompassTheme)).variant, light);
 
-    // Surfaces that must never appear once light mode is on. (`darkBgApp` ==
-    // `darkBgInput` and `darkBgSidebar` == `darkBgPanel` in the palette, so a
-    // set would contain duplicates; list the distinct values only.)
+    // Surfaces from the dark (Dracula) palette that must never appear once a
+    // light theme is selected. (`bgApp` == `bgInput` and `bgSidebar` ==
+    // `bgPanel` in the palette, so list the distinct values only.)
+    const dark = CompassThemeVariant.dracula;
     final darkSurfaces = <Color>{
-      CompassColors.darkBgApp,
-      CompassColors.darkBgSidebar,
-      CompassColors.darkBgSubtle,
-      CompassColors.darkBgHover,
+      dark.palette.bgApp,
+      dark.palette.bgSidebar,
+      dark.palette.bgSubtle,
+      dark.palette.bgHover,
     };
 
     // Every opaque surface currently in the tree must use the light palette,
@@ -474,11 +505,11 @@ void main() {
         }
         if (color == null) continue;
         expect(darkSurfaces.contains(color), isFalse,
-            reason: '$section (light mode): a surface still uses the dark colour $color');
-        if (color == CompassColors.lightBgPanel) lightPanels++;
+            reason: '$section (light theme): a surface still uses a dark colour $color');
+        if (color == light.palette.bgPanel) lightPanels++;
       }
       expect(lightPanels, greaterThan(0),
-          reason: '$section (light mode): expected at least one light panel surface');
+          reason: '$section (light theme): expected at least one light panel surface');
     }
 
     Future<void> selectSection(String label) async {
