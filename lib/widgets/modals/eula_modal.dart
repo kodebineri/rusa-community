@@ -1,0 +1,92 @@
+import 'package:flutter/services.dart';
+import 'package:flutter/widgets.dart';
+import '../../icons/compass_svg_icons.dart';
+import '../../theme/compass_theme.dart';
+import '../../theme/compass_typography.dart';
+import '../compass_markdown_view.dart';
+import 'compass_modal.dart';
+
+/// End User License Agreement dialog.
+///
+/// The license text is *not* duplicated in Dart: it is read from the bundled
+/// `EULA.md` asset (declared in `pubspec.yaml`) and rendered with
+/// [CompassMarkdownView], so editing the Markdown file is enough to update the
+/// dialog. The file is loaded once, when this modal is first mounted (it is a
+/// permanent child of the root `Stack`), so opening it later never waits.
+class EulaModal extends StatefulWidget {
+  final bool isOpen;
+  final VoidCallback onClose;
+
+  const EulaModal({super.key, required this.isOpen, required this.onClose});
+
+  @override
+  State<EulaModal> createState() => _EulaModalState();
+}
+
+class _EulaModalState extends State<EulaModal> {
+  /// Asset path of the license text, relative to `pubspec.yaml`.
+  static const String _assetPath = 'EULA.md';
+
+  String? _markdown;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    try {
+      final text = await rootBundle.loadString(_assetPath);
+      if (!mounted) return;
+      setState(() => _markdown = text);
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _error = 'Could not load the license text ($_assetPath).');
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = CompassTheme.of(context);
+
+    return CompassModalShell(
+      isOpen: widget.isOpen,
+      maxWidth: 640.0,
+      onBackdropTap: widget.onClose,
+      children: [
+        CompassModalHeader(
+          title: 'End User License Agreement',
+          subtitle: 'Version 1.0',
+          iconSvg: CompassSvgIcons.file,
+          onClose: widget.onClose,
+        ),
+        if (_error != null)
+          Padding(
+            padding: const EdgeInsets.only(top: 12.0),
+            child: CompassErrorBanner(message: _error!),
+          )
+        else if (_markdown == null)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 24.0),
+            child: Text(
+              'Loading license text...',
+              textAlign: TextAlign.center,
+              style: CompassTypography.bodyRegular(color: theme.textMuted),
+            ),
+          )
+        else
+          Padding(
+            padding: const EdgeInsets.only(top: 12.0),
+            child: CompassMarkdownView(markdown: _markdown!),
+          ),
+        CompassModalFooter(
+          children: [
+            CompassSecondaryButton(label: 'Close', onTap: widget.onClose),
+          ],
+        ),
+      ],
+    );
+  }
+}

@@ -102,7 +102,7 @@ Stack
 │        ├ _buildDocumentsPagination    (Tree/JSON/Table switcher + Prev/Next) — same condition
 │        └ Expanded > SingleChildScrollView(16) > _buildActiveTabView(...)
 │  3. CompassTerminal                   (docked mongosh drawer; the only "footer" region)
-└─ 14 modal overlays + the touch-only CompassActionSheet
+└─ 16 modal overlays + the touch-only CompassActionSheet
    (always-installed children; each closed one renders SizedBox.shrink)
 ```
 

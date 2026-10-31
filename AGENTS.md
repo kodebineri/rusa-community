@@ -19,6 +19,8 @@ the engine instance.
   not compiled by Flutter. Comments in Dart files say "Converted from `src/components/X.tsx`".
 - Tests: `test/widget_test.dart` (15 widget tests, single file).
 - Sample data sources of truth: `sample_library.json`, `sample_social_network.json` (repo root).
+- License text: `EULA.md` (repo root) — bundled as a Flutter asset (`pubspec.yaml`) and
+  rendered by `EulaModal` via `CompassMarkdownView`; edit the Markdown, not the widget.
 - `README.md` at repo root is **stale AI Studio boilerplate** — ignore it.
 
 ## Commands
@@ -62,7 +64,7 @@ the legacy `src/` React app; `npm` is not needed for Flutter work).
    afterwards. All reads are synchronous during `build()` — never make the engine async.
 5. **Closed modals render `SizedBox.shrink()`.** `CompassModalShell.build` returns shrink when
    `!isOpen`, so closed modal children are constructed but **not mounted** (finders won't see
-   them; no stray hit-testing). All 14 modals live permanently in the root `Stack`
+   them; no stray hit-testing). All 16 modals live permanently in the root `Stack`
    (`main.dart` ~L864–984).
 6. **`InsertDocumentModal.onInsert` returns `String?`**: `null` = success (modal closes
    itself), non-null = error message shown in the modal's `CompassErrorBanner`. The handler in
@@ -111,6 +113,9 @@ the legacy `src/` React app; `npm` is not needed for Flutter work).
 | All models (`MongoDocument`, `QueryFilterOptions`, …) | `lib/models/mongo_models.dart` |
 | `CollectionTab` | `lib/models/collection_tab.dart` |
 | Modal primitives (`CompassModalShell`, `CompassInput`, buttons) | `lib/widgets/modals/compass_modal.dart` |
+| `EulaModal` (renders the bundled `EULA.md`) | `lib/widgets/modals/eula_modal.dart` |
+| `AboutModal` (logo, app name, version) | `lib/widgets/modals/about_modal.dart` |
+| `CompassMarkdownView` (dependency-free Markdown renderer) | `lib/widgets/compass_markdown_view.dart` |
 | `CompassActionSheet` (touch overflow sheet) | `lib/widgets/modals/compass_action_sheet.dart` |
 | `CompassIconButton`, `CompassHover` | `lib/widgets/compass_icon_button.dart`, `lib/widgets/compass_hover.dart` |
 | `CompassTheme`, `CompassColors`, `CompassTypography`, `CompassDensity` | `lib/theme/` |

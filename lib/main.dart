@@ -1,5 +1,6 @@
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'dart:async';
 import 'theme/compass_colors.dart';
 import 'theme/compass_density.dart';
@@ -38,6 +39,8 @@ import 'widgets/modals/import_export_modal.dart';
 import 'widgets/modals/export_language_modal.dart';
 import 'widgets/modals/save_view_modal.dart';
 import 'widgets/modals/mongosh_confirmation_modal.dart';
+import 'widgets/modals/eula_modal.dart';
+import 'widgets/modals/about_modal.dart';
 import 'widgets/modals/compass_modal.dart';
 import 'widgets/modals/compass_action_sheet.dart';
 
@@ -63,76 +66,155 @@ class CompassApp extends StatefulWidget {
 }
 
 class _CompassAppState extends State<CompassApp> {
-  void _showInfoDialog(String title, String message) {
-    final overlay = Overlay.of(context);
+  /// The app-level [Overlay] created in [build]. Transient dialogs must be
+  /// inserted through this key: [State.context] sits *above* that overlay, so
+  /// `Overlay.of(context)` finds no overlay and throws.
+  final GlobalKey<OverlayState> _overlayKey = GlobalKey<OverlayState>();
+
+  /// Shows a transient message dialog above the app shell.
+  ///
+  /// [copyValue] adds a "Copy link" button for messages that contain a URL.
+  void _showInfoDialog(String title, String message, {String? copyValue}) {
+    final overlay = _overlayKey.currentState;
+    if (overlay == null) return;
     late OverlayEntry entry;
     entry = OverlayEntry(
       builder: (context) {
-        final theme = _theme;
-        return Stack(
-          children: [
-            Positioned.fill(
-              child: GestureDetector(
-                behavior: HitTestBehavior.opaque,
-                onTap: () => entry.remove(),
-                child: Container(color: const Color(0x80000000)),
-              ),
-            ),
-            Center(
-              child: Container(
-                width: 360,
-                decoration: BoxDecoration(
-                  color: theme.bgPanel,
-                  borderRadius: BorderRadius.circular(10.0),
-                  border: Border.all(color: theme.border, width: 1.0),
-                  boxShadow: const [
-                    BoxShadow(
-                      color: Color(0x33000000),
-                      blurRadius: 12.0,
-                      offset: Offset(0, 6),
-                    ),
-                  ],
+        final theme = CompassTheme.of(context);
+        var copied = false;
+        return CompassDensity.forWidth(
+          width: MediaQuery.sizeOf(context).width,
+          child: Stack(
+            children: [
+              Positioned.fill(
+                child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: () => entry.remove(),
+                  child: Container(color: const Color(0x80000000)),
                 ),
-                padding: const EdgeInsets.all(16.0),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Text(title,
-                        style: CompassTypography.header(color: theme.textPrimary)),
-                    const SizedBox(height: 8.0),
-                    Text(message,
-                        style:
-                            CompassTypography.bodyRegular(color: theme.textSecondary)),
-                    const SizedBox(height: 16.0),
-                    Align(
-                      alignment: Alignment.centerRight,
-                      child: CompassHover(
-                        onTap: () => entry.remove(),
-                        builder: (hovered) => Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 14.0, vertical: 6.0),
-                          decoration: BoxDecoration(
-                            color: hovered
-                                ? CompassColors.greenHover
-                                : theme.accent,
-                            borderRadius: BorderRadius.circular(6.0),
+              ),
+              Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 360.0),
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: theme.bgPanel,
+                        borderRadius: BorderRadius.circular(10.0),
+                        border: Border.all(color: theme.border, width: 1.0),
+                        boxShadow: const [
+                          BoxShadow(
+                            color: Color(0x33000000),
+                            blurRadius: 12.0,
+                            offset: Offset(0, 6),
                           ),
-                          child: Text('OK',
-                              style:
-                                  CompassTypography.header(color: theme.onAccent)),
-                        ),
+                        ],
+                      ),
+                      padding: const EdgeInsets.all(16.0),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Text(title,
+                              style: CompassTypography.header(
+                                  color: theme.textPrimary)),
+                          const SizedBox(height: 8.0),
+                          Text(message,
+                              style: CompassTypography.bodyRegular(
+                                  color: theme.textSecondary)),
+                          const SizedBox(height: 16.0),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.end,
+                            children: [
+                              if (copyValue != null) ...[
+                                StatefulBuilder(
+                                  builder: (context, setLocalState) =>
+                                      CompassSecondaryButton(
+                                    label: copied ? 'Copied' : 'Copy link',
+                                    onTap: () {
+                                      Clipboard.setData(
+                                        ClipboardData(text: copyValue),
+                                      );
+                                      setLocalState(() => copied = true);
+                                    },
+                                  ),
+                                ),
+                                const SizedBox(width: 8.0),
+                              ],
+                              CompassHover(
+                                onTap: () => entry.remove(),
+                                semanticLabel: 'OK',
+                                builder: (hovered) => Container(
+                                  constraints: BoxConstraints(
+                                    minHeight:
+                                        CompassDensity.of(context).minTapTarget,
+                                  ),
+                                  alignment: Alignment.center,
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 14.0, vertical: 6.0),
+                                  decoration: BoxDecoration(
+                                    color: hovered
+                                        ? CompassColors.greenHover
+                                        : theme.accent,
+                                    borderRadius: BorderRadius.circular(6.0),
+                                  ),
+                                  child: Text('OK',
+                                      style: CompassTypography.header(
+                                          color: theme.onAccent)),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
                       ),
                     ),
-                  ],
+                  ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         );
       },
     );
     overlay.insert(entry);
+  }
+
+  /// Bug reports open the upstream GitHub issue tracker in the system browser.
+  static final Uri _bugReportUri =
+      Uri.parse('https://github.com/mongodb-js/compass/issues');
+
+  /// Opens [_bugReportUri] in the system browser.
+  ///
+  /// [LaunchMode.externalApplication] is the intended mode; platforms (and
+  /// older plugin builds) that only implement the default mode get a second
+  /// attempt. When neither works — for example when the desktop plugin was
+  /// added after the running binary was compiled — the caller shows the URL
+  /// instead of failing silently.
+  Future<bool> _openBugReportInBrowser() async {
+    for (final mode in <LaunchMode>[
+      LaunchMode.externalApplication,
+      LaunchMode.platformDefault,
+    ]) {
+      try {
+        if (await launchUrl(_bugReportUri, mode: mode)) return true;
+      } catch (_) {
+        // MissingPluginException on a stale build, PlatformException when no
+        // browser handler exists: try the next mode.
+      }
+    }
+    return false;
+  }
+
+  /// Report Bug entry point for both the header menu and the touch sheet.
+  Future<void> _handleReportBug() async {
+    final opened = await _openBugReportInBrowser();
+    if (opened || !mounted) return;
+    _showInfoDialog(
+      'Report Bug',
+      'Could not open a browser. Please open an issue at $_bugReportUri',
+      copyValue: _bugReportUri.toString(),
+    );
   }
   bool _isDarkMode = true;
   ConnectionProfile? _connection;
@@ -147,6 +229,8 @@ class _CompassAppState extends State<CompassApp> {
 
   /// True while the touch-only header overflow sheet is open.
   bool _isHeaderActionsOpen = false;
+  bool _isEulaModalOpen = false;
+  bool _isAboutModalOpen = false;
 
   /// True while the touch-only query-bar overflow sheet is open.
   bool _isQueryActionsOpen = false;
@@ -897,13 +981,13 @@ class _CompassAppState extends State<CompassApp> {
                       setState(() => _isHeaderActionsOpen = true);
                     },
                     onReportBug: () {
-                      _showInfoDialog('Report Bug', 'Please open an issue at https://github.com/mongodb-js/compass/issues or contact your administrator.');
+                      unawaited(_handleReportBug());
                     },
                     onShowEula: () {
-                      _showInfoDialog('EULA', 'MongoDB Compass is licensed under the Server Side Public License (SSPL).');
+                      setState(() => _isEulaModalOpen = true);
                     },
                     onShowAbout: () {
-                      _showInfoDialog('About', 'MongoDB Compass (Flutter Port)\nVersion 7.0.8\n\nA MongoDB Compass clone written in Flutter.');
+                      setState(() => _isAboutModalOpen = true);
                     },
                   ),
 
@@ -1106,6 +1190,14 @@ class _CompassAppState extends State<CompassApp> {
                 collName: _selectedCollName,
                 indexName: _dropIndexName,
               ),
+              EulaModal(
+                isOpen: _isEulaModalOpen,
+                onClose: () => setState(() => _isEulaModalOpen = false),
+              ),
+              AboutModal(
+                isOpen: _isAboutModalOpen,
+                onClose: () => setState(() => _isAboutModalOpen = false),
+              ),
               DeleteDocumentModal(
                 isOpen: _isDeleteDocModalOpen,
                 onClose: () => setState(() => _isDeleteDocModalOpen = false),
@@ -1200,8 +1292,7 @@ class _CompassAppState extends State<CompassApp> {
                     svg: CompassSvgIcons.activity,
                     onTap: () {
                       setState(() => _isHeaderActionsOpen = false);
-                      _showInfoDialog('Report Bug',
-                          'Please open an issue at https://github.com/mongodb-js/compass/issues or contact your administrator.');
+                      unawaited(_handleReportBug());
                     },
                   ),
                   CompassActionSheetItem(
@@ -1209,8 +1300,7 @@ class _CompassAppState extends State<CompassApp> {
                     svg: CompassSvgIcons.file,
                     onTap: () {
                       setState(() => _isHeaderActionsOpen = false);
-                      _showInfoDialog('EULA',
-                          'MongoDB Compass is licensed under the Server Side Public License (SSPL).');
+                      setState(() => _isEulaModalOpen = true);
                     },
                   ),
                   CompassActionSheetItem(
@@ -1218,8 +1308,7 @@ class _CompassAppState extends State<CompassApp> {
                     svg: CompassSvgIcons.key,
                     onTap: () {
                       setState(() => _isHeaderActionsOpen = false);
-                      _showInfoDialog('About',
-                          'MongoDB Compass (Flutter Port)\nVersion 7.0.8\n\nA MongoDB Compass clone written in Flutter.');
+                      setState(() => _isAboutModalOpen = true);
                     },
                   ),
                 ],
@@ -1283,6 +1372,7 @@ class _CompassAppState extends State<CompassApp> {
         // overlay so that the menu — which lives in the overlay — counts as
         // part of the field's region.
         child: Overlay(
+          key: _overlayKey,
           // The context menu may extend past the window edge (it is anchored
           // to the text field), so the overlay must not clip its entries.
           clipBehavior: Clip.none,

@@ -14,6 +14,7 @@ dependencies:
   google_fonts: ^6.2.1
   file_selector: ^1.1.0
   mongo_dart: ^0.10.10
+  url_launcher: ^6.3.0
 
 dev_dependencies:
   flutter_test:
@@ -22,3 +23,6 @@ dev_dependencies:
 
 flutter:
   uses-material-design: false
+  assets:
+    # License text rendered by EulaModal (lib/widgets/modals/eula_modal.dart).
+    - EULA.md

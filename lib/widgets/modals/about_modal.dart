@@ -1,0 +1,115 @@
+import 'package:flutter/widgets.dart';
+import '../../icons/compass_svg_icons.dart';
+import '../../theme/compass_colors.dart';
+import '../../theme/compass_theme.dart';
+import '../../theme/compass_typography.dart';
+import 'compass_modal.dart';
+
+/// About dialog: logo, app name and version.
+///
+/// Opened from the header more-menu (desktop) and from the touch action sheet.
+/// It follows the same `CompassModalShell` conventions as the other modals, so
+/// it is a permanent child of the root `Stack` in `main.dart` and renders
+/// `SizedBox.shrink()` while closed.
+class AboutModal extends StatelessWidget {
+  final bool isOpen;
+  final VoidCallback onClose;
+
+  /// Keep in sync with the version badge in `CompassHeader` (`7.0.8`).
+  static const String appVersion = '7.0.8';
+
+  const AboutModal({super.key, required this.isOpen, required this.onClose});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = CompassTheme.of(context);
+
+    return CompassModalShell(
+      isOpen: isOpen,
+      maxWidth: 320.0,
+      onBackdropTap: onClose,
+      children: [
+        const SizedBox(height: 8.0),
+
+        // Logo: the same leaf-on-green-gradient badge as the header, scaled up.
+        Center(
+          child: Container(
+            width: 72.0,
+            height: 72.0,
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [CompassColors.greenAccent, CompassColors.greenForest],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(16.0),
+              boxShadow: const [
+                BoxShadow(
+                  color: Color(0x33000000),
+                  blurRadius: 8.0,
+                  offset: Offset(0, 2),
+                ),
+              ],
+            ),
+            alignment: Alignment.center,
+            child: const CompassSvg(
+              svgString: CompassSvgIcons.mongoLeaf,
+              size: 40.0,
+            ),
+          ),
+        ),
+
+        const SizedBox(height: 16.0),
+
+        // App name, two-tone exactly like the header wordmark.
+        Center(
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'Compass',
+                  style: CompassTypography.title(color: theme.textPrimary)
+                      .copyWith(fontSize: 20.0),
+                ),
+                const SizedBox(width: 4.0),
+                Text(
+                  'Flutter',
+                  style: CompassTypography.title(color: theme.accent)
+                      .copyWith(fontSize: 20.0),
+                ),
+              ],
+            ),
+          ),
+        ),
+
+        const SizedBox(height: 10.0),
+
+        // Version badge, same shape as the header's `7.0.8` chip.
+        Center(
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 3.0),
+            decoration: BoxDecoration(
+              color: theme.bgSubtle,
+              borderRadius: BorderRadius.circular(4.0),
+              border: Border.all(color: theme.border, width: 1.0),
+            ),
+            child: Text(
+              'Version $appVersion',
+              style: CompassTypography.monoSmall(color: theme.textMuted),
+            ),
+          ),
+        ),
+
+        const SizedBox(height: 8.0),
+
+        CompassModalFooter(
+          children: [
+            CompassSecondaryButton(label: 'Close', onTap: onClose),
+          ],
+        ),
+      ],
+    );
+  }
+}

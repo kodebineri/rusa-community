@@ -1,6 +1,14 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <!-- Required to talk to a real MongoDB server (mongodb:// and mongodb+srv://). -->
     <uses-permission android:name="android.permission.INTERNET"/>
+    <!-- Required by url_launcher on Android 11+ so the "Report Bug" link can be
+         resolved to a browser (see _handleReportBug in lib/main.dart). -->
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="https" />
+        </intent>
+    </queries>
     <application
         android:label="MongoDB Compass"
         android:name="${applicationName}"
