@@ -2,7 +2,6 @@ import 'dart:convert';
 
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter/widgets.dart';
 import 'package:mongodb_compass_flutter/utils/json_syntax_text_controller.dart';
 import '../theme/compass_colors.dart';
 import '../theme/compass_density.dart';
@@ -563,7 +562,6 @@ class _CompassQueryBarState extends State<CompassQueryBar> {
         return desktopTextSelectionControls;
       case TargetPlatform.android:
       case TargetPlatform.fuchsia:
-      default:
         return materialTextSelectionControls;
     }
   }
@@ -625,7 +623,7 @@ class _CompassQueryBarState extends State<CompassQueryBar> {
                 focusNode: focusNode,
                 style: style,
                 cursorColor: theme.accent,
-                selectionColor: theme.accent.withOpacity(0.4),
+                selectionColor: theme.accent.withValues(alpha: 0.4),
                 selectionControls: getPlatformSelectionControls(),
                 backgroundCursorColor: theme.bgInput,
                 keyboardType: TextInputType.multiline,
@@ -1091,8 +1089,8 @@ class _CompassQueryBarState extends State<CompassQueryBar> {
       //   | <- cursor here
       // }
       final prefix =
-          value.text.substring(0, selection.start) + '\n' + innerIndent;
-      final suffix = '\n' + baseIndent + value.text.substring(selection.start);
+          '${value.text.substring(0, selection.start)}\n$innerIndent';
+      final suffix = '\n$baseIndent${value.text.substring(selection.start)}';
 
       final newText = prefix + suffix;
       final cursorOffset = prefix.length;

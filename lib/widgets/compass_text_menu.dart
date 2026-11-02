@@ -168,8 +168,6 @@ EditableTextContextMenuBuilder compassTextContextMenuBuilderFor(
   required CompassDensity density,
 }) {
   return (BuildContext context, EditableTextState editableTextState) {
-    // ignore: avoid_print
-    print('PROBE-MENU builder called sel=${editableTextState.textEditingValue.selection}');
     final TextEditingValue value = editableTextState.textEditingValue;
     final bool hasSelection =
         value.selection.isValid && !value.selection.isCollapsed;

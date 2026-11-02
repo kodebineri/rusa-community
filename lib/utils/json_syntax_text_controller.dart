@@ -5,9 +5,9 @@ class JsonSyntaxTextController extends TextEditingController {
   CompassTheme theme;
 
   JsonSyntaxTextController({
-    String? text,
+    super.text,
     required this.theme,
-  }) : super(text: text);
+  });
 
   @override
   TextSpan buildTextSpan({

@@ -220,7 +220,7 @@ order; nested objects count as a single `Object` type (no flattening). Per field
 activeSection='documents', docViewMode='tree', queryOptions, isSameTarget(db, coll) }` —
 the per-tab UI state restored on tab switch.
 
-## `RealMongoService` (`lib/services/real_mongo_service.dart`, ~580 lines) — production path
+## `RealMongoService` (`lib/services/real_mongo_service.dart`, ~957 lines) — production path
 
 - `class RealMongoService extends LocalMongoEngine` — that inheritance is why assigning it to
   the `mongoEngine` global type-checks.
@@ -228,11 +228,18 @@ the per-tab UI state restored on tab switch.
   list so `build()` can read synchronously. Mutations run `super.*` first (updates the
   mirror) then are **fire-and-forget replayed** to the server (`_fire*`; errors → `lastError`
   + `onError`; `onDataChanged` callback triggers background `setState`).
-- API: `static Future<RealMongoService> connect(String uri)` (Db.create → open → ping →
-  `reload()`; throws on bad URI/unreachable/auth), `Future<void> reload()`,
-  `Future<void> dispose()`. Cap: `maxDocsPerCollection = 20000`.
-- `reload()`: listDatabases → per-db `getCollectionInfos`, skips `system.*`, detects views
-  (`type == 'view'`), loads docs + indexes.
+- API: `static Future<void> test(String uri)` (quick open+ping, no mirroring),
+  `static Future<RealMongoService> connect(String uri)`, `Future<void> reloadFast()`,
+  `Future<void> _loadAllDataInBackground()`, `Future<void> loadCollectionData(db, coll)`,
+  `Future<void> reload()`, `Future<void> dispose()`. Cap:
+  **`maxDocsPerCollection = 5000`** (was 20000).
+- **Connect is two-phase:** `connect` does `Db.create → open (20 s) → reloadFast (20 s)`,
+  throwing on bad URI/unreachable/auth. `reloadFast` lists databases and creates *empty*
+  `MongoDatabase` entries immediately (UI tree appears fast), then `_loadAllDataInBackground`
+  fills collections/docs/indexes and calls `onDataChanged`. `loadCollectionData` lazily loads
+  one collection (10 s docs / 8 s indexes).
+- `reload()` (full, synchronous-style): listDatabases → per-db `getCollectionInfos`, skips
+  `system.*`, detects views (`type == 'view'`), loads docs + indexes.
 - Overrides every mutation (insert/update/delete/index/db/coll/view/validator) plus
   `resetToDefaults` (**reloads from server instead of re-seeding**) and `analyzeSchema`
   (uses `_bsonTypeName`: `Date`, `Boolean`, runtime fallback; percentages over present

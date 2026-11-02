@@ -4,7 +4,7 @@ Companion to root `AGENTS.md`. Covers the Flutter app shell: bootstrap, state, n
 tabs, document CRUD, modal orchestration, and the `build()` layout tree.
 For the data layer see `docs/engine.md`; for widgets see `docs/ui.md`.
 
-`lib/main.dart` ≈ 1488 lines, 55 KB — a single `StatefulWidget` file containing the entire
+`lib/main.dart` ≈ 1997 lines — a single `StatefulWidget` file containing the entire
 app shell. Line numbers below are approximate anchors; they drift as the file changes.
 
 ## Bootstrap
@@ -17,13 +17,21 @@ void main() => runApp(const DefaultTextEditingShortcuts(child: CompassApp()));
   `DefaultTextEditingShortcuts` is load-bearing: inputs are bare `EditableText`
   (`CompassInput`), which accepts typed characters but ignores Backspace/arrows/Home/End/
   Ctrl+C/V without it. (Test 3 exists specifically for this.)
-- No `Navigator`, no routing, no `GlobalKey`s anywhere in `main.dart`.
+- No `Navigator`, no routing. There is exactly **one** `GlobalKey`: `_overlayKey`
+  (`GlobalKey<OverlayState>`), because `CompassApp` hosts its own `Overlay` (there is no
+  `WidgetsApp` to provide one). `_showInfoDialog` inserts an `OverlayEntry` through it.
 - Root build wrap order (outermost → innermost):
-  `AnnotatedRegion<SystemUiOverlayStyle>` (transparent status bar, brightness from dark mode)
-  → `CompassTheme(isDarkMode: _isDarkMode, …)` → manual `MediaQuery` fallback
-  (`MediaQuery.fromView` if none) → `Directionality(ltr)` → `LayoutBuilder`
-  → `Container(bgApp)` → **`Stack`** (content column + all modal overlays)
-  → `CompassDensity.forWidth(width: …)` (innermost: touch vs desktop metrics).
+  `AnnotatedRegion<SystemUiOverlayStyle>` (transparent status bar, brightness from the variant)
+  → `CompassTheme(variant: _themeVariant, …)` → manual `MediaQuery` fallback
+  (`MediaQuery.fromView` if none) → `Directionality(ltr)` → `TapRegionSurface`
+  → `Overlay(key: _overlayKey, clipBehavior: Clip.none, initialEntries: [_shellEntry])`.
+  The shell itself (built by `_shellEntry` → `_buildShell(context)`) is
+  `LayoutBuilder` → `Container(bgApp)` → **`Stack`** (content column + all modal/action-sheet
+  overlays) → `CompassDensity.forWidth(width: …)` (innermost: touch vs desktop metrics).
+- Why `TapRegionSurface` + `Overlay` + `clipBehavior: Clip.none`: they are what `WidgetsApp`
+  would normally supply. The custom copy/paste menu (`compass_text_menu.dart`) lives in the
+  overlay and must count as part of the field's tap region (dismissal) and be allowed to paint
+  past the window edge (it is anchored to the field).
 - Breakpoint: `isDesktop = constraints.maxWidth >= 768` (sidebar is off-canvas below it).
 - **Density is width-driven, not platform-driven**: `flutter_test` forces
   `TargetPlatform.android`, so a platform check would put the 1920 px test viewport into
@@ -34,18 +42,21 @@ void main() => runApp(const DefaultTextEditingShortcuts(child: CompassApp()));
 > Naming trap: the section field is **`_activeTab`**, the tab index is **`_activeTabIndex`**.
 > There is no `_activeSection`/`_activeTabId`.
 
-**Theme / connection (L60–90)**
+**Theme / connection (L220–231)**
 
 | Field | Type | Purpose |
 |---|---|---|
-| `_isDarkMode` | `bool = true` | dark default; drives `_theme` + root `CompassTheme` |
-| `_connection` | `ConnectionProfile?` | current profile (seeded "Local Standalone"); null after disconnect |
+| `_themeVariant` | `CompassThemeVariant = .defaultVariant` (Dracula) | selected theme; drives `_theme` + root `CompassTheme`; changed via header menu / action sheet |
+| `_connection` | `ConnectionProfile?` | current profile; **null at boot** (the connect popup is open), set on connect / sample-data, cleared on disconnect |
 | `_realService` | `RealMongoService?` | non-null only while on a live server; also gates header `showResetSample` |
-| `_savedConnections` | `List<ConnectionProfile>` | two seeded profiles (Local Standalone, Atlas Production) |
+| `_savedConnections` | `List<ConnectionProfile>` | two seeded profiles (`1` "Local Standalone (27017)", `2` "Atlas Production ReplicaSet") |
 
-**Panel flags (L74–76):** `_isConnectModalOpen`, `_isTerminalOpen` (docked mongosh shell),
-`_isMobileSidebarOpen` (off-canvas sidebar < 768px), `_isHeaderActionsOpen` (touch-only
-header overflow sheet).
+**Panel flags (L229–243):** `_isConnectModalOpen` (**defaults to `true`** — the app boots into
+the connection popup), `_isTerminalOpen` (docked mongosh shell), `_isMobileSidebarOpen`
+(off-canvas sidebar < 768px), `_isHeaderActionsOpen` (touch-only header overflow sheet),
+`_isEulaModalOpen`, `_isAboutModalOpen`, `_isQueryActionsOpen` (touch-only query-bar overflow
+sheet), `_isQueryOptionsExpanded` (query-bar options panel; owned here so the overflow sheet
+can toggle it).
 
 **Layout flags (refreshed by the root `LayoutBuilder` on every layout pass):**
 
@@ -55,7 +66,7 @@ header overflow sheet).
 | `_windowWidth` | `double` | viewport width in logical pixels |
 | `_isCompactLayout` | `bool` (getter) | `_windowWidth < 900` — the labelled chrome collapses into icon buttons |
 
-**Modal state — flag + payload pairs (L95–142):**
+**Modal state — flag + payload pairs (L276–323):**
 
 | Modal group | Fields |
 |---|---|
@@ -73,26 +84,30 @@ header overflow sheet).
 | Save View | `_isSaveViewModalOpen`, `_saveViewPipeline`, `_saveViewPipelineJson` |
 | Terminal confirm | `_pendingTerminalOperation?`, `_pendingTerminalConfirm?` (derived `isOpen`) |
 
-**Selection / section / view (L144–149):** `_selectedDbName = 'library'`,
+**Selection / section / view (L325–347):** `_selectedDbName = 'library'`,
 `_selectedCollName = 'books'`, `_activeTab = 'documents'`
 (`documents|aggregations|schema|indexes`), `_docViewMode = 'tree'` (`tree|json|table`),
 `_queryOptions: QueryFilterOptions` (mutable; `filter/project/sort/skip=0/limit=20`).
 
-**Tabs (L157–160):** `_openTabs: List<CollectionTab>` seeded with
+**Tabs (L331–347):** `_openTabs: List<CollectionTab>` seeded with
 `[CollectionTab('library','books')]`, `_activeTabIndex = 0` (`-1` = none/sentinel).
 
 **Not a state field:** `mongoEngine` is a mutable *top-level global* in
 `lib/services/mongo_engine.dart`. Assigned during connect/disconnect inside `setState`.
 
-There is **no `initState`** — everything initializes via field initializers, so the app boots
-straight into `library.books` Documents/tree with empty query on the local engine.
+There is **no `initState`** — everything initializes via field initializers. The app lays out
+`library.books` Documents/tree with an empty query on the local engine immediately, but the
+**connection popup is open over it** on first launch (`_isConnectModalOpen = true`).
 
-## Layout tree of `build()` (~L706–1024)
+## Layout tree — `build()` (~L1381) hosts `_buildShell()` (~L940) in an `OverlayEntry`
+
+`build()` only stacks the root wrappers (see "Bootstrap"); the shell is `_shellEntry`
+(`OverlayEntry(builder: _buildShell)`), installed as the root `Overlay`'s first entry.
 
 ```
-Stack
+Shell Stack
 ├─ Column
-│  1. CompassHeader                     (56px; connection, Reset Samples, terminal toggle, dark toggle)
+│  1. CompassHeader                     (56px; connection, Reset Samples, terminal toggle, theme menu)
 │  2. Expanded > Row
 │     ├ CompassSidebar                  (if isDesktop || _isMobileSidebarOpen)
 │     └ Expanded > Column
@@ -102,11 +117,11 @@ Stack
 │        ├ _buildDocumentsPagination    (Tree/JSON/Table switcher + Prev/Next) — same condition
 │        └ Expanded > SingleChildScrollView(16) > _buildActiveTabView(...)
 │  3. CompassTerminal                   (docked mongosh drawer; the only "footer" region)
-└─ 16 modal overlays + the touch-only CompassActionSheet
+└─ 16 modal overlays + TWO CompassActionSheet overlays (header actions, query actions)
    (always-installed children; each closed one renders SizedBox.shrink)
 ```
 
-Data derived at the top of `build()` (~L713–719), all synchronous:
+Data derived at the top of `_buildShell()` (~L947–953), all synchronous:
 
 ```dart
 service = mongoEngine
@@ -121,7 +136,7 @@ import `onImportComplete`, index create/drop (`onCreated` / `_confirmDropIndex`)
 section no longer derives data in `build()` — `SchemaView` owns its analysis and re-runs
 `analyzeSchema` itself (on open, on db/coll change, and via its Analyze button).
 
-### `_buildActiveTabView` (~L1444–1513)
+### `_buildActiveTabView` (~L1927–1997)
 
 - `activeColl == null` → centered "Select a collection to view data".
 - `documents`: empty → `_buildDocumentsEmptyState` (Insert First Document button, hidden for
@@ -141,7 +156,7 @@ section no longer derives data in `build()` — `SchemaView` owns its analysis a
   `_confirmDropIndex` (`dropIndex`); the table re-reads the live `activeColl.indexes` list on
   the next `setState`. See `docs/ui.md`.
 
-### Collection header (`_buildCollectionHeader`, ~L1026–1193)
+### Collection header (`_buildCollectionHeader`, ~L1436–1594)
 
 - Breadcrumb row: db icon + db name + `>` + table icon + coll name + "N docs" chip;
   right side header actions (`_buildHeaderAction`): New Coll, Rename (eye icon for views),
@@ -156,7 +171,7 @@ section no longer derives data in `build()` — `SchemaView` owns its analysis a
   a labelled chip when `_isCompactLayout` (< 900 px); `_buildDocumentsAction` does the same
   for the Insert Document button and the Read-Only badge. On desktop the labels stay.
 
-### Pagination (`_buildDocumentsPagination`, ~L1298–1373)
+### Pagination (`_buildDocumentsPagination`, ~L1766–1859)
 
 Left = segmented Tree/JSON/Table switcher (`_buildViewModeBtn` → `_docViewMode`).
 Right = `"start – end of total"` label + Prev/Next buttons that do
@@ -165,7 +180,7 @@ Right = `"start – end of total"` label + Prev/Next buttons that do
 On touch the whole bar becomes a horizontal `SingleChildScrollView` (the switcher, the
 label and the pager no longer fit on one phone-width line).
 
-## Tab management (~L168–249)
+## Tab management (~L349–447)
 
 `CollectionTab` (see `lib/models/collection_tab.dart`) stores per-tab UI state: `dbName`,
 `collName`, `activeSection` (default `'documents'`), `docViewMode` (default `'tree'`),
@@ -188,7 +203,7 @@ label and the pager no longer fit on one phone-width line).
 holds the old reference — synced only when `_saveActiveTabState()` runs. Renames mutate tab
 fields in place.
 
-## Document CRUD handlers (~L471–557)
+## Document CRUD handlers (~L667–753)
 
 | Handler | Behavior |
 |---|---|
@@ -200,7 +215,7 @@ fields in place.
 | `_confirmDeleteDocument()` | `mongoEngine.deleteDocument(...)`, clears payload (payload is NOT cleared by modal `onClose`) |
 | `_handleUpdateDocument(id, fields)` | direct `updateDocument` in try/catch that swallows errors + `setState` (wired to JSON view inline edit — currently unused there) |
 
-`InsertDocumentModal` instantiation in the Stack (~L940–949):
+`InsertDocumentModal` instantiation in the Stack (~L1214–1223):
 
 ```dart
 InsertDocumentModal(
@@ -217,25 +232,32 @@ Note: `onClose` does **not** clear `_editingDoc` (only `_openInsertDocument`,
 
 ## Modal orchestration
 
-All modals are permanently installed children of the root `Stack` (~L864–984), each with an
+All modals are permanently installed children of the root `Stack` (~L1123–1367), each with an
 `isOpen` boolean; `CompassModalShell` returns `SizedBox.shrink()` when closed (invariant 5 in
 AGENTS.md). Order: Connection, CreateDb, CreateCollection, **CreateIndex**, Rename,
-DropDatabase, DropCollection, **DropIndex**, DeleteDocument, **InsertDocument**, ImportExport,
-ExportLanguage, SaveView, MongoshConfirmation (`isOpen: _pendingTerminalOperation != null`).
+DropDatabase, DropCollection, **DropIndex**, **Eula**, **About**, DeleteDocument,
+**InsertDocument**, ImportExport, ExportLanguage, SaveView, MongoshConfirmation
+(`isOpen: _pendingTerminalOperation != null`).
 
 Three modals hand-roll their own `Positioned.fill` overlay instead of `CompassModalShell`:
 `ConnectionModal` (fixed width 560), `ExportLanguageModal` (width 580),
 `MongoshConfirmationModal` (width 512).
 
-A **fourth** overlay is installed after them: `CompassActionSheet` (`_isHeaderActionsOpen`),
-the touch/narrow-window bottom sheet that hosts the header actions which do not fit
-(change connection / reset samples / `_mongosh` / disconnect). It is opened from the
-header's `⋮` button via `onOpenActions`.
+**Two** `CompassActionSheet` overlays are installed after them:
+
+- header actions (`_isHeaderActionsOpen`) — opened from the header's `⋮` via `onOpenActions`:
+  change connection / reset samples / `_mongosh` / disconnect / **theme picker** / Report Bug /
+  EULA / About.
+- query actions (`_isQueryActionsOpen`) — opened from the query bar's `onOpenOverflow`: toggle
+  the options panel (`_isQueryOptionsExpanded`) / reset query / show generated code.
+
+Both are root-`Stack` children (a `Positioned.fill` sheet hosted inside a widget would be
+squeezed into a sliver).
 
 Payload-clearing asymmetry to remember: most `onClose` closures only flip the boolean;
 delete payload clears on confirm; insert payload (`_editingDoc`) clears on open/success.
 
-## Connection flow (~L261–357, L559–606)
+## Connection flow (~L449–551)
 
 - `_handleConnectProfile(profile)` → `RealMongoService.connect(profile.uri)` (async),
   `mongoEngine = connected`, `_resetTabsTo(firstDbWithCollections, firstColl)`,
@@ -249,7 +271,7 @@ delete payload clears on confirm; insert payload (`_editingDoc`) clears on open/
   re-seed + `_resetTabsTo('library','books')`.
 - Header `showResetSample: _realService == null` — Reset Samples hidden on live connections.
 
-## Terminal / mongosh (~L600–703, 852–862, 979–984)
+## Terminal / mongosh (~L817–920, terminal widget at L1110)
 
 `CompassTerminal` (docked bottom drawer) → `onRequestConfirmation: _requestTerminalConfirmation`
 → sets `_pendingTerminalOperation`/`_pendingTerminalConfirm` → `MongoshConfirmationModal`.
@@ -261,26 +283,30 @@ Helpers: `_splitArgs` (bracket-depth aware), `_parseMap`.
 
 | Range | Section |
 |---|---|
-| 40–52 | `main()` + DefaultTextEditingShortcuts rationale |
-| 54–59 | `CompassApp` + porting-constraint doc comment |
-| 61–170 | all state fields (grouped) |
-| 188–275 | tab handlers |
-| 290–370 | connection handlers |
-| 378–490 | db/collection/index modal handlers (create/rename/drop/drop-index) |
-| 491–578 | document CRUD |
-| 579–640 | import/export/language/save-view/reset/disconnect/terminal confirm |
-| 641–720 | `_executeTerminalCommand` + arg helpers |
-| 718 | `_theme` palette getter (workaround) |
-| 726–1093 | `build()` (header ~750, sidebar ~780, main pane ~830–870, terminal ~870, overlays ~885–1048) |
-| 1095–1253 | `_buildCollectionHeader` |
-| 1255–1307 | `_buildDocumentsAction` (Insert Document / Read-Only badge) |
-| 1309–1343 | `_buildTab` |
-| 1345–1385 | `_buildHeaderAction` |
-| 1387–1423 | `_buildViewModeBtn` |
-| 1425–1518 | `_buildDocumentsPagination` |
-| 1520–1535 | `_buildPageButton` |
-| 1537–1584 | `_buildDocumentsEmptyState` |
-| 1586–1655 | `_buildActiveTabView` |
+| 48–54 | `main()` + DefaultTextEditingShortcuts rationale |
+| 55–67 | `CompassApp` + porting-constraint doc comment |
+| 69–218 | state class head: `_overlayKey`, `_showInfoDialog`, Report-Bug helpers (`_bugReportUri` 185) |
+| 220–323 | theme/connection fields + panel/modal flags |
+| 325–347 | selection/section/view + tab seed |
+| 349–447 | tab handlers |
+| 449–551 | connection handlers (`_handleConnectProfile` 455) |
+| 554–665 | db/collection/index modal handlers (create/rename/drop/drop-index) |
+| 667–753 | document CRUD |
+| 755–815 | import/export/language/save-view/reset/disconnect/terminal confirm |
+| 817–920 | `_executeTerminalCommand` + arg helpers |
+| 922 | `_theme` palette getter (workaround) |
+| 924–937 | `_shellEntry` (`OverlayEntry(builder: _buildShell)`) |
+| 940–1379 | `_buildShell()` (header ~963, sidebar ~1003, main pane ~1039, terminal ~1110, overlays ~1123–1367) |
+| 1381–1434 | `build()` root wrappers (AnnotatedRegion → CompassTheme → MediaQuery → Directionality → TapRegionSurface → Overlay) |
+| 1436–1594 | `_buildCollectionHeader` |
+| 1596–1648 | `_buildDocumentsAction` (Insert Document / Read-Only badge) |
+| 1650–1684 | `_buildTab` |
+| 1686–1726 | `_buildHeaderAction` |
+| 1728–1764 | `_buildViewModeBtn` |
+| 1766–1859 | `_buildDocumentsPagination` |
+| 1861–1876 | `_buildPageButton` |
+| 1878–1925 | `_buildDocumentsEmptyState` |
+| 1927–1997 | `_buildActiveTabView` |
 
 ## Recipe: adding a new modal
 
@@ -288,7 +314,7 @@ Helpers: `_splitArgs` (bracket-depth aware), `_parseMap`.
    `CompassModalHeader` + `CompassModalFooter` (see `docs/ui.md`); props always include
    `bool isOpen` + `VoidCallback onClose`; reset controllers in `didUpdateWidget` when
    `isOpen` flips false→true.
-2. In `main.dart`: add `_is<Name>ModalOpen` flag (+ payload fields) near L95–142.
+2. In `main.dart`: add `_is<Name>ModalOpen` flag (+ payload fields) near L276–323.
 3. Add an `_open…` setter and a `_confirm…`/`_handle…` callback near the related handlers.
-4. Instantiate it once in the root `Stack` (~L864–984) with `isOpen`/`onClose`.
+4. Instantiate it once in the root `Stack` (~L1123–1367) with `isOpen`/`onClose`.
 5. Add a widget test if behavior matters — see `docs/testing.md`.

@@ -101,6 +101,38 @@ A `MouseRegion` + optional `GestureDetector` + optional `Semantics(button: true)
   verified overflow-free at 320/360/390/414/600/767/768/1024/1920 px with a temporary
   probe that was deleted afterwards.
 
+## Text selection context menu & syntax colouring
+
+Two small cross-cutting helpers make bare `EditableText`s usable (no Material
+`AdaptiveTextSelectionToolbar` is available).
+
+### `lib/widgets/compass_text_menu.dart`
+
+- `CompassTextContextMenu` (`{density, onCut, onCopy, onPaste, onSelectAll, canCut/canCopy/canPaste}`) —
+  a themed panel with Cut / Copy / Paste / Select-all rows, `minWidth 168`, rows
+  `≥ density.minTapTarget`. Tapping the panel (not a row) closes it.
+- `compassTextContextMenuBuilderFor(LayerLink anchorLink, {required CompassDensity density})` —
+  the `EditableTextContextMenuBuilder`. It anchors the menu to the field (`below` when it fits,
+  `above` otherwise for the bottom-docked mongosh prompt) via `CompositedTransformFollower`.
+  **The field must be wrapped in a `CompositedTransformTarget` with the same `LayerLink`**, or
+  the menu opens in the window corner. Every action closes the menu (`ContextMenuController.removeAny`).
+- `compassHandleTapOutside(event, focusNode)` — the `onTapOutside` handler; closes the menu and
+  only unfocuses on non-touch pointers (so the soft keyboard stays open on a phone).
+- The menu lives in the root `Overlay`, hence `main.dart`'s `TapRegionSurface` + `Overlay`
+  (see `docs/architecture.md` → Bootstrap) and its `CompassDensity` must be passed in
+  (the overlay sits above the app's density provider).
+
+Wired in: `CompassInput`, `CompassQueryBar`'s fields, `CompassTerminal`'s prompt. The sidebar
+search field does **not** wire it (plain `EditableText`).
+
+### `lib/utils/json_syntax_text_controller.dart` — `JsonSyntaxTextController`
+
+A `TextEditingController` subclass whose `buildTextSpan` regex-highlights JSON: keys →
+`theme.accent`, strings → `0xFF6A9955`, numbers → `0xFFB5CEA8`, `true/false/null` →
+`0xFF569CD6`, punctuation → `theme.textMuted`. Its `theme` field is mutable and refreshed in
+`didChangeDependencies`. Used **only** by the query bar's filter / project / sort fields (not
+by the insert-document JSON editor, which uses a plain controller).
+
 ## Shared modal primitives — `lib/widgets/modals/compass_modal.dart`
 
 Only these 9 public widgets exist (there is **no** `CompassSelect`/`CompassToggle`/
@@ -112,7 +144,7 @@ hand-rolled check rows in `create_collection_modal.dart`):
 | `CompassModalShell` | `isOpen`, `maxWidth = 448`, `children`, `onBackdropTap?` | **`if (!isOpen) return const SizedBox.shrink()`** → else `Positioned.fill` → `CompassColors.modalOverlay` (60% black) → centered card: width `min(maxWidth, constraints.maxWidth - 32)`, `maxHeight = constraints.maxHeight - 64`, margin 16, padding 20, radius 12, `bgPanel` + `border`, shadow; content = `SingleChildScrollView > Column(stretch)`. Backdrop: outer `GestureDetector(onTap: onBackdropTap)` with an inner tap-absorber so only backdrop clicks close. **Must be a direct child of a `Stack`.** |
 | `CompassModalHeader` | `title`, `subtitle?`, `iconSvg`, `iconColor?/iconBg?/iconBorder?`, `onClose` | 32×32 icon chip (green badge defaults) + title (`CompassTypography.header`) + optional subtitle + close `CompassIconButton(close, 14)`; bottom border |
 | `CompassFieldLabel` | `label`, `hint?`, `trailing?` | label row with optional right hint |
-| `CompassInput` | `controller`, `placeholder`, `autofocus`, `maxLines = 1`, `minLinesAuto = true`, `minLines?`, `mono = true`, `obscureText`, `onChanged?`, `onSubmitted?` | **Built directly on `EditableText`** (documented: avoid Material `TextField` dependency). Own `FocusNode` (disposed). Boxed container + placeholder shown only when text empty. `resolvedMinLines = minLines ?? (minLinesAuto && maxLines > 1 ? maxLines : 1)` |
+| `CompassInput` | `controller`, `placeholder`, `autofocus`, `maxLines = 1`, `minLinesAuto = true`, `minLines?`, `mono = true`, `obscureText`, `onChanged?`, `onSubmitted?` | **Built directly on `EditableText`** (documented: avoid Material `TextField` dependency). Own `FocusNode` (disposed). **Wrapped in `CompositedTransformTarget(link: _menuAnchor)`** and wires the custom copy/paste menu: `contextMenuBuilder: compassTextContextMenuBuilderFor(_menuAnchor, …)` + `onTapOutside: compassHandleTapOutside` (see "Text selection context menu"). Boxed container + placeholder shown only when text empty. `resolvedMinLines = minLines ?? (minLinesAuto && maxLines > 1 ? maxLines : 1)` |
 | `CompassPrimaryButton` | `label`, `iconSvg?`, `onTap` (null = disabled), `fullWidth` | green accent button; label rendered as `Text(label, CompassTypography.header(...))`. Wrapped in `ConstrainedBox(minHeight: density.minTapTarget)` + `CompassHover` (hover fill `CompassColors.greenHover`) |
 | `CompassSecondaryButton` | `label`, `iconSvg?`, `onTap` | subtle `bgSubtle` + border; hover swaps to `bgHover` + `borderHover` |
 | `CompassDangerButton` | `label`, `iconSvg?`, `onTap` | red; ⚠ the rendered icon is **hardcoded to `CompassSvgIcons.trash`** — `iconSvg` is ignored. Hover fill `Color(0xFFFF6B85)` |
@@ -123,8 +155,9 @@ hand-rolled check rows in `create_collection_modal.dart`):
 
 All modals (except the three noted) render via `CompassModalShell`; all reset
 controllers/errors in `didUpdateWidget` when `isOpen` flips false→true; all are instantiated
-permanently in `main.dart`'s root `Stack` (~L864–984). The touch-only
-`CompassActionSheet` lives in the same stack (last child, so it paints above the modals).
+permanently in `main.dart`'s root `Stack` (~L1123–1367). **Two** touch-only
+`CompassActionSheet`s live in the same stack (last children, so they paint above the
+modals): the header overflow sheet and the query-bar overflow sheet.
 
 | Modal | Props | Notes |
 |---|---|---|
@@ -169,9 +202,9 @@ paragraph, so the parser never throws. The text is read from the bundled `EULA.m
 
 | Widget | Props & behavior |
 |---|---|
-| `CompassHeader` | `connection, onOpenConnectModal, onDisconnect, onResetData?, showResetSample = true, isTerminalOpen, onToggleTerminal, themeVariant, onSelectTheme, onToggleMobileSidebar, isMobile = false, onOpenActions?`. 56px bar: hamburger (`isMobile` only — the sidebar is docked on desktop), mongoLeaf logo + "Compass Flutter" + 7.0.8 badge → connect modal, connection pill (or amber Connect), **Reset Samples** (only when `showResetSample` — passed as `_realService == null`), mongosh terminal toggle, Disconnect/Connect. Note: the selected theme is passed in as `themeVariant` (the header does not read it from `CompassTheme`). **Below a 1100 px window the bar collapses**: the version badge, the divider and the connection pill are replaced by a status dot, the labelled actions move into the `CompassActionSheet` and a `⋮` (`moreVertical`) button opens it via `onOpenActions`. The `moreVertical` menu hosts the **theme picker above Report Bug** — a `DARK THEMES` section (`Dracula` / `Tokyo Night` / `Night Owl`) and a `LIGHT THEMES` section (`Monokai Light` / `Tokyo Night Light` / `Material Light`), each row a swatch + name + check for the active variant, selecting one calls `onSelectTheme(variant)`. Below a divider it also hosts **Report Bug** (opens the GitHub issue tracker in the system browser via `url_launcher`, falling back to an info dialog with a **Copy link** button when no handler exists), **EULA** (`EulaModal`) and **About** (`AboutModal`). The touch `CompassActionSheet` carries the same theme list (labelled `<name> (dark\|light)`) |
-| `CompassSidebar` | 256px. Props: `databases, selectedDb, selectedColl, onSelectCollection, onSelectDatabase, onOpenCreateDb, onOpenCreateColl, onRenameDb, onRenameColl, onDropDb, onDropColl, onRefresh`. Sections: header (refresh + create-DB icons, search box — ⚠ **display-only, `_searchQuery` is final `''` (dead code)**), DB tree (chevron toggles `_expandedDbs`, **pre-seeded `library:true`, `social_networks:true`**; row tap → `onSelectDatabase` + auto-expand; trailing plus/pencil/trash; collections show doc counts, amber eye for views), footer Create Database button. **On touch it becomes an overlay drawer** of `min(320, 85 % of the viewport)` and the search input grows to 44 px |
-| `CompassQueryBar` | `options: QueryFilterOptions, onChangeOptions(fn), onExecuteQuery, onResetQuery, onExportToLanguage, executionTimeMs?, totalResultsCount?`. **Uses its own `EditableText`** (not `CompassInput`) wrapped in `Visibility(maintainState/maintainSize)` so the element identity survives empty↔non-empty (documented fix for test 2). FILTER field with lenient auto-quoting validation + amber/green status icon, Enter → find; Options toggle expands PROJECT/SORT/SKIP/LIMIT fields (each reports `options.copyWith(...)`, skip clamps ≥0, limit ≥1); Reset / Show Code / **Find** buttons; stats ribbon `Matches: n · Time: xms`. **On touch (or below a 640 px query bar) the filter input takes the full width and the four buttons wrap onto a second row; the options panel stacks (PROJECT / SORT full width, SKIP + LIMIT side by side) and the "press Enter" hint disappears** |
+| `CompassHeader` | `connection, onOpenConnectModal, onDisconnect, onResetData?, showResetSample = true, isTerminalOpen, onToggleTerminal, themeVariant, onSelectTheme, onToggleMobileSidebar, isMobile = false, onOpenActions?, onReportBug?, onShowEula?, onShowAbout?`. 56px bar: hamburger (`isMobile` only — the sidebar is docked on desktop), mongoLeaf logo + "Compass Flutter" + 7.0.8 badge → connect modal, connection pill (or amber Connect), **Reset Samples** (only when `showResetSample` — passed as `_realService == null`), mongosh terminal toggle, Disconnect/Connect. Note: the selected theme is passed in as `themeVariant` (the header does not read it from `CompassTheme`). **Below a 1100 px window the bar collapses**: the version badge, the divider and the connection pill are replaced by a status dot, the labelled actions move into the `CompassActionSheet` and a `⋮` (`moreVertical`) button opens it via `onOpenActions`. The `moreVertical` menu hosts the **theme picker above Report Bug** — a `DARK THEMES` section (`Dracula` / `Tokyo Night` / `Night Owl`) and a `LIGHT THEMES` section (`Monokai Light` / `Tokyo Night Light` / `Material Light`), each row a swatch + name + check for the active variant, selecting one calls `onSelectTheme(variant)`. Below a divider it also hosts **Report Bug** (opens the GitHub issue tracker in the system browser via `url_launcher`, falling back to an info dialog with a **Copy link** button when no handler exists), **EULA** (`EulaModal`) and **About** (`AboutModal`). The touch `CompassActionSheet` carries the same theme list (labelled `<name> (dark\|light)`) |
+| `CompassSidebar` | 256px. Props: `databases, selectedDb, selectedColl, onSelectCollection, onSelectDatabase, onOpenCreateDb, onOpenCreateColl, onRenameDb, onRenameColl, onDropDb, onDropColl, onRefresh`. Sections: header (refresh + create-DB icons, **working search box** filtering the DB tree client-side on db name or any collection name), DB tree (chevron toggles `_expandedDbs`, **pre-seeded `library:true`, `social_networks:true`**; row tap → `onSelectDatabase` + auto-expand; trailing plus/pencil/trash; collections show doc counts, amber eye for views), footer Create Database button. **On touch it becomes an overlay drawer** of `min(320, 85 % of the viewport)` and the search input grows to 44 px |
+| `CompassQueryBar` | `options: QueryFilterOptions, onChangeOptions(fn), onExecuteQuery, onResetQuery, onExportToLanguage, optionsExpanded, onToggleOptions, onOpenOverflow, executionTimeMs?, totalResultsCount?`. **Uses its own `EditableText`** (not `CompassInput`) wrapped in `Visibility(maintainState/maintainSize)` so the element identity survives empty↔non-empty (documented fix for test 2). FILTER / PROJECT / SORT use a `JsonSyntaxTextController` (**JSON syntax colouring**); filter/project/sort also get the custom context menu + **auto-close bracket pairs** (`_handleAutoClosePairs`) and Enter-between-brackets formatting (`_handleEnterFormatting`). **Nothing executes on type anymore** — `_handleFilterChange` only validates (amber/green status icon) and typing in SKIP/LIMIT is a no-op; values commit on **Find** via `_executeWithCurrentFilter` (Enter fires `onSubmitted`). Options toggle expands the panel (`optionsExpanded` lives in `main.dart` so the root query-action sheet can toggle it); skip clamps ≥0, limit ≥1; Reset / Show Code / **Find** buttons; stats ribbon `Matches: n · Time: xms`. **On touch (or below a 640 px query bar) the filter input takes the full width and the four buttons wrap onto a second row; the options panel stacks (PROJECT / SORT full width, SKIP + LIMIT side by side) and the "press Enter" hint disappears; a `onOpenOverflow` control opens the query-action sheet** |
 | `CollectionTabBar` | 36px strip. `tabs, activeIndex, onSelect(i), onClose(i)`. Tabs `minWidth 140/maxWidth 200`, active = `bgSubtle` + 2px accent bottom border; icon = `table` (or `database` when coll name empty); close = `CompassSvg(close, 11)`; right counter `'<n> open'`; active tab auto-revealed via `Scrollable.ensureVisible` post-frame |
 | `CompassTerminal` | Docked mongosh-like drawer. `isOpen, onClose, activeDbName, onExecuteCommand?, onRequestConfirmation?`. `SizedBox.shrink()` when closed; heights 220/380; hardcoded dark palette. Input line `<db>> ` + `EditableText`; `_simulateOutput` fakes `help`/`show dbs`/`show collections`/`db.*`/`use *`; `_detectRisky(command)` (regexes for `dropDatabase`, `drop/deleteMany/remove/deleteOne/updateMany/updateOne(`) → `RiskyOperationDetails` → deferred until confirmed via `onRequestConfirmation` |
 
@@ -180,11 +213,11 @@ paragraph, so the parser never throws. The text is read from the bundled `EULA.m
 - **`CompassSvg extends StatelessWidget`** — defined in the *same file* (L6):
   `{required String svgString, double size = 14, Color? color}` → `SvgPicture.string(...)`
   with optional `ColorFilter`. The only icon renderer in the app.
-- **`CompassSvgIcons`** — 34 `static const String` raw SVG literals (mostly 24×24 viewBox,
+- **`CompassSvgIcons`** — 37 `static const String` raw SVG literals (mostly 24×24 viewBox,
   `stroke="currentColor"`): `mongoLeaf, terminal, search, sliders, rotateCcw, database,
   table, code, layers, barChart, key, shieldCheck, activity, plus, trash, copy, file,
   upload, download, check, pencil, eye, chevronDown, chevronLeft, chevronRight, chevronUp,
-  close, play, menu, sun, moon, zap, arrowUpDown, moreVertical`.
+  close, play, menu, sun, moon, zap, arrowUpDown, moreVertical, cut, paste, selectAll`.
 - Usage: `CompassSvg(svgString: CompassSvgIcons.<name>, size: <px>, color: <theme color>)`.
   Tests find icons via `find.byWidgetPredicate((w) => w is CompassSvg && w.svgString ==
   CompassSvgIcons.<name>)` (`svgString` is a public field).

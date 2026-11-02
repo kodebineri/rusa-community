@@ -3,13 +3,30 @@
 Companion to root `AGENTS.md`. Single test file, **15 `testWidgets` tests**, all widget
 level (no unit tests, no integration tests, no golden tests).
 
+> **Status (2026-11-03, after commit `382656d`): 15 pass / 0 fail, `flutter analyze` clean.**
+
 ## Commands
 
 ```bash
-flutter test                              # all (expect 15/15)
+flutter test                              # all — expect 15/15
 flutter test test/widget_test.dart        # the only test file
-flutter analyze                           # must stay "No issues found"
+flutter analyze                           # expect "No issues found!"
 ```
+
+## Two behaviors every full-app test must respect
+
+Both were introduced recently; tests written before them silently fail.
+
+1. **The app boots into the connection popup.** `_isConnectModalOpen = true`, so the
+   `ConnectionModal` overlay covers the shell and `tester.tap(...)` on shell widgets lands on
+   the backdrop. Every full-app test calls the `closeConnectionPopup(tester)` helper (defined
+   at the top of the test file, right after the imports) immediately after pumping
+   `const CompassApp()`. It taps the modal's close icon and is a no-op if the popup is already
+   closed.
+2. **Queries do not execute on type.** `CompassQueryBar` commits the filter/options only when
+   **Find** is tapped (`_executeWithCurrentFilter`); `_handleFilterChange` merely validates.
+   Test 2 therefore taps `find.text('Find')` before asserting `onChangeOptions` fired — typing
+   alone leaves `last` null.
 
 Run `flutter analyze` before `flutter test` — analyzer errors usually mean a finder or API
 misuse that would fail the test anyway.
@@ -19,15 +36,15 @@ misuse that would fail the test anyway.
 | # | Name | Covers |
 |---|---|---|
 | 1 | `CompassApp builds without error` | smoke; full app at 1920×1080 |
-| 2 | `query bar filter stays editable across empty/non-empty` | element identity of the filter `EditableText` across rebuilds (the `Visibility(maintainState)` fix) |
+| 2 | `query bar filter stays editable across empty/non-empty` | element identity of the filter `EditableText` across rebuilds (the `Visibility(maintainState)` fix); taps **Find** to commit before asserting `onChangeOptions` |
 | 3 | `CompassInput handles Backspace and arrow keys (needs DefaultTextEditingShortcuts)` | `sendKeyEvent` on `CompassInput`; proves the `DefaultTextEditingShortcuts` wrapper in `main.dart` |
 | 4 | `CompassHeader respects top safe area inset` | `tester.view.padding = FakeViewPadding(top: 48)` propagates through header |
 | 5 | `CompassHeader hides Reset Samples button when showResetSample is false` | `showResetSample` gating |
 | 6 | `AggregationsView allows editing stage content, adding stages, and running pipeline` | `Visual Pipeline Stages` → `Add Stage` → `Stage 4:` → `Run Pipeline` → `Pipeline Results` (uses `pumpAndSettle`) |
 | 7 | `selecting collections opens them in tabs` | sidebar click → tab appears; close icon; `'<n> open'` counter |
-| 8 | `collection tab bar follows CompassTheme light mode` | `CompassTheme(isDarkMode: false)` wrapper around the widget |
-| 9 | `toggling the theme switches the chrome to light mode` | tap the header sun/moon `CompassSvg` → root `CompassTheme.isDarkMode` + header chrome colors flip |
-| 10 | `content views follow light mode (documents, aggregations, schema, indexes)` | helper closures `selectSection(label)` / `expectLightSurfaces(section)` walking every section |
+| 8 | `collection tab bar follows the selected CompassTheme variant` | pumps `CollectionTabBar` inside `CompassTheme(variant: monokaiLight, …)` and asserts the strip decoration uses `variant.palette.bgPanel` / `.border` |
+| 9 | `options menu lists every theme and applies the selected one` | full app: closes the popup, opens the header `⋮` menu, expects every `CompassThemeVariant.label` + `DARK THEMES` / `LIGHT THEMES` headings, taps `Monokai Light` → root `CompassTheme.variant` + header color flip |
+| 10 | `content views follow the selected light theme (documents, aggregations, schema, indexes)` | full app: closes the popup, selects `materialLight` via the `⋮` menu, then walks every section with `selectSection(label)` / `expectLightSurfaces(section)` (asserts no dark-palette surface remains) |
 | 11 | `tree-mode copy icon opens a popup with the copied value and an Insert Document button` | **duplicate/duplicate-popup flow**: copy icon → `InsertDocumentModal` in clone mode with cloned JSON + fresh `_id`, no silent insert; unmodified insert → `E11000` banner, count unchanged; edit isbn → insert succeeds, modal closes, count +1, `#3` card appears |
 | 12 | `Analyze Schema button shows progress and re-runs the analysis` | open Schema → auto-analysis shows disabled `Analyzing...` → 250 ms pump → idle + field cards; insert a doc with a new field directly via `mongoEngine.insertDocument` (schema stays stale) → tap **Analyze Schema** → `Analyzing...` → pump → new field card + header count `10 unique fields` |
 | 13 | `Create Index modal creates an index and reports duplicate names` | Indexes section → **Create Index** opens `CreateIndexModal`; empty field → `'Field name is required'`; `year` + `-1 (Descending)` + unique checkbox → create → modal closes, `year_-1` row + `{year: -1}` in the table, engine index `unique == true` / `keys['year'] == -1`; re-create the same name → `'An index with this name or key pattern already exists'` banner, engine count unchanged |
@@ -49,7 +66,8 @@ addTearDown(tester.view.resetDevicePixelRatio);
 
 Test 4 additionally uses `tester.view.padding = FakeViewPadding(top: 48.0)` +
 `addTearDown(tester.view.resetPadding)`. Tests 2/3/8 instead pump inside an explicit
-`MediaQuery(data: MediaQueryData(size: …))` wrapper.
+`MediaQuery(data: MediaQueryData(size: …))` wrapper; tests 2/3 also wrap in an `Overlay`
+(the custom copy/paste menu is inserted there — see `compass_text_menu.dart`).
 
 ### Exception drain loop
 
@@ -74,6 +92,11 @@ for (var i = 0; i < 50 && tester.takeException() != null; i++) {}
 No `pumpAndSettle` for the full app (animations/timers can hang it) — only test 6 uses
 `pumpAndSettle`, on a standalone `AggregationsView`.
 
+**Full-app tests must dismiss the connection popup first.** A fresh `CompassApp` opens
+`ConnectionModal` over the shell (`_isConnectModalOpen = true`), so taps on the header,
+sidebar or section tabs hit the modal backdrop. Close it (backdrop tap / its close control)
+before driving the shell.
+
 ### Tapping icons (no Material `Icon`, so no semantic labels)
 
 ```dart
@@ -82,8 +105,8 @@ await tester.tap(find.byWidgetPredicate(
 ));
 ```
 
-Icons: `sun` (theme toggle), `close` (tab close), `copy` (tree-mode duplicate),
-`trash` (indexes table — one per droppable index, so scope or index into the finder).
+Icons: `moreVertical` (header options / theme menu), `close` (tab close), `copy` (tree-mode
+duplicate), `trash` (indexes table — one per droppable index, so scope or index into the finder).
 Scope with `find.descendant(of: find.byType(SomeWidget), matching: …)` when several of the
 same icon exist (e.g. one copy icon per document card).
 
@@ -126,9 +149,9 @@ final count = books.documents.length;       // capture BEFORE the interaction
 ### Reading widget state directly
 
 ```dart
-tester.widget<CompassTheme>(find.byType(CompassTheme)).isDarkMode
+tester.widget<CompassTheme>(find.byType(CompassTheme)).variant   // not isDarkMode (variant is authoritative)
 tester.widget<CollectionTabBar>(find.byType(CollectionTabBar)).tabs
-tester.widgetList<Container>(...)            // inspect BoxDecoration colors vs CompassColors
+tester.widgetList<Container>(...)            // inspect BoxDecoration colors vs variant.palette / CompassColors
 ```
 
 ### Keyboard events (test 3)
@@ -167,6 +190,9 @@ the full `CompassApp` (which includes it via `main()`'s wrapper).
   `tester.pump(const Duration(milliseconds: 300))` to reach the completed state. `SchemaView`
   cancels the timer in `dispose()` (test 10 leaves the section mid-analysis; no pending-timer
   failure).
-- The default boot state (fresh `CompassApp`): `library.books` open, section `documents`,
-  view mode `tree`, empty query, dark mode, sidebar with `library` + `social_networks`
-  pre-expanded.
+- The default boot state (fresh `CompassApp`): **the connection popup is open** over
+  `library.books` (section `documents`, view mode `tree`, empty query, Dracula dark theme,
+  sidebar with `library` + `social_networks` pre-expanded). Dismiss the popup before asserting
+  on the shell.
+- The custom copy/paste menu is inserted into the root `Overlay`; a widget pumped in isolation
+  without an `Overlay` ancestor will throw when the menu tries to open.

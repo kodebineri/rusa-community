@@ -23,6 +23,19 @@ the engine instance.
   rendered by `EulaModal` via `CompassMarkdownView`; edit the Markdown, not the widget.
 - `README.md` at repo root is **stale AI Studio boilerplate** — ignore it.
 
+## Current status — read before you change anything
+
+_(Last verified 2026-11-03, after commit `382656d` "enable preset themes".)_
+
+- **`flutter analyze` is clean** and **`flutter test` is 15/15.** Keep both that way; the
+  recurring test patterns live in `docs/testing.md`.
+- **The app boots into the connection popup** (`_isConnectModalOpen = true`). Full-app widget
+  tests must dismiss it first — use the `closeConnectionPopup(tester)` helper in
+  `test/widget_test.dart`, or shell taps land on the modal backdrop.
+- **Queries do not execute on type.** `CompassQueryBar` commits filter/options only on
+  **Find** (`_executeWithCurrentFilter`); typing just validates. Tests must tap Find before
+  asserting `onChangeOptions`.
+
 ## Commands
 
 | Task | Command |
@@ -48,9 +61,13 @@ the legacy `src/` React app; `npm` is not needed for Flutter work).
 ## Hard invariants (do not break)
 
 1. **No Material app.** No `MaterialApp`, `Scaffold`, `Navigator`, `Theme`, or `Icon` widgets.
-   Root is `Directionality` + manual `MediaQuery` + a `Stack` (see `docs/architecture.md`).
-   `runApp(const DefaultTextEditingShortcuts(child: CompassApp()))` is **load-bearing** —
-   `CompassInput` uses bare `EditableText`, which loses Backspace/arrows/Ctrl+C without it.
+   Root is `AnnotatedRegion` → `CompassTheme` → manual `MediaQuery` → `Directionality` →
+   `TapRegionSurface` → `Overlay(key: _overlayKey, initialEntries: [_shellEntry])`; the shell
+   (`_buildShell`) is a `Stack` living inside that overlay (see `docs/architecture.md`). The
+   `TapRegionSurface` + `Overlay` exist so bare `EditableText` fields get tap-outside dismissal
+   for the custom copy/paste menu. `runApp(const DefaultTextEditingShortcuts(child: CompassApp()))`
+   is **load-bearing** — `CompassInput` uses bare `EditableText`, which loses
+   Backspace/arrows/Ctrl+C without it.
 2. **No Atlas sample data.** Seed data comes only from the two root JSON files, mirrored as
    Dart literals inside `LocalMongoEngine.seedSampleData()`. Never reintroduce `sample_mflix`,
    `sample_airbnb`, `sample_restaurants`, etc.
@@ -64,8 +81,8 @@ the legacy `src/` React app; `npm` is not needed for Flutter work).
    afterwards. All reads are synchronous during `build()` — never make the engine async.
 5. **Closed modals render `SizedBox.shrink()`.** `CompassModalShell.build` returns shrink when
    `!isOpen`, so closed modal children are constructed but **not mounted** (finders won't see
-   them; no stray hit-testing). All 16 modals live permanently in the root `Stack`
-   (`main.dart` ~L864–984).
+   them; no stray hit-testing). All 16 modals plus **two** `CompassActionSheet` overlays (header
+   + query-bar) live permanently in the root `Stack` (`main.dart` ~L1123–1367).
 6. **`InsertDocumentModal.onInsert` returns `String?`**: `null` = success (modal closes
    itself), non-null = error message shown in the modal's `CompassErrorBanner`. The handler in
    `main.dart` (`_handleInsertDocument`) must NOT close the modal.
@@ -76,7 +93,7 @@ the legacy `src/` React app; `npm` is not needed for Flutter work).
 9. **Never throw out of `build()`.** The engine's `findDocuments` returns an empty result on
    parse errors; UI input parsing uses `tolerantParse` inside try/catch. Keep it that way.
 10. **Icons are `CompassSvg` + `CompassSvgIcons.<name>`** (inline SVG string constants in
-    `lib/icons/compass_svg_icons.dart`), never Material `Icon`. 34 icons exist; add new ones
+    `lib/icons/compass_svg_icons.dart`), never Material `Icon`. 37 icons exist; add new ones
     as new `static const String` SVG literals.
 11. **Theme:** colors come from `CompassTheme.of(context)` getters, which resolve the
     selected `CompassThemeVariant`'s `CompassPalette` (six VS Code-inspired themes in
@@ -99,13 +116,26 @@ the legacy `src/` React app; `npm` is not needed for Flutter work).
     `CompassActionSheet`, which is a root-`Stack` child like the modals. Never hard-code
     tap-target sizes.
 
+14. **Text selection is hand-rolled** (`lib/widgets/compass_text_menu.dart`). Material's
+    `AdaptiveTextSelectionToolbar` needs `MaterialLocalizations`, so bare `EditableText`s get
+    `contextMenuBuilder: compassTextContextMenuBuilderFor(link, density: …)` +
+    `onTapOutside: compassHandleTapOutside`, and must be wrapped in a
+    `CompositedTransformTarget(link: …)` carrying a matching `LayerLink` (otherwise the menu
+    opens in the window corner). Copy/paste do nothing at all without this. The query bar's
+    filter / project / sort fields additionally use `JsonSyntaxTextController`
+    (`lib/utils/json_syntax_text_controller.dart`) for JSON syntax colouring.
+
 ## Known dead-ends / no-op code (don't "fix" silently, don't rely on)
 
 - `DocumentJsonView.onUpdateDocument` is declared/required but **never invoked** in the file.
-- Sidebar search box is display-only (`_searchQuery` is final `''` — dead filter code).
 - `google_fonts` is in pubspec but never imported; fonts ("Plus Jakarta Sans", "JetBrains
   Mono") are referenced by name and fall back at runtime — no font files ship.
 - `QueryFilterOptions.collation` / `maxTimeMS` are stored but never consumed by the engine.
+- `CompassQueryBar._handleSkipChange` / `_handleLimitChange` are **intentional no-ops**
+  ("do not execute on type"); the numeric fields commit only on blur/Find.
+
+No longer dead (do not re-add to this list): the **sidebar search box now works** — `_searchQuery`
+is mutable and filters the DB tree client-side (`compass_sidebar.dart`).
 
 ## Quick symbol map
 
@@ -125,4 +155,6 @@ the legacy `src/` React app; `npm` is not needed for Flutter work).
 | `CompassIconButton`, `CompassHover` | `lib/widgets/compass_icon_button.dart`, `lib/widgets/compass_hover.dart` |
 | `CompassTheme`, `CompassThemeVariant` / `CompassPalette`, `CompassColors`, `CompassTypography`, `CompassDensity` | `lib/theme/` |
 | `CompassSvg`, `CompassSvgIcons` | `lib/icons/compass_svg_icons.dart` |
+| `CompassTextContextMenu`, `compassTextContextMenuBuilderFor`, `compassHandleTapOutside` | `lib/widgets/compass_text_menu.dart` |
+| `JsonSyntaxTextController` (JSON syntax colouring) | `lib/utils/json_syntax_text_controller.dart` |
 | Tests | `test/widget_test.dart` |

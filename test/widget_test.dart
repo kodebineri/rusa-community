@@ -18,6 +18,7 @@ import 'package:mongodb_compass_flutter/widgets/compass_header.dart';
 import 'package:mongodb_compass_flutter/widgets/compass_query_bar.dart';
 import 'package:mongodb_compass_flutter/widgets/compass_sidebar.dart';
 import 'package:mongodb_compass_flutter/widgets/modals/compass_modal.dart';
+import 'package:mongodb_compass_flutter/widgets/modals/connection_modal.dart';
 import 'package:mongodb_compass_flutter/widgets/modals/create_index_modal.dart';
 import 'package:mongodb_compass_flutter/widgets/modals/drop_index_modal.dart';
 import 'package:mongodb_compass_flutter/widgets/modals/insert_document_modal.dart';
@@ -25,6 +26,22 @@ import 'package:mongodb_compass_flutter/widgets/views/aggregations_view.dart';
 import 'package:mongodb_compass_flutter/widgets/views/document_tree_view.dart';
 import 'package:mongodb_compass_flutter/widgets/views/indexes_view.dart';
 import 'package:mongodb_compass_flutter/widgets/views/schema_view.dart';
+
+/// A fresh `CompassApp` boots into the connection popup (`_isConnectModalOpen
+/// = true`), which covers the shell. Close it before driving the shell, or the
+/// taps land on the modal backdrop instead of the header/sidebar/tabs.
+Future<void> closeConnectionPopup(WidgetTester tester) async {
+  final closeIcon = find.descendant(
+    of: find.byType(ConnectionModal),
+    matching: find.byWidgetPredicate(
+      (w) => w is CompassSvg && w.svgString == CompassSvgIcons.close,
+    ),
+  );
+  if (closeIcon.evaluate().isEmpty) return;
+  await tester.tap(closeIcon.first);
+  await tester.pump();
+  for (var i = 0; i < 50 && tester.takeException() != null; i++) {}
+}
 
 void main() {
   testWidgets('CompassApp builds without error', (WidgetTester tester) async {
@@ -87,25 +104,36 @@ void main() {
 
     final elementBefore = tester.element(filterField);
 
+    // Typing only validates — nothing is committed until Find is pressed.
     await tester.enterText(filterField, 'abc');
     await tester.pump();
-    expect(last?.filter, 'abc');
+    expect(last, isNull, reason: 'typing must not execute the query');
     // The EditableText element must survive typing...
     expect(identical(tester.element(filterField), elementBefore), isTrue);
+
+    await tester.tap(find.text('Find'));
+    await tester.pump();
+    expect(last?.filter, 'abc');
 
     // ...and clearing to empty (backspace to nothing) must NOT recreate it,
     // otherwise the text-input connection is dropped and the field becomes
     // uneditable.
     await tester.enterText(filterField, '');
     await tester.pump();
-    expect(last?.filter, '');
     expect(identical(tester.element(filterField), elementBefore), isTrue);
+
+    await tester.tap(find.text('Find'));
+    await tester.pump();
+    expect(last?.filter, '');
 
     // It must still accept input after having been emptied.
     await tester.enterText(filterField, 'xy');
     await tester.pump();
-    expect(last?.filter, 'xy');
     expect(identical(tester.element(filterField), elementBefore), isTrue);
+
+    await tester.tap(find.text('Find'));
+    await tester.pump();
+    expect(last?.filter, 'xy');
 
     for (var i = 0; i < 50 && tester.takeException() != null; i++) {}
   });
@@ -171,6 +199,7 @@ void main() {
     await tester.pumpWidget(const CompassApp());
     await tester.pump();
     for (var i = 0; i < 50 && tester.takeException() != null; i++) {}
+    await closeConnectionPopup(tester);
 
     final headerFinder = find.byType(CompassHeader);
     expect(headerFinder, findsOneWidget);
@@ -294,6 +323,7 @@ void main() {
     await tester.pumpWidget(const CompassApp());
     await tester.pump();
     for (var i = 0; i < 50 && tester.takeException() != null; i++) {}
+    await closeConnectionPopup(tester);
 
     final tabBar = find.byType(CollectionTabBar);
     expect(tabBar, findsOneWidget);
@@ -406,6 +436,7 @@ void main() {
     await tester.pumpWidget(const CompassApp());
     await tester.pump();
     for (var i = 0; i < 50 && tester.takeException() != null; i++) {}
+    await closeConnectionPopup(tester);
 
     Color? headerColor() {
       final header = find.byType(CompassHeader);
@@ -463,6 +494,7 @@ void main() {
     await tester.pumpWidget(const CompassApp());
     await tester.pump();
     for (var i = 0; i < 50 && tester.takeException() != null; i++) {}
+    await closeConnectionPopup(tester);
 
     const light = CompassThemeVariant.materialLight;
 
@@ -544,6 +576,7 @@ void main() {
     await tester.pumpWidget(const CompassApp());
     await tester.pump();
     for (var i = 0; i < 50 && tester.takeException() != null; i++) {}
+    await closeConnectionPopup(tester);
 
     final booksColl = mongoEngine.getCollection('library', 'books')!;
     final originalCount = booksColl.documents.length;
@@ -668,6 +701,7 @@ void main() {
     await tester.pumpWidget(const CompassApp());
     await tester.pump();
     for (var i = 0; i < 50 && tester.takeException() != null; i++) {}
+    await closeConnectionPopup(tester);
 
     // Opening the Schema section auto-runs an analysis: the button is
     // disabled and shows "Analyzing..." until the simulated 250 ms pass
@@ -763,6 +797,7 @@ void main() {
     await tester.pumpWidget(const CompassApp());
     await tester.pump();
     for (var i = 0; i < 50 && tester.takeException() != null; i++) {}
+    await closeConnectionPopup(tester);
 
     // Switch to the Indexes section (library.books is selected by default).
     await tester.tap(find.text('Indexes').first);
@@ -859,6 +894,7 @@ void main() {
     await tester.pumpWidget(const CompassApp());
     await tester.pump();
     for (var i = 0; i < 50 && tester.takeException() != null; i++) {}
+    await closeConnectionPopup(tester);
 
     await tester.tap(find.text('Indexes').first);
     await tester.pump();
@@ -931,6 +967,7 @@ void main() {
     await tester.pumpWidget(const CompassApp());
     await tester.pump();
     for (var i = 0; i < 50 && tester.takeException() != null; i++) {}
+    await closeConnectionPopup(tester);
 
     final tree = find.byType(DocumentTreeView);
     expect(tree, findsOneWidget);
