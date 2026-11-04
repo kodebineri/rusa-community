@@ -1,4 +1,4 @@
-// Basic smoke test for the MongoDB Compass Flutter client.
+// Basic smoke test for the Rusa (MongoDB database client) Flutter app.
 
 import 'dart:convert';
 
@@ -7,28 +7,28 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import 'package:mongodb_compass_flutter/main.dart';
-import 'package:mongodb_compass_flutter/icons/compass_svg_icons.dart';
-import 'package:mongodb_compass_flutter/models/collection_tab.dart';
-import 'package:mongodb_compass_flutter/models/mongo_models.dart';
-import 'package:mongodb_compass_flutter/services/mongo_engine.dart';
-import 'package:mongodb_compass_flutter/theme/compass_theme.dart';
-import 'package:mongodb_compass_flutter/theme/compass_theme_presets.dart';
-import 'package:mongodb_compass_flutter/widgets/collection_tab_bar.dart';
-import 'package:mongodb_compass_flutter/widgets/compass_header.dart';
-import 'package:mongodb_compass_flutter/widgets/compass_query_bar.dart';
-import 'package:mongodb_compass_flutter/widgets/compass_sidebar.dart';
-import 'package:mongodb_compass_flutter/widgets/modals/compass_modal.dart';
-import 'package:mongodb_compass_flutter/widgets/modals/connection_modal.dart';
-import 'package:mongodb_compass_flutter/widgets/modals/create_index_modal.dart';
-import 'package:mongodb_compass_flutter/widgets/modals/drop_index_modal.dart';
-import 'package:mongodb_compass_flutter/widgets/modals/eula_acceptance_modal.dart';
-import 'package:mongodb_compass_flutter/widgets/modals/insert_document_modal.dart';
-import 'package:mongodb_compass_flutter/widgets/views/aggregations_view.dart';
-import 'package:mongodb_compass_flutter/widgets/views/document_json_view.dart';
-import 'package:mongodb_compass_flutter/widgets/views/document_tree_view.dart';
-import 'package:mongodb_compass_flutter/widgets/views/indexes_view.dart';
-import 'package:mongodb_compass_flutter/widgets/views/schema_view.dart';
+import 'package:rusa/main.dart';
+import 'package:rusa/icons/compass_svg_icons.dart';
+import 'package:rusa/models/collection_tab.dart';
+import 'package:rusa/models/mongo_models.dart';
+import 'package:rusa/services/mongo_engine.dart';
+import 'package:rusa/theme/compass_theme.dart';
+import 'package:rusa/theme/compass_theme_presets.dart';
+import 'package:rusa/widgets/collection_tab_bar.dart';
+import 'package:rusa/widgets/compass_header.dart';
+import 'package:rusa/widgets/compass_query_bar.dart';
+import 'package:rusa/widgets/compass_sidebar.dart';
+import 'package:rusa/widgets/modals/compass_modal.dart';
+import 'package:rusa/widgets/modals/connection_modal.dart';
+import 'package:rusa/widgets/modals/create_index_modal.dart';
+import 'package:rusa/widgets/modals/drop_index_modal.dart';
+import 'package:rusa/widgets/modals/eula_acceptance_modal.dart';
+import 'package:rusa/widgets/modals/insert_document_modal.dart';
+import 'package:rusa/widgets/views/aggregations_view.dart';
+import 'package:rusa/widgets/views/document_json_view.dart';
+import 'package:rusa/widgets/views/document_tree_view.dart';
+import 'package:rusa/widgets/views/indexes_view.dart';
+import 'package:rusa/widgets/views/schema_view.dart';
 
 /// A fresh `CompassApp` boots into the connection popup (`_isConnectModalOpen
 /// = true`), which covers the shell. Close it before driving the shell, or the
@@ -218,7 +218,7 @@ void main() {
     final headerTopLeft = tester.getTopLeft(headerFinder);
     expect(headerTopLeft.dy, 0.0);
 
-    final titleFinder = find.text('Compass');
+    final titleFinder = find.text('Rusa');
     expect(titleFinder, findsOneWidget);
     final titleTopLeft = tester.getTopLeft(titleFinder);
     expect(titleTopLeft.dy, greaterThanOrEqualTo(48.0),

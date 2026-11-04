@@ -2,7 +2,7 @@ import 'dart:convert';
 
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/services.dart';
-import 'package:mongodb_compass_flutter/utils/json_syntax_text_controller.dart';
+import 'package:rusa/utils/json_syntax_text_controller.dart';
 import '../theme/compass_colors.dart';
 import '../theme/compass_density.dart';
 import '../theme/compass_theme.dart';

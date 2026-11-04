@@ -58,7 +58,7 @@ class _EulaModalState extends State<EulaModal> {
       children: [
         CompassModalHeader(
           title: 'End User License Agreement',
-          subtitle: 'Version 1.1',
+          subtitle: 'Version 1.2',
           iconSvg: CompassSvgIcons.file,
           onClose: widget.onClose,
         ),

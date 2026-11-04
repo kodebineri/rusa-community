@@ -1,9 +1,11 @@
 # PRIVACY POLICY
 
 **Last Updated:** November 04, 2026  
-**Version:** 1.0
+**Version:** 1.1
 
-This Privacy Policy explains how the developers of MongoDB Compass Flutter Client ("Licensor", "We", "Us", or "Our") handle information in connection with the MongoDB Compass Flutter Client software ("Software"). It should be read together with the End User License Agreement (EULA).
+This Privacy Policy explains how the developers of Rusa ("Licensor", "We", "Us", or "Our") handle information in connection with the Rusa software, a MongoDB database client ("Software"). It should be read together with the End User License Agreement (EULA).
+
+Rusa is an independent, unofficial client. It is not affiliated with, endorsed by, or sponsored by MongoDB, Inc. "MongoDB" is a trademark of MongoDB, Inc., used here only to describe compatibility.
 
 By using the Software, you acknowledge that you have read and understood this Privacy Policy.
 

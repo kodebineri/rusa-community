@@ -1,5 +1,5 @@
 import 'package:flutter/cupertino.dart';
-import 'package:mongodb_compass_flutter/theme/compass_theme.dart';
+import 'package:rusa/theme/compass_theme.dart';
 
 class JsonSyntaxTextController extends TextEditingController {
   CompassTheme theme;

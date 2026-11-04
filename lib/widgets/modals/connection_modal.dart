@@ -409,8 +409,9 @@ class _ConnectionModalState extends State<ConnectionModal> {
                   ),
                   alignment: Alignment.center,
                   child: const CompassSvg(
-                    svgString: CompassSvgIcons.mongoLeaf,
+                    svgString: CompassSvgIcons.rusa,
                     size: 18.0,
+                    color: Color(0xFFFFFFFF),
                   ),
                 ),
                 const SizedBox(width: 10.0),
@@ -758,7 +759,7 @@ class _ConnectionModalState extends State<ConnectionModal> {
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Text(
-            'MongoDB Compass v1.42.0 Web Client',
+            'Rusa — a MongoDB database client',
             style: CompassTypography.caption(color: _theme.textMuted),
           ),
           Row(

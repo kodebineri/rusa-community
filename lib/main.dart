@@ -55,7 +55,7 @@ void main() {
   // characters but ignore those editing keys.
   runApp(const DefaultTextEditingShortcuts(child: CompassApp()));
 }
-/// Root MongoDB Compass Web & Desktop Flutter application.
+/// Root Rusa application — an independent MongoDB database client.
 /// Converted from React TSX (src/App.tsx) adhering strictly to:
 /// 1. Layout & Flexbox (LayoutBuilder, Column, Row, Wrap, exact gaps)
 /// 2. Color & Styling (Color(0xFF...), no default Material 3 palettes)

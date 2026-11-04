@@ -64,7 +64,7 @@ class _PrivacyPolicyModalState extends State<PrivacyPolicyModal> {
       children: [
         CompassModalHeader(
           title: 'Privacy Policy',
-          subtitle: 'Version 1.0',
+          subtitle: 'Version 1.1',
           iconSvg: CompassSvgIcons.shieldCheck,
           onClose: widget.onClose,
         ),

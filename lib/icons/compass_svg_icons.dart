@@ -1,7 +1,7 @@
 import 'package:flutter/widgets.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
-/// SVG Icon catalog for MongoDB Compass.
+/// SVG icon catalog for Rusa.
 /// Strictly adheres to UI Constraint #5: "do not use generic Icon widget, use svg icon as much as possible".
 class CompassSvg extends StatelessWidget {
   final String svgString;
@@ -37,9 +37,19 @@ class CompassSvgIcons {
 </svg>
 ''';
 
+  // Rusa brand mark — a simple deer head (placeholder; swap for the final
+  // logo). Stroke-based so it can be tinted with `CompassSvg(color: ...)`.
+  static const String rusa = '''
+<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <path d="M9.4 9.2 7.4 5.6 4.9 4.6M7.4 5.6 6.9 8.6M14.6 9.2 16.6 5.6 19.1 4.6M16.6 5.6 17.1 8.6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M12 8.4c-2.05 0-3.6 1.62-3.6 3.55 0 1.62 1.02 2.85 2.24 3.45l-.24 2.35c-.12 1.28.66 2.25 1.6 2.25s1.72-.97 1.6-2.25l-.24-2.35c1.22-.6 2.24-1.83 2.24-3.45C15.6 10.02 14.05 8.4 12 8.4Z" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="10.7" cy="11.7" r="0.8" fill="currentColor"/>
+  <circle cx="13.3" cy="11.7" r="0.8" fill="currentColor"/>
+</svg>
+''';
+
   // Terminal / mongosh icon
-  static const String terminal = '''
-<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" xmlns="http://www.w3.org/2000/svg">
+  static const String terminal = '''<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" xmlns="http://www.w3.org/2000/svg">
   <polyline points="4 17 10 11 4 5"></polyline>
   <line x1="12" y1="19" x2="20" y2="19"></line>
 </svg>

@@ -53,34 +53,34 @@ class AboutModal extends StatelessWidget {
             ),
             alignment: Alignment.center,
             child: const CompassSvg(
-              svgString: CompassSvgIcons.mongoLeaf,
+              svgString: CompassSvgIcons.rusa,
               size: 40.0,
+              color: Color(0xFFFFFFFF),
             ),
           ),
         ),
 
         const SizedBox(height: 16.0),
 
-        // App name, two-tone exactly like the header wordmark.
+        // App name.
         Center(
           child: FittedBox(
             fit: BoxFit.scaleDown,
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  'Compass',
-                  style: CompassTypography.title(color: theme.textPrimary)
-                      .copyWith(fontSize: 20.0),
-                ),
-                const SizedBox(width: 4.0),
-                Text(
-                  'Flutter',
-                  style: CompassTypography.title(color: theme.accent)
-                      .copyWith(fontSize: 20.0),
-                ),
-              ],
+            child: Text(
+              'Rusa',
+              style: CompassTypography.title(color: theme.textPrimary)
+                  .copyWith(fontSize: 22.0),
             ),
+          ),
+        ),
+
+        const SizedBox(height: 4.0),
+
+        // Descriptive tagline (generic, to avoid implying affiliation).
+        Center(
+          child: Text(
+            'A MongoDB database client',
+            style: CompassTypography.caption(color: theme.textSecondary),
           ),
         ),
 
@@ -99,6 +99,19 @@ class AboutModal extends StatelessWidget {
               'Version $appVersion',
               style: CompassTypography.monoSmall(color: theme.textMuted),
             ),
+          ),
+        ),
+
+        const SizedBox(height: 8.0),
+
+        // Non-affiliation disclaimer (trademark hygiene).
+        Center(
+          child: Text(
+            'Rusa is an independent, unofficial client. It is not affiliated '
+            'with, endorsed by, or sponsored by MongoDB, Inc. "MongoDB" is a '
+            'trademark of MongoDB, Inc., used only to describe compatibility.',
+            textAlign: TextAlign.center,
+            style: CompassTypography.caption(color: theme.textMuted),
           ),
         ),
 

@@ -1,4 +1,4 @@
-/// Data models for MongoDB Compass Flutter client.
+/// Data models for the Rusa MongoDB client.
 /// Equivalent to src/types/mongo.ts.
 library;
 

@@ -66,7 +66,7 @@ class _EulaAcceptanceModalState extends State<EulaAcceptanceModal> {
       children: [
         const CompassModalHeader(
           title: 'End User License Agreement',
-          subtitle: 'Version 1.1',
+          subtitle: 'Version 1.2',
           iconSvg: CompassSvgIcons.file,
           showClose: false,
         ),
@@ -74,7 +74,7 @@ class _EulaAcceptanceModalState extends State<EulaAcceptanceModal> {
           padding: const EdgeInsets.only(top: 12.0),
           child: Text(
             'Please review and accept the End User License Agreement to use '
-            'MongoDB Compass Flutter Client.',
+            'Rusa, a MongoDB database client.',
             style: CompassTypography.bodyRegular(color: theme.textSecondary),
           ),
         ),

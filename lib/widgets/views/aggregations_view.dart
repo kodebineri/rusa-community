@@ -51,7 +51,7 @@ const List<String> _availableOperators = [
   r'$lookup',
 ];
 
-/// MongoDB Compass Aggregations Pipeline Builder and Runner.
+/// Aggregations pipeline builder and runner (Compass-style).
 /// Supports visual stage editing, operator changing, stage reordering,
 /// raw JSON/mongosh script execution, and interactive live pipeline results.
 class AggregationsView extends StatefulWidget {

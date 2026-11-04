@@ -137,21 +137,17 @@ class CompassHeader extends StatelessWidget {
                       ),
                       alignment: Alignment.center,
                       child: const CompassSvg(
-                        svgString: CompassSvgIcons.mongoLeaf,
+                        svgString: CompassSvgIcons.rusa,
                         size: 18.0,
+                        color: Color(0xFFFFFFFF),
                       ),
                     ),
                     const SizedBox(width: 8.0), // exact CSS gap
                     Text(
-                      'Compass',
+                      'Rusa',
                       style: CompassTypography.title(color: theme.textPrimary),
                     ),
                     if (!compact) ...[
-                      const SizedBox(width: 3.0),
-                      Text(
-                        'Flutter',
-                        style: CompassTypography.title(color: theme.accent),
-                      ),
                       const SizedBox(width: 6.0),
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 5.0, vertical: 2.0),

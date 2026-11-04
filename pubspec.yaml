@@ -1,5 +1,5 @@
-name: mongodb_compass_flutter
-description: "A professional MongoDB Compass web and desktop client built with Flutter, migrating React TSX components to high-fidelity Flutter widgets."
+name: rusa
+description: "Rusa — an independent MongoDB database client built with Flutter. Not affiliated with MongoDB, Inc."
 publish_to: "none"
 version: 1.0.0+1
 

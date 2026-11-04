@@ -1,4 +1,4 @@
-package com.example.mongodb_compass_flutter
+package com.kodebineri.rusa
 
 import io.flutter.embedding.android.FlutterActivity
 

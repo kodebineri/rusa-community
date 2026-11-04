@@ -1,11 +1,13 @@
 # END USER LICENSE AGREEMENT (EULA)
 
 **Last Updated:** November 04, 2026  
-**Version:** 1.1
+**Version:** 1.2
 
-This End User License Agreement ("Agreement") is a legal agreement between you ("User", "You") and the developers of MongoDB Compass Flutter Client ("Licensor", "We", "Us", or "Our") for the use of the MongoDB Compass Flutter Client software ("Software").
+This End User License Agreement ("Agreement") is a legal agreement between you ("User", "You") and the developers of Rusa ("Licensor", "We", "Us", or "Our") for the use of the Rusa software, a MongoDB database client ("Software").
 
 By downloading, installing, accessing, or using the Software, you agree to be bound by the terms of this Agreement. If you do not agree to these terms, do not use the Software.
+
+Rusa is an independent, unofficial client. It is not affiliated with, endorsed by, or sponsored by MongoDB, Inc. "MongoDB" is a trademark of MongoDB, Inc., used in this Agreement only to describe compatibility.
 
 ## 1. LICENSE GRANT
 

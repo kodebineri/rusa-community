@@ -1,6 +1,6 @@
 import 'package:flutter/painting.dart';
 
-/// Exact hexadecimal colors extracted from the MongoDB Compass React web implementation.
+/// Exact hexadecimal colors extracted from the MongoDB Compass React reference implementation.
 /// Adheres strictly to the UI constraints: no Material 3 default colors or system gradients.
 class CompassColors {
   // Dark theme palette (MongoDB Compass Signature Dark)

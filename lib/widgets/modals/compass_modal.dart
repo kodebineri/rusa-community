@@ -8,7 +8,7 @@ import '../../widgets/compass_hover.dart';
 import '../../widgets/compass_icon_button.dart';
 import '../../widgets/compass_text_menu.dart';
 
-/// Shared modal primitives for the MongoDB Compass Flutter client.
+/// Shared modal primitives for the Rusa client.
 ///
 /// The React app renders modals as `fixed inset-0` overlays appended next to
 /// the workspace. Flutter has no built-in portal, so every modal is a

@@ -10,7 +10,7 @@
         </intent>
     </queries>
     <application
-        android:label="MongoDB Compass"
+        android:label="Rusa"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity

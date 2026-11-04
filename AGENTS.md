@@ -1,14 +1,14 @@
-# AGENTS.md — MongoDB Compass Flutter Client
+# AGENTS.md — Rusa (MongoDB database client)
 
 Read this first. It is the index and the rulebook; **do not rescan the whole repo** —
 open only the specific doc and file listed for your task.
 
 ## What this is
 
-A **MongoDB Compass clone written in Flutter** (Dart), ported from a React/TSX
-reference app. It runs fully against an **in-memory local Mongo engine** seeded with sample
-data by default, and can connect to a **real MongoDB server** (via `mongo_dart`) which swaps
-the engine instance.
+**Rusa** is a MongoDB database client written in Flutter (Dart) — an independent
+re-implementation of the MongoDB Compass UI, ported from a React/TSX reference app. It runs
+fully against an **in-memory local Mongo engine** seeded with sample data by default, and can
+connect to a **real MongoDB server** (via `mongo_dart`) which swaps the engine instance.
 
 - **Responsive**: the desktop layout is the reference, but the app adapts to phone widths
   (tap targets 44 dp, drawer sidebar, overflow sheets). See invariant 13 and
@@ -23,6 +23,13 @@ the engine instance.
   (`pubspec.yaml`) and rendered by `EulaModal` / `EulaAcceptanceModal` /
   `PrivacyPolicyModal` via `CompassMarkdownView`; edit the Markdown, not the widgets.
 - `README.md` at repo root is **stale AI Studio boilerplate** — ignore it.
+- **Branding:** the product name is **Rusa**, tagline "a MongoDB database client". User-visible
+  strings must not say "Compass" and must not use the MongoDB leaf logo — the brand mark is
+  `CompassSvgIcons.rusa` (placeholder deer mark). "MongoDB" appears only descriptively, and
+  About / EULA / Privacy carry a non-affiliation disclaimer.
+- **Identifiers:** OS app id is **`com.kodebineri.rusa`** (Android `applicationId`/`namespace`
+  + `MainActivity` package, iOS `PRODUCT_BUNDLE_IDENTIFIER`, Windows `CompanyName`). The **Dart
+  package name is `rusa`** (`name:` in `pubspec.yaml`, so imports use `package:rusa/…`).
 
 ## Current status — read before you change anything
 
@@ -98,7 +105,7 @@ the legacy `src/` React app; `npm` is not needed for Flutter work).
 9. **Never throw out of `build()`.** The engine's `findDocuments` returns an empty result on
    parse errors; UI input parsing uses `tolerantParse` inside try/catch. Keep it that way.
 10. **Icons are `CompassSvg` + `CompassSvgIcons.<name>`** (inline SVG string constants in
-    `lib/icons/compass_svg_icons.dart`), never Material `Icon`. 37 icons exist; add new ones
+    `lib/icons/compass_svg_icons.dart`), never Material `Icon`. 38 icons exist; add new ones
     as new `static const String` SVG literals.
 11. **Theme:** colors come from `CompassTheme.of(context)` getters, which resolve the
     selected `CompassThemeVariant`'s `CompassPalette` (six VS Code-inspired themes in
