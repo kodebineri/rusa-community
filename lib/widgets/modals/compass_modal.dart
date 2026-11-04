@@ -101,7 +101,11 @@ class CompassModalHeader extends StatelessWidget {
   final Color? iconColor;
   final Color? iconBg;
   final Color? iconBorder;
-  final VoidCallback onClose;
+  final VoidCallback? onClose;
+
+  /// Whether the header shows its close (×) button. Set false for modals that
+  /// cannot be dismissed, e.g. the first-run EULA gate.
+  final bool showClose;
 
   const CompassModalHeader({
     super.key,
@@ -111,7 +115,8 @@ class CompassModalHeader extends StatelessWidget {
     this.iconColor,
     this.iconBg,
     this.iconBorder,
-    required this.onClose,
+    this.onClose,
+    this.showClose = true,
   });
 
   @override
@@ -156,14 +161,15 @@ class CompassModalHeader extends StatelessWidget {
               ],
             ),
           ),
-          CompassIconButton(
-            svgString: CompassSvgIcons.close,
-            onTap: onClose,
-            size: 14.0,
-            padding: 4.0,
-            color: theme.textMuted,
-            semanticLabel: 'Close',
-          ),
+          if (showClose && onClose != null)
+            CompassIconButton(
+              svgString: CompassSvgIcons.close,
+              onTap: onClose!,
+              size: 14.0,
+              padding: 4.0,
+              color: theme.textMuted,
+              semanticLabel: 'Close',
+            ),
         ],
       ),
     );

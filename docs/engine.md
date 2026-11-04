@@ -43,10 +43,10 @@ inside `setState`). Every view/modal imports this file. Reads must stay **synchr
 | `renameDatabase` | `bool (old, new)` | **throws** on invalid/duplicate names |
 | `renameCollection` | `bool (db, old, new)` | **throws**; rebuilds map in order; retargets views |
 | `insertDocument` | `MongoDocument (db, coll, Map doc)` | unique checks, **inserts at index 0** |
-| `updateDocument` | `bool (db, coll, String docId, Map updatedFields)` | `$set`/`$inc`/`$unset` (first match wins) or merge; throws on views |
+| `updateDocument` | `bool (db, coll, String docId, Map updatedFields)` | `$set`/`$inc`/`$unset` (first match wins) or **full replace**; throws on views |
 | `deleteDocument` | `bool (db, coll, String docId)` | throws on views |
 | `deleteMany` / `deleteOne` | by filter | missing coll/view → 0/false (no throw) |
-| `updateMany` | by filter + update | missing coll/view → 0 |
+| `updateMany` | by filter + update | missing coll/view → 0; plain map = **replace each matched doc**, operator map = merge |
 | `createIndex` | `bool (db, coll, MongoIndex)` | false on name collision; random `sizeKb` 16–55 |
 | `dropIndex` | `bool (db, coll, String indexName)` | false for `_id_` (protected) |
 | `saveValidator` | `bool (db, coll, Map? validator, String level, String action)` | |
@@ -78,7 +78,11 @@ inside `setState`). Every view/modal imports this file. Reads must stay **synchr
 - **Rename validation:** DB name cannot match `[/\\. "$*<>:|?]` or be ≥64 chars; collection
   names cannot contain `$` or start with `system.`.
 - **`updateDocument` operator precedence:** if/else-if — only **one** of `$set`/`$inc`/
-  `$unset` applies (first wins). Else branch merges fields and force-sets `'_id': docId`.
+  `$unset` applies (first wins). The else branch **replaces the whole document**
+  (`{...updatedFields, '_id': docId}`): any field omitted from `updatedFields` is **removed**,
+  and `_id` is always forced back to `docId`. (Plain maps therefore mean replacement, matching
+  MongoDB.) **`updateMany` follows the same rule:** a plain map replaces each matched document
+  (`_id` preserved), an operator map merges.
 
 ### Line map of `local_mongo_engine.dart`
 
@@ -243,7 +247,11 @@ the per-tab UI state restored on tab switch.
 - Overrides every mutation (insert/update/delete/index/db/coll/view/validator) plus
   `resetToDefaults` (**reloads from server instead of re-seeding**) and `analyzeSchema`
   (uses `_bsonTypeName`: `Date`, `Boolean`, runtime fallback; percentages over present
-  values; up to 4 samples).
+  values; up to 4 samples). `updateDocument` replays a **plain map** with `replaceOne`
+  (so removed fields are deleted on the server too) and an operator map with `updateOne` +
+  `_toServerUpdate`. `updateMany` does the same: a plain map replays one `replaceOne` per
+  matched document (ids captured before the mirror is mutated), an operator map one
+  `updateMany`.
 - Value conversion: `ObjectId → .oid` hex string, `DateTime → ISO-8601 string`,
   `Uint8List → base64`, Int64/Decimal → int-or-string; back via `ObjectId.tryParse(hex) ??
   hex`; plain update maps wrapped in `$set`. `_ensureDbPath` defaults empty path to `/test`.

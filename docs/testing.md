@@ -1,21 +1,21 @@
 # Testing — `test/widget_test.dart`
 
-Companion to root `AGENTS.md`. Single test file, **15 `testWidgets` tests**, all widget
+Companion to root `AGENTS.md`. Single test file, **18 `testWidgets` tests**, all widget
 level (no unit tests, no integration tests, no golden tests).
 
-> **Status (2026-11-03, after commit `382656d`): 15 pass / 0 fail, `flutter analyze` clean.**
+> **Status (2026-11-04, after commit `382656d`): 18 pass / 0 fail, `flutter analyze` clean.**
 
 ## Commands
 
 ```bash
-flutter test                              # all — expect 15/15
+flutter test                              # all — expect 18/18
 flutter test test/widget_test.dart        # the only test file
 flutter analyze                           # expect "No issues found!"
 ```
 
-## Two behaviors every full-app test must respect
+## Three behaviors every full-app test must respect
 
-Both were introduced recently; tests written before them silently fail.
+These were introduced recently; tests written before them silently fail.
 
 1. **The app boots into the connection popup.** `_isConnectModalOpen = true`, so the
    `ConnectionModal` overlay covers the shell and `tester.tap(...)` on shell widgets lands on
@@ -27,6 +27,13 @@ Both were introduced recently; tests written before them silently fail.
    **Find** is tapped (`_executeWithCurrentFilter`); `_handleFilterChange` merely validates.
    Test 2 therefore taps `find.text('Find')` before asserting `onChangeOptions` fired — typing
    alone leaves `last` null.
+3. **The first run is gated by the EULA.** The app reads `SharedPreferences` on startup; if
+   `eula_accepted` is unset, `EulaAcceptanceModal` covers everything. `main()` has a global
+   `setUp` that calls `SharedPreferences.setMockInitialValues({'eula_accepted': true})`, so
+   every test except test 18 sees an already-accepted user. Without the plugin mock the read
+   throws and the app would deadlock behind the gate.
+   (`closeConnectionPopup` also does one extra `pump()` to let the stored flag load and clear
+   the startup cover.)
 
 Run `flutter analyze` before `flutter test` — analyzer errors usually mean a finder or API
 misuse that would fail the test anyway.
@@ -50,6 +57,9 @@ misuse that would fail the test anyway.
 | 13 | `Create Index modal creates an index and reports duplicate names` | Indexes section → **Create Index** opens `CreateIndexModal`; empty field → `'Field name is required'`; `year` + `-1 (Descending)` + unique checkbox → create → modal closes, `year_-1` row + `{year: -1}` in the table, engine index `unique == true` / `keys['year'] == -1`; re-create the same name → `'An index with this name or key pattern already exists'` banner, engine count unchanged |
 | 14 | `Drop Index modal removes a non-protected index after confirmation` | trash count = `indexes.length - 1` (`_id_` row shows "Protected"); first trash (`isbn_1`, seed order) → `DropIndexModal` shows header title + danger button `'Drop Index'` (`findsNWidgets(2)`) and `isbn_1`; **Cancel** keeps the index; reopen → danger button → engine no longer has `isbn_1`, row + trash disappear, `_id_` untouched |
 | 15 | `tree view starts with data structures collapsed` | default `library.books` tree: zero `chevronDown`, two `chevronRight` (one `genre_ids` per doc), `[ ... 2 items ]` + `[ ... 1 items ]` summaries, no `0:` child rows; tap chevron → child rows `0:`/`1:` appear + summary gone; tap again → summary restored |
+| 16 | `json view edit button saves changes to the document` | switch to **JSON** mode → one pencil per card; tap pencil → body becomes an `EditableText` (pencil replaced by check/close on that card only); edit `copies_available`, **remove `rating`**, enterText, tap **check** → engine doc updated, `rating` gone (replacement semantics), `_id` preserved, editor closes, pencil returns. Uses `resetToDefaults` teardown |
+| 17 | `updateMany with a plain map replaces matched documents` | engine-level: `mongoEngine.updateMany(db, coll, {_id:…}, {title, copies_available})` → matched doc has only those fields (+`_id`), `author`/`rating` gone, the other doc untouched; a `$set` update then merges without removing fields. Uses `resetToDefaults` teardown |
+| 18 | `first-time user must accept the EULA before using the app` | overrides the prefs mock with `{}` → `EulaAcceptanceModal` + `I Accept` shown, `eula_accepted` still unset; `ensureVisible` + tap **I Accept** → gate gone and `eula_accepted == true` persisted |
 
 ## Recurring techniques (copy these patterns)
 

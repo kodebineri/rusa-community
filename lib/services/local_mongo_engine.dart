@@ -587,7 +587,10 @@ class LocalMongoEngine {
         _unsetPath(finalMap, k.toString());
       }
     } else {
-      finalMap = {...finalMap, ...updatedFields, '_id': docId};
+      // A plain map is a full replacement (MongoDB semantics): the provided map
+      // becomes the whole document, so fields omitted from it are removed.
+      // `_id` is always preserved.
+      finalMap = {...updatedFields, '_id': docId};
     }
 
     coll.documents[index] = MongoDocument.fromMap(finalMap);
@@ -629,19 +632,25 @@ class LocalMongoEngine {
     for (var i = 0; i < coll.documents.length; i++) {
       final d = coll.documents[i];
       if (!_matchesFilter(d.data, filter)) continue;
-      final map = Map<String, dynamic>.from(d.data);
+      late Map<String, dynamic> map;
       if (update.containsKey('\$set') && update['\$set'] is Map) {
+        map = Map<String, dynamic>.from(d.data);
         (update['\$set'] as Map).forEach((k, v) => _setPath(map, k.toString(), v));
       } else if (update.containsKey('\$inc') && update['\$inc'] is Map) {
+        map = Map<String, dynamic>.from(d.data);
         (update['\$inc'] as Map).forEach((k, v) {
           _setPath(map, k.toString(), _asNum(_resolvePath(map, k.toString())) + _asNum(v));
         });
       } else {
-        for (final entry in update.entries) {
-          if (!entry.key.toString().startsWith('\$')) {
-            map[entry.key.toString()] = entry.value;
-          }
-        }
+        // A plain map is a full replacement (MongoDB semantics): each matched
+        // document becomes the provided map, so omitted fields are removed.
+        // `_id` is always preserved.
+        map = <String, dynamic>{
+          for (final entry in update.entries)
+            if (!entry.key.toString().startsWith('\$'))
+              entry.key.toString(): entry.value,
+          '_id': d.id,
+        };
       }
       coll.documents[i] = MongoDocument.fromMap(map);
       count++;

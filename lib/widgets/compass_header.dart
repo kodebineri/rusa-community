@@ -39,6 +39,7 @@ class CompassHeader extends StatelessWidget {
 
   final VoidCallback? onReportBug;
   final VoidCallback? onShowEula;
+  final VoidCallback? onShowPrivacyPolicy;
   final VoidCallback? onShowAbout;
 
   const CompassHeader({
@@ -57,6 +58,7 @@ class CompassHeader extends StatelessWidget {
     this.onOpenActions,
     this.onReportBug,
     this.onShowEula,
+    this.onShowPrivacyPolicy,
     this.onShowAbout,
   });
 
@@ -407,7 +409,7 @@ class CompassHeader extends StatelessWidget {
 
                 const SizedBox(width: 4.0),
 
-                // More menu (Report Bug, EULA, About) - rightmost
+                // More menu (Report Bug, EULA, Privacy Policy, About) - rightmost
                 CompassIconButton(
                   svgString: CompassSvgIcons.moreVertical,
                   onTap: () {
@@ -490,6 +492,14 @@ class CompassHeader extends StatelessWidget {
                                       onTap: () {
                                         entry.remove();
                                         onShowEula?.call();
+                                      },
+                                    ),
+                                    _buildHeaderMenuItem(
+                                      themeMenu,
+                                      label: 'Privacy Policy',
+                                      onTap: () {
+                                        entry.remove();
+                                        onShowPrivacyPolicy?.call();
                                       },
                                     ),
                                     _buildHeaderMenuItem(

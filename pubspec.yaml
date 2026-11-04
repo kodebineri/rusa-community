@@ -15,6 +15,7 @@ dependencies:
   file_selector: ^1.1.0
   mongo_dart: ^0.10.10
   url_launcher: ^6.3.0
+  shared_preferences: ^2.5.6
 
 dev_dependencies:
   flutter_test:
@@ -26,3 +27,6 @@ flutter:
   assets:
     # License text rendered by EulaModal (lib/widgets/modals/eula_modal.dart).
     - EULA.md
+    # Privacy text rendered by PrivacyPolicyModal
+    # (lib/widgets/modals/privacy_policy_modal.dart).
+    - PRIVACY.md

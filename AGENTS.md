@@ -17,17 +17,18 @@ the engine instance.
 - Active product: `lib/` (Dart/Flutter) — this is what you modify.
 - Original React reference: `src/` (TSX) — read-only reference for intended behavior;
   not compiled by Flutter. Comments in Dart files say "Converted from `src/components/X.tsx`".
-- Tests: `test/widget_test.dart` (15 widget tests, single file).
+- Tests: `test/widget_test.dart` (18 widget tests, single file).
 - Sample data sources of truth: `sample_library.json`, `sample_social_network.json` (repo root).
-- License text: `EULA.md` (repo root) — bundled as a Flutter asset (`pubspec.yaml`) and
-  rendered by `EulaModal` via `CompassMarkdownView`; edit the Markdown, not the widget.
+- Legal text: `EULA.md` and `PRIVACY.md` (repo root) — bundled as Flutter assets
+  (`pubspec.yaml`) and rendered by `EulaModal` / `EulaAcceptanceModal` /
+  `PrivacyPolicyModal` via `CompassMarkdownView`; edit the Markdown, not the widgets.
 - `README.md` at repo root is **stale AI Studio boilerplate** — ignore it.
 
 ## Current status — read before you change anything
 
 _(Last verified 2026-11-03, after commit `382656d` "enable preset themes".)_
 
-- **`flutter analyze` is clean** and **`flutter test` is 15/15.** Keep both that way; the
+- **`flutter analyze` is clean** and **`flutter test` is 18/18.** Keep both that way; the
   recurring test patterns live in `docs/testing.md`.
 - **The app boots into the connection popup** (`_isConnectModalOpen = true`). Full-app widget
   tests must dismiss it first — use the `closeConnectionPopup(tester)` helper in
@@ -35,13 +36,17 @@ _(Last verified 2026-11-03, after commit `382656d` "enable preset themes".)_
 - **Queries do not execute on type.** `CompassQueryBar` commits filter/options only on
   **Find** (`_executeWithCurrentFilter`); typing just validates. Tests must tap Find before
   asserting `onChangeOptions`.
+- **First run is gated by the EULA.** Until the user taps **I Accept**,
+  `EulaAcceptanceModal` covers everything (no close button, no backdrop dismiss). Acceptance
+  is persisted with `shared_preferences` under key `eula_accepted` via
+  `AppPreferences` (`lib/services/app_preferences.dart`), so it is asked once per device.
 
 ## Commands
 
 | Task | Command |
 |---|---|
 | Static analysis (must be clean) | `flutter analyze` |
-| Tests (must be 15/15) | `flutter test` |
+| Tests (must be 18/18) | `flutter test` |
 | Run desktop app | `flutter run -d windows` |
 | Run on Android | `flutter run -d <device>` (needs `INTERNET` — already in the main manifest) |
 | Run a single test file | `flutter test test/widget_test.dart` |
@@ -81,7 +86,7 @@ the legacy `src/` React app; `npm` is not needed for Flutter work).
    afterwards. All reads are synchronous during `build()` — never make the engine async.
 5. **Closed modals render `SizedBox.shrink()`.** `CompassModalShell.build` returns shrink when
    `!isOpen`, so closed modal children are constructed but **not mounted** (finders won't see
-   them; no stray hit-testing). All 16 modals plus **two** `CompassActionSheet` overlays (header
+   them; no stray hit-testing). All 17 modals plus **two** `CompassActionSheet` overlays (header
    + query-bar) live permanently in the root `Stack` (`main.dart` ~L1123–1367).
 6. **`InsertDocumentModal.onInsert` returns `String?`**: `null` = success (modal closes
    itself), non-null = error message shown in the modal's `CompassErrorBanner`. The handler in
@@ -127,7 +132,6 @@ the legacy `src/` React app; `npm` is not needed for Flutter work).
 
 ## Known dead-ends / no-op code (don't "fix" silently, don't rely on)
 
-- `DocumentJsonView.onUpdateDocument` is declared/required but **never invoked** in the file.
 - `google_fonts` is in pubspec but never imported; fonts ("Plus Jakarta Sans", "JetBrains
   Mono") are referenced by name and fall back at runtime — no font files ship.
 - `QueryFilterOptions.collation` / `maxTimeMS` are stored but never consumed by the engine.
@@ -149,7 +153,10 @@ is mutable and filters the DB tree client-side (`compass_sidebar.dart`).
 | `CollectionTab` | `lib/models/collection_tab.dart` |
 | Modal primitives (`CompassModalShell`, `CompassInput`, buttons) | `lib/widgets/modals/compass_modal.dart` |
 | `EulaModal` (renders the bundled `EULA.md`) | `lib/widgets/modals/eula_modal.dart` |
+| `EulaAcceptanceModal` (first-run gate) | `lib/widgets/modals/eula_acceptance_modal.dart` |
+| `PrivacyPolicyModal` (renders the bundled `PRIVACY.md`) | `lib/widgets/modals/privacy_policy_modal.dart` |
 | `AboutModal` (logo, app name, version) | `lib/widgets/modals/about_modal.dart` |
+| `appPreferences` (`shared_preferences` wrapper) | `lib/services/app_preferences.dart` |
 | `CompassMarkdownView` (dependency-free Markdown renderer) | `lib/widgets/compass_markdown_view.dart` |
 | `CompassActionSheet` (touch overflow sheet) | `lib/widgets/modals/compass_action_sheet.dart` |
 | `CompassIconButton`, `CompassHover` | `lib/widgets/compass_icon_button.dart`, `lib/widgets/compass_hover.dart` |

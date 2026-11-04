@@ -54,9 +54,10 @@ void main() => runApp(const DefaultTextEditingShortcuts(child: CompassApp()));
 **Panel flags (L229–243):** `_isConnectModalOpen` (**defaults to `true`** — the app boots into
 the connection popup), `_isTerminalOpen` (docked mongosh shell), `_isMobileSidebarOpen`
 (off-canvas sidebar < 768px), `_isHeaderActionsOpen` (touch-only header overflow sheet),
-`_isEulaModalOpen`, `_isAboutModalOpen`, `_isQueryActionsOpen` (touch-only query-bar overflow
+`_isEulaModalOpen`, `_isAboutModalOpen`, `_isPrivacyPolicyModalOpen`, `_isQueryActionsOpen` (touch-only query-bar overflow
 sheet), `_isQueryOptionsExpanded` (query-bar options panel; owned here so the overflow sheet
-can toggle it).
+can toggle it), and `_eulaAccepted` (`bool?` — first-run EULA flag: `null` = still loading,
+`false` = gate shown, `true` = accepted).
 
 **Layout flags (refreshed by the root `LayoutBuilder` on every layout pass):**
 
@@ -95,9 +96,12 @@ can toggle it).
 **Not a state field:** `mongoEngine` is a mutable *top-level global* in
 `lib/services/mongo_engine.dart`. Assigned during connect/disconnect inside `setState`.
 
-There is **no `initState`** — everything initializes via field initializers. The app lays out
-`library.books` Documents/tree with an empty query on the local engine immediately, but the
-**connection popup is open over it** on first launch (`_isConnectModalOpen = true`).
+State initializes via field initializers; the only `initState` loads the stored EULA flag
+(`_loadEulaStatus` → `appPreferences.hasAcceptedEula()`). The shell lays out `library.books`
+Documents/tree with an empty query on the local engine immediately, but on first launch it is
+covered by the **EULA gate** (`EulaAcceptanceModal`) and, behind it, the **connection popup**
+(`_isConnectModalOpen = true`). Until the gate is accepted, `_eulaAccepted` is `null` (loading,
+blank cover) or `false` (gate shown) and the app is not interactive.
 
 ## Layout tree — `build()` (~L1381) hosts `_buildShell()` (~L940) in an `OverlayEntry`
 
@@ -117,8 +121,10 @@ Shell Stack
 │        ├ _buildDocumentsPagination    (Tree/JSON/Table switcher + Prev/Next) — same condition
 │        └ Expanded > SingleChildScrollView(16) > _buildActiveTabView(...)
 │  3. CompassTerminal                   (docked mongosh drawer; the only "footer" region)
-└─ 16 modal overlays + TWO CompassActionSheet overlays (header actions, query actions)
+└─ 17 modal overlays + TWO CompassActionSheet overlays (header actions, query actions)
    (always-installed children; each closed one renders SizedBox.shrink)
+   + the conditionally-rendered first-run EULA gate (blank cover while the flag loads, then
+     EulaAcceptanceModal) as the LAST child, so it paints above everything until accepted
 ```
 
 Data derived at the top of `_buildShell()` (~L947–953), all synchronous:
@@ -213,7 +219,7 @@ fields in place.
 | `_handleCloneDocument(doc)` | `_editingDoc = null`; `_clonedDoc = Map.from(doc.data)..['_id'] = mongoEngine.generateObjectId()`; opens modal. Clone always inserts |
 | `_requestDeleteDocument(id, doc)` | resolves doc if null, opens delete modal |
 | `_confirmDeleteDocument()` | `mongoEngine.deleteDocument(...)`, clears payload (payload is NOT cleared by modal `onClose`) |
-| `_handleUpdateDocument(id, fields)` | direct `updateDocument` in try/catch that swallows errors + `setState` (wired to JSON view inline edit — currently unused there) |
+| `_handleUpdateDocument(id, fields)` | direct `updateDocument` in try/catch that swallows errors + `setState` (used by the JSON view's inline editor) |
 
 `InsertDocumentModal` instantiation in the Stack (~L1214–1223):
 
@@ -235,7 +241,7 @@ Note: `onClose` does **not** clear `_editingDoc` (only `_openInsertDocument`,
 All modals are permanently installed children of the root `Stack` (~L1123–1367), each with an
 `isOpen` boolean; `CompassModalShell` returns `SizedBox.shrink()` when closed (invariant 5 in
 AGENTS.md). Order: Connection, CreateDb, CreateCollection, **CreateIndex**, Rename,
-DropDatabase, DropCollection, **DropIndex**, **Eula**, **About**, DeleteDocument,
+DropDatabase, DropCollection, **DropIndex**, **Eula**, **Privacy Policy**, **About**, DeleteDocument,
 **InsertDocument**, ImportExport, ExportLanguage, SaveView, MongoshConfirmation
 (`isOpen: _pendingTerminalOperation != null`).
 
@@ -253,6 +259,11 @@ Three modals hand-roll their own `Positioned.fill` overlay instead of `CompassMo
 
 Both are root-`Stack` children (a `Positioned.fill` sheet hosted inside a widget would be
 squeezed into a sliver).
+
+Separately, the **first-run EULA gate** (`EulaAcceptanceModal`) is *conditionally* rendered as
+the last `Stack` child while `_eulaAccepted != true` (with a blank `ColoredBox` cover while the
+flag is still `null`). It is **not** one of the 17 permanently-installed modals: accepting it
+(`_acceptEula`) persists the flag and reveals the connection popup.
 
 Payload-clearing asymmetry to remember: most `onClose` closures only flip the boolean;
 delete payload clears on confirm; insert payload (`_editingDoc`) clears on open/success.

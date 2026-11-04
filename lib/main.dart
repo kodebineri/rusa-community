@@ -13,6 +13,7 @@ import 'models/collection_tab.dart';
 import 'services/local_mongo_engine.dart';
 import 'services/mongo_engine.dart';
 import 'services/real_mongo_service.dart';
+import 'services/app_preferences.dart';
 import 'widgets/compass_header.dart';
 import 'widgets/compass_hover.dart';
 import 'widgets/compass_icon_button.dart';
@@ -41,6 +42,8 @@ import 'widgets/modals/export_language_modal.dart';
 import 'widgets/modals/save_view_modal.dart';
 import 'widgets/modals/mongosh_confirmation_modal.dart';
 import 'widgets/modals/eula_modal.dart';
+import 'widgets/modals/eula_acceptance_modal.dart';
+import 'widgets/modals/privacy_policy_modal.dart';
 import 'widgets/modals/about_modal.dart';
 import 'widgets/modals/compass_modal.dart';
 import 'widgets/modals/compass_action_sheet.dart';
@@ -71,6 +74,40 @@ class _CompassAppState extends State<CompassApp> {
   /// inserted through this key: [State.context] sits *above* that overlay, so
   /// `Overlay.of(context)` finds no overlay and throws.
   final GlobalKey<OverlayState> _overlayKey = GlobalKey<OverlayState>();
+
+  /// Whether the user has accepted the EULA. `null` while the stored flag is
+  /// being read; the first-run gate blocks the app while it is `null` or
+  /// `false`.
+  bool? _eulaAccepted;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadEulaStatus();
+  }
+
+  Future<void> _loadEulaStatus() async {
+    bool accepted;
+    try {
+      accepted = await appPreferences.hasAcceptedEula();
+    } catch (_) {
+      // Never leave the user locked out if the store is unavailable.
+      accepted = false;
+    }
+    if (!mounted) return;
+    setState(() => _eulaAccepted = accepted);
+  }
+
+  /// Called by [EulaAcceptanceModal] when the user accepts the licence. The
+  /// acceptance is persisted, so the gate never returns on this device.
+  void _acceptEula() {
+    setState(() {
+      _eulaAccepted = true;
+      // First-run flow: after the gate, present the connection popup.
+      _isConnectModalOpen = true;
+    });
+    unawaited(appPreferences.setEulaAccepted(true));
+  }
 
   /// Shows a transient message dialog above the app shell.
   ///
@@ -234,6 +271,7 @@ class _CompassAppState extends State<CompassApp> {
   bool _isHeaderActionsOpen = false;
   bool _isEulaModalOpen = false;
   bool _isAboutModalOpen = false;
+  bool _isPrivacyPolicyModalOpen = false;
 
   /// True while the touch-only query-bar overflow sheet is open.
   bool _isQueryActionsOpen = false;
@@ -989,6 +1027,9 @@ class _CompassAppState extends State<CompassApp> {
                     onShowEula: () {
                       setState(() => _isEulaModalOpen = true);
                     },
+                    onShowPrivacyPolicy: () {
+                      setState(() => _isPrivacyPolicyModalOpen = true);
+                    },
                     onShowAbout: () {
                       setState(() => _isAboutModalOpen = true);
                     },
@@ -1197,6 +1238,10 @@ class _CompassAppState extends State<CompassApp> {
                 isOpen: _isEulaModalOpen,
                 onClose: () => setState(() => _isEulaModalOpen = false),
               ),
+              PrivacyPolicyModal(
+                isOpen: _isPrivacyPolicyModalOpen,
+                onClose: () => setState(() => _isPrivacyPolicyModalOpen = false),
+              ),
               AboutModal(
                 isOpen: _isAboutModalOpen,
                 onClose: () => setState(() => _isAboutModalOpen = false),
@@ -1321,6 +1366,14 @@ class _CompassAppState extends State<CompassApp> {
                     },
                   ),
                   CompassActionSheetItem(
+                    label: 'Privacy Policy',
+                    svg: CompassSvgIcons.shieldCheck,
+                    onTap: () {
+                      setState(() => _isHeaderActionsOpen = false);
+                      setState(() => _isPrivacyPolicyModalOpen = true);
+                    },
+                  ),
+                  CompassActionSheetItem(
                     label: 'About',
                     svg: CompassSvgIcons.key,
                     onTap: () {
@@ -1365,6 +1418,25 @@ class _CompassAppState extends State<CompassApp> {
                   ),
                 ],
               ),
+
+              // First-run EULA gate: the last child so it paints above every
+              // other overlay and blocks all interaction until accepted. While
+              // the stored flag is still being read (`null`) a blank cover
+              // prevents a flash of the app (or the licence) for returning
+              // users.
+              if (_eulaAccepted == null)
+                Positioned.fill(
+                  child: GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTap: () {},
+                    child: ColoredBox(color: _theme.bgApp),
+                  ),
+                )
+              else if (!_eulaAccepted!)
+                EulaAcceptanceModal(
+                  isOpen: true,
+                  onAccept: _acceptEula,
+                ),
             ],
           ),
         );

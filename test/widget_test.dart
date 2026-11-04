@@ -5,6 +5,7 @@ import 'dart:convert';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:mongodb_compass_flutter/main.dart';
 import 'package:mongodb_compass_flutter/icons/compass_svg_icons.dart';
@@ -21,8 +22,10 @@ import 'package:mongodb_compass_flutter/widgets/modals/compass_modal.dart';
 import 'package:mongodb_compass_flutter/widgets/modals/connection_modal.dart';
 import 'package:mongodb_compass_flutter/widgets/modals/create_index_modal.dart';
 import 'package:mongodb_compass_flutter/widgets/modals/drop_index_modal.dart';
+import 'package:mongodb_compass_flutter/widgets/modals/eula_acceptance_modal.dart';
 import 'package:mongodb_compass_flutter/widgets/modals/insert_document_modal.dart';
 import 'package:mongodb_compass_flutter/widgets/views/aggregations_view.dart';
+import 'package:mongodb_compass_flutter/widgets/views/document_json_view.dart';
 import 'package:mongodb_compass_flutter/widgets/views/document_tree_view.dart';
 import 'package:mongodb_compass_flutter/widgets/views/indexes_view.dart';
 import 'package:mongodb_compass_flutter/widgets/views/schema_view.dart';
@@ -31,6 +34,8 @@ import 'package:mongodb_compass_flutter/widgets/views/schema_view.dart';
 /// = true`), which covers the shell. Close it before driving the shell, or the
 /// taps land on the modal backdrop instead of the header/sidebar/tabs.
 Future<void> closeConnectionPopup(WidgetTester tester) async {
+  // Let the stored EULA flag load so the first-run cover clears.
+  await tester.pump();
   final closeIcon = find.descendant(
     of: find.byType(ConnectionModal),
     matching: find.byWidgetPredicate(
@@ -44,6 +49,12 @@ Future<void> closeConnectionPopup(WidgetTester tester) async {
 }
 
 void main() {
+  // All tests run as a user who has already accepted the EULA, so the first-run
+  // gate does not block the app shell. Test 18 overrides this.
+  setUp(() {
+    SharedPreferences.setMockInitialValues({'eula_accepted': true});
+  });
+
   testWidgets('CompassApp builds without error', (WidgetTester tester) async {
     // The app is desktop-first; use a desktop-sized surface.
     tester.view.physicalSize = const Size(1920.0, 1080.0);
@@ -1018,6 +1029,173 @@ void main() {
     expect(
       find.descendant(of: tree, matching: find.text('[ ... 2 items ]')),
       findsOneWidget,
+    );
+  });
+
+  testWidgets('json view edit button saves changes to the document',
+      (WidgetTester tester) async {
+    tester.view.physicalSize = const Size(1920.0, 1080.0);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    // The engine is a shared singleton; restore the seed data afterwards.
+    addTearDown(mongoEngine.resetToDefaults);
+
+    await tester.pumpWidget(const CompassApp());
+    await tester.pump();
+    for (var i = 0; i < 50 && tester.takeException() != null; i++) {}
+    await closeConnectionPopup(tester);
+
+    // Switch the documents view to JSON.
+    await tester.tap(find.text('JSON'));
+    await tester.pump();
+    for (var i = 0; i < 50 && tester.takeException() != null; i++) {}
+
+    final jsonView = find.byType(DocumentJsonView);
+    expect(jsonView, findsOneWidget);
+
+    final books = mongoEngine.getCollection('library', 'books')!;
+    final originalCount = books.documents.length;
+    final firstId = books.documents.first.id;
+
+    // One pencil per document card.
+    final editIcon = find.descendant(
+      of: jsonView,
+      matching: find.byWidgetPredicate(
+        (w) => w is CompassSvg && w.svgString == CompassSvgIcons.pencil,
+      ),
+    );
+    expect(editIcon, findsNWidgets(originalCount));
+
+    // Tapping the pencil opens the inline JSON editor for that card.
+    await tester.tap(editIcon.first);
+    await tester.pump();
+    for (var i = 0; i < 50 && tester.takeException() != null; i++) {}
+
+    final editor = find.descendant(
+      of: jsonView,
+      matching: find.byType(EditableText),
+    );
+    expect(editor, findsOneWidget, reason: 'the card body must become editable');
+    // Only the edited card swaps its pencil for Save/Cancel.
+    expect(editIcon, findsNWidgets(originalCount - 1));
+
+    final edited =
+        jsonDecode(tester.widget<EditableText>(editor).controller.text)
+            as Map<String, dynamic>;
+    edited['copies_available'] = 1234;
+    edited.remove('rating'); // deleting a field must delete it persistently
+    await tester.enterText(editor, jsonEncode(edited));
+    await tester.pump();
+
+    // Save (check icon).
+    final saveIcon = find.descendant(
+      of: jsonView,
+      matching: find.byWidgetPredicate(
+        (w) => w is CompassSvg && w.svgString == CompassSvgIcons.check,
+      ),
+    );
+    expect(saveIcon, findsOneWidget);
+    await tester.tap(saveIcon);
+    await tester.pump();
+    for (var i = 0; i < 50 && tester.takeException() != null; i++) {}
+
+    final saved = books.documents.firstWhere((d) => d.id == firstId);
+    expect(saved.data['copies_available'], 1234,
+        reason: 'the edited field must be persisted to the engine');
+    expect(saved.data.containsKey('rating'), isFalse,
+        reason: 'a field removed from the JSON must be removed persistently');
+    expect(saved.data['_id'], firstId,
+        reason: 'the document identity must be preserved');
+    // The editor closes and the pencil returns.
+    expect(
+      find.descendant(of: jsonView, matching: find.byType(EditableText)),
+      findsNothing,
+    );
+    expect(editIcon, findsNWidgets(originalCount));
+  });
+
+  testWidgets('updateMany with a plain map replaces matched documents',
+      (WidgetTester tester) async {
+    // Restore the mutated seed data afterwards.
+    addTearDown(mongoEngine.resetToDefaults);
+
+    final books = mongoEngine.getCollection('library', 'books')!;
+    final firstId = books.documents.first.id;
+    final secondId = books.documents[1].id;
+
+    // A non-operator update document is a full replacement (`$set` still merges).
+    final replaced = mongoEngine.updateMany(
+      'library',
+      'books',
+      {'_id': firstId},
+      {'title': 'Rewritten', 'copies_available': 7},
+    );
+    expect(replaced, 1);
+
+    final first = books.documents.firstWhere((d) => d.id == firstId);
+    expect(first.data['title'], 'Rewritten');
+    expect(first.data['copies_available'], 7);
+    expect(first.data['_id'], firstId);
+    expect(first.data.containsKey('author'), isFalse,
+        reason: 'a plain update document replaces, it does not merge');
+    expect(first.data.containsKey('rating'), isFalse);
+
+    // Documents that did not match the filter are untouched.
+    final second = books.documents.firstWhere((d) => d.id == secondId);
+    expect(second.data['title'], isNot('Rewritten'));
+
+    // An operator update still merges.
+    mongoEngine.updateMany(
+      'library',
+      'books',
+      {'_id': firstId},
+      {'\$set': {'copies_available': 9}},
+    );
+    final merged = books.documents.firstWhere((d) => d.id == firstId);
+    expect(merged.data['copies_available'], 9);
+    expect(merged.data['title'], 'Rewritten',
+        reason: r'an $set update must not remove other fields');
+  });
+
+  testWidgets('first-time user must accept the EULA before using the app',
+      (WidgetTester tester) async {
+    // A brand-new install: nothing stored yet.
+    SharedPreferences.setMockInitialValues(const {});
+    tester.view.physicalSize = const Size(1920.0, 1080.0);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(const CompassApp());
+    await tester.pump();
+    for (var i = 0; i < 50 && tester.takeException() != null; i++) {}
+    await tester.pump();
+
+    // The gate blocks the app: it is on screen and cannot be dismissed.
+    expect(find.byType(EulaAcceptanceModal), findsOneWidget);
+    expect(find.text('I Accept'), findsOneWidget);
+    expect(find.text('End User License Agreement'), findsWidgets);
+
+    // Nothing is persisted until the user accepts.
+    expect(
+      (await SharedPreferences.getInstance()).getBool('eula_accepted'),
+      isNull,
+    );
+
+    // Accept (the button sits at the end of the scrollable licence text).
+    await tester.ensureVisible(find.text('I Accept'));
+    await tester.pump();
+    await tester.tap(find.text('I Accept'));
+    await tester.pump();
+    for (var i = 0; i < 50 && tester.takeException() != null; i++) {}
+    await tester.pump();
+
+    // The gate is gone and acceptance is persisted for the next launch.
+    expect(find.text('I Accept'), findsNothing);
+    expect(
+      (await SharedPreferences.getInstance()).getBool('eula_accepted'),
+      isTrue,
     );
   });
 }

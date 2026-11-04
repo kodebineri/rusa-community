@@ -467,11 +467,25 @@ class RealMongoService extends LocalMongoEngine {
   ) {
     final ok = super.updateDocument(dbName, collName, docId, updatedFields);
     if (!ok) return false;
-    _fireCollection(
-      dbName,
-      collName,
-      (c) => c.updateOne({'_id': _toObjectId(docId)}, _toServerUpdate(updatedFields)),
-    );
+    final hasOperator =
+        updatedFields.keys.any((k) => k.toString().startsWith(r'$'));
+    if (hasOperator) {
+      _fireCollection(
+        dbName,
+        collName,
+        (c) => c.updateOne({'_id': _toObjectId(docId)}, _toServerUpdate(updatedFields)),
+      );
+    } else {
+      // A plain map is a full replacement, so fields omitted from it are
+      // removed on the server too (matching the local mirror).
+      final replacement = _denormalizeDoc({...updatedFields, '_id': docId});
+      replacement['_id'] = _toObjectId(docId);
+      _fireCollection(
+        dbName,
+        collName,
+        (c) => c.replaceOne({'_id': _toObjectId(docId)}, replacement),
+      );
+    }
     return true;
   }
 
@@ -502,13 +516,50 @@ class RealMongoService extends LocalMongoEngine {
 
   @override
   int updateMany(String dbName, String collName, Map filter, Map update) {
+    final hasOperator = update.keys.any((k) => k.toString().startsWith(r'$'));
+
+    // For a replacement update, capture the matching ids *before* the mirror is
+    // mutated: replacing can change the field the filter matched on, so a later
+    // re-query could otherwise miss documents.
+    final targetIds = hasOperator
+        ? const <String>[]
+        : findDocuments(
+                dbName,
+                collName,
+                QueryFilterOptions(
+                  filter: jsonEncode(filter),
+                  limit: 1000000000,
+                ),
+              )
+            .documents
+            .map((d) => d.id)
+            .toList(growable: false);
+
     final count = super.updateMany(dbName, collName, filter, update);
-    if (count > 0) {
+    if (count == 0) return count;
+
+    if (hasOperator) {
       _fireCollection(
         dbName,
         collName,
         (c) => c.updateMany(_denormalizeFilter(filter), _toServerUpdate(update)),
       );
+    } else {
+      // A plain map is a full replacement: replay one `replaceOne` per matched
+      // document so fields omitted from the replacement are removed on the
+      // server too (matching the local mirror).
+      for (final id in targetIds) {
+        final replacement = _denormalizeDoc(<String, dynamic>{
+          for (final entry in update.entries) entry.key.toString(): entry.value,
+          '_id': id,
+        });
+        replacement['_id'] = _toObjectId(id);
+        _fireCollection(
+          dbName,
+          collName,
+          (c) => c.replaceOne({'_id': _toObjectId(id)}, replacement),
+        );
+      }
     }
     return count;
   }
