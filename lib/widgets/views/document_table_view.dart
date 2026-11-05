@@ -285,6 +285,13 @@ class _DocumentTableViewState extends State<DocumentTableView> {
         style: CompassTypography.monoMedium(color: _theme.bsonNumber, size: 11.0),
       );
     }
+    if (val is MongoObjectId) {
+      return Text(
+        'ObjectId("${val.hex}")',
+        style: CompassTypography.monoBold(color: _theme.accent, size: 11.0),
+        overflow: TextOverflow.ellipsis,
+      );
+    }
     if (val is List) {
       return Text(
         '[${val.length} items]',
@@ -303,14 +310,6 @@ class _DocumentTableViewState extends State<DocumentTableView> {
         return Text(
           'ISODate("$val")',
           style: CompassTypography.monoMedium(color: _theme.bsonDate, size: 11.0),
-          overflow: TextOverflow.ellipsis,
-        );
-      }
-      // Check if ObjectId
-      if (val.length == 24 && RegExp(r'^[a-fA-F0-9]{24}$').hasMatch(val)) {
-        return Text(
-          'ObjectId("$val")',
-          style: CompassTypography.monoBold(color: _theme.accent, size: 11.0),
           overflow: TextOverflow.ellipsis,
         );
       }

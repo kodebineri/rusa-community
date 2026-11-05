@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:math';
 
 import '../models/mongo_models.dart';
+import '../utils/mongo_json_parser.dart';
 
 /// Dart implementation of sample data and Mongo engine service
 /// Mirrors src/services/sampleData.ts and mongoEngine.ts.
@@ -29,9 +30,34 @@ class LocalMongoEngine {
   /// `sample_social_network.json` in the repo root.
   ///
   /// The JSON files use MongoDB extended JSON (`{ "$oid": ... }`,
-  /// `{ "$date": ... }`); here ObjectIds are stored as their 24-char hex
-  /// string and dates as ISO-8601 strings — the same normalisation
-  /// [RealMongoService] applies to real server documents.
+  /// `{ "$date": ... }`); here ObjectIds keep the BSON type ([MongoObjectId],
+  /// built from the 24-char hex strings via [_typedSeedDocs]) and dates are
+  /// ISO-8601 strings — the same shape [RealMongoService] applies to real
+  /// server documents.
+  /// The bundled JSON expresses ObjectIds as 24-char hex strings; the in-memory
+  /// engine keeps the BSON type ([MongoObjectId]) instead, so the editors can
+  /// show `ObjectId("...")` and distinguish it from a plain string.
+  static List<MongoDocument> _typedSeedDocs(List<MongoDocument> docs) => [
+        for (final doc in docs)
+          MongoDocument.fromMap(_typedSeedValue(doc.data) as Map<String, dynamic>),
+      ];
+
+  static dynamic _typedSeedValue(dynamic value) {
+    if (value is String &&
+        value.length == 24 &&
+        RegExp(r'^[a-fA-F0-9]{24}$').hasMatch(value)) {
+      return MongoObjectId(value);
+    }
+    if (value is Map) {
+      return <String, dynamic>{
+        for (final entry in value.entries)
+          entry.key.toString(): _typedSeedValue(entry.value),
+      };
+    }
+    if (value is List) return value.map(_typedSeedValue).toList();
+    return value;
+  }
+
   void seedSampleData() {
     final books = [
       MongoDocument.fromMap({
@@ -162,7 +188,7 @@ class LocalMongoEngine {
         collections: {
           'books': MongoCollection(
             name: 'books',
-            documents: books,
+            documents: _typedSeedDocs(books),
             indexes: [
               MongoIndex(name: '_id_', keys: {'_id': 1}, unique: true),
               MongoIndex(name: 'isbn_1', keys: {'isbn': 1}, unique: true),
@@ -172,7 +198,7 @@ class LocalMongoEngine {
           ),
           'publishers': MongoCollection(
             name: 'publishers',
-            documents: publishers,
+            documents: _typedSeedDocs(publishers),
             indexes: [
               MongoIndex(name: '_id_', keys: {'_id': 1}, unique: true),
               MongoIndex(name: 'name_1', keys: {'name': 1}),
@@ -180,7 +206,7 @@ class LocalMongoEngine {
           ),
           'genres': MongoCollection(
             name: 'genres',
-            documents: genres,
+            documents: _typedSeedDocs(genres),
             indexes: [
               MongoIndex(name: '_id_', keys: {'_id': 1}, unique: true),
               MongoIndex(name: 'name_1', keys: {'name': 1}),
@@ -193,7 +219,7 @@ class LocalMongoEngine {
         collections: {
           'users': MongoCollection(
             name: 'users',
-            documents: users,
+            documents: _typedSeedDocs(users),
             indexes: [
               MongoIndex(name: '_id_', keys: {'_id': 1}, unique: true),
               MongoIndex(name: 'username_1', keys: {'username': 1}, unique: true),
@@ -202,7 +228,7 @@ class LocalMongoEngine {
           ),
           'posts': MongoCollection(
             name: 'posts',
-            documents: posts,
+            documents: _typedSeedDocs(posts),
             indexes: [
               MongoIndex(name: '_id_', keys: {'_id': 1}, unique: true),
               MongoIndex(name: 'author_id_1', keys: {'author_id': 1}),
@@ -211,7 +237,7 @@ class LocalMongoEngine {
           ),
           'comments': MongoCollection(
             name: 'comments',
-            documents: comments,
+            documents: _typedSeedDocs(comments),
             indexes: [
               MongoIndex(name: '_id_', keys: {'_id': 1}, unique: true),
               MongoIndex(name: 'post_id_1', keys: {'post_id': 1}),
@@ -256,15 +282,21 @@ class LocalMongoEngine {
     try {
       if (options.filter.trim().isNotEmpty) {
         final parsed = tolerantParse(options.filter);
-        if (parsed is Map) parsedFilter = parsed;
+        if (parsed is Map) {
+          parsedFilter = _normalizeExtendedJson(parsed) as Map;
+        }
       }
       if (options.project.trim().isNotEmpty) {
         final parsed = tolerantParse(options.project);
-        if (parsed is Map) parsedProject = parsed;
+        if (parsed is Map) {
+          parsedProject = _normalizeExtendedJson(parsed) as Map;
+        }
       }
       if (options.sort.trim().isNotEmpty) {
         final parsed = tolerantParse(options.sort);
-        if (parsed is Map) parsedSort = parsed;
+        if (parsed is Map) {
+          parsedSort = _normalizeExtendedJson(parsed) as Map;
+        }
       }
     } catch (_) {
       return QueryResult(documents: const [], totalCount: 0, executionTimeMs: 0);
@@ -359,6 +391,7 @@ class LocalMongoEngine {
 
   /// Maps a decoded JSON value to the BSON type name Compass would display.
   String _jsonTypeOf(dynamic v) {
+    if (v is MongoObjectId) return 'ObjectId';
     if (v is String) return 'String';
     if (v is int) return 'Int32';
     if (v is double) return 'Double';
@@ -392,7 +425,7 @@ class LocalMongoEngine {
             name: initialCollName,
             documents: [
               MongoDocument.fromMap({
-                '_id': generateObjectId(),
+                '_id': MongoObjectId(generateObjectId()),
                 'createdAt': DateTime.now().toIso8601String(),
                 'name': 'Sample Item',
                 'active': true,
@@ -444,14 +477,15 @@ class LocalMongoEngine {
       throw Exception('Source collection "$sourceCollName" does not exist in database "$dbName"');
     }
 
-    final docs = _runPipeline(source.documents, pipeline, dbName);
+    final normalizedPipeline = _normalizeExtendedJson(pipeline) as List;
+    final docs = _runPipeline(source.documents, normalizedPipeline, dbName);
     db.collections[clean] = MongoCollection(
       name: clean,
       documents: docs,
       indexes: [MongoIndex(name: '_id_', keys: {'_id': 1}, sizeKb: 0)],
       isView: true,
       viewOn: sourceCollName,
-      pipeline: pipeline,
+      pipeline: normalizedPipeline,
     );
     return true;
   }
@@ -532,8 +566,13 @@ class LocalMongoEngine {
       throw Exception('Cannot insert document: "$collName" is a read-only MongoDB view.');
     }
 
-    final newMap = <String, dynamic>{...doc};
-    newMap['_id'] = doc['_id'] ?? generateObjectId();
+    final newMap = <String, dynamic>{
+      for (final entry in doc.entries)
+        entry.key: _normalizeExtendedJson(entry.value),
+    };
+    // A user-supplied `_id` (string or ObjectId) is kept as typed; only a
+    // missing `_id` gets a generated BSON ObjectId.
+    newMap['_id'] = newMap['_id'] ?? MongoObjectId(generateObjectId());
 
     for (final index in coll.indexes) {
       if (index.unique) {
@@ -541,7 +580,9 @@ class LocalMongoEngine {
           final conflict = index.keys.keys.every((key) {
             final v1 = _resolvePath(existing.data, key);
             final v2 = _resolvePath(newMap, key);
-            return v1 != null && v2 != null && v1 == v2;
+            return v1 != null &&
+                v2 != null &&
+                _sameValue(v1, v2, looseId: key == '_id');
           });
           if (conflict) {
             throw Exception(
@@ -571,26 +612,34 @@ class LocalMongoEngine {
     final index = coll.documents.indexWhere((d) => d.id == docId);
     if (index == -1) return false;
 
+    final normalizedFields = <String, dynamic>{
+      for (final entry in updatedFields.entries)
+        entry.key: _normalizeExtendedJson(entry.value),
+    };
+
     var finalMap = Map<String, dynamic>.from(coll.documents[index].data);
-    if (updatedFields.containsKey('\$set')) {
-      final setObj = updatedFields['\$set'] as Map;
+    if (normalizedFields.containsKey('\$set')) {
+      final setObj = normalizedFields['\$set'] as Map;
       setObj.forEach((k, v) => _setPath(finalMap, k.toString(), v));
-    } else if (updatedFields.containsKey('\$inc')) {
-      final incObj = updatedFields['\$inc'] as Map;
+    } else if (normalizedFields.containsKey('\$inc')) {
+      final incObj = normalizedFields['\$inc'] as Map;
       incObj.forEach((k, v) {
         final current = _asNum(_resolvePath(finalMap, k.toString()));
         _setPath(finalMap, k.toString(), current + _asNum(v));
       });
-    } else if (updatedFields.containsKey('\$unset')) {
-      final unsetObj = updatedFields['\$unset'] as Map;
+    } else if (normalizedFields.containsKey('\$unset')) {
+      final unsetObj = normalizedFields['\$unset'] as Map;
       for (final k in unsetObj.keys) {
         _unsetPath(finalMap, k.toString());
       }
     } else {
       // A plain map is a full replacement (MongoDB semantics): the provided map
       // becomes the whole document, so fields omitted from it are removed.
-      // `_id` is always preserved.
-      finalMap = {...updatedFields, '_id': docId};
+      // `_id` is always preserved (keeping its BSON type, e.g. an ObjectId).
+      finalMap = {
+        ...normalizedFields,
+        '_id': coll.documents[index].data['_id'] ?? docId,
+      };
     }
 
     coll.documents[index] = MongoDocument.fromMap(finalMap);
@@ -611,15 +660,17 @@ class LocalMongoEngine {
   int deleteMany(String dbName, String collName, Map filter) {
     final coll = getCollection(dbName, collName);
     if (coll == null || coll.isView) return 0;
+    final normalizedFilter = _normalizeExtendedJson(filter) as Map;
     final before = coll.documents.length;
-    coll.documents.removeWhere((d) => _matchesFilter(d.data, filter));
+    coll.documents.removeWhere((d) => _matchesFilter(d.data, normalizedFilter));
     return before - coll.documents.length;
   }
 
   bool deleteOne(String dbName, String collName, Map filter) {
     final coll = getCollection(dbName, collName);
     if (coll == null || coll.isView) return false;
-    final index = coll.documents.indexWhere((d) => _matchesFilter(d.data, filter));
+    final normalizedFilter = _normalizeExtendedJson(filter) as Map;
+    final index = coll.documents.indexWhere((d) => _matchesFilter(d.data, normalizedFilter));
     if (index == -1) return false;
     coll.documents.removeAt(index);
     return true;
@@ -628,17 +679,19 @@ class LocalMongoEngine {
   int updateMany(String dbName, String collName, Map filter, Map update) {
     final coll = getCollection(dbName, collName);
     if (coll == null || coll.isView) return 0;
+    final normalizedFilter = _normalizeExtendedJson(filter) as Map;
+    final normalizedUpdate = _normalizeExtendedJson(update) as Map;
     var count = 0;
     for (var i = 0; i < coll.documents.length; i++) {
       final d = coll.documents[i];
-      if (!_matchesFilter(d.data, filter)) continue;
+      if (!_matchesFilter(d.data, normalizedFilter)) continue;
       late Map<String, dynamic> map;
-      if (update.containsKey('\$set') && update['\$set'] is Map) {
+      if (normalizedUpdate.containsKey('\$set') && normalizedUpdate['\$set'] is Map) {
         map = Map<String, dynamic>.from(d.data);
-        (update['\$set'] as Map).forEach((k, v) => _setPath(map, k.toString(), v));
-      } else if (update.containsKey('\$inc') && update['\$inc'] is Map) {
+        (normalizedUpdate['\$set'] as Map).forEach((k, v) => _setPath(map, k.toString(), v));
+      } else if (normalizedUpdate.containsKey('\$inc') && normalizedUpdate['\$inc'] is Map) {
         map = Map<String, dynamic>.from(d.data);
-        (update['\$inc'] as Map).forEach((k, v) {
+        (normalizedUpdate['\$inc'] as Map).forEach((k, v) {
           _setPath(map, k.toString(), _asNum(_resolvePath(map, k.toString())) + _asNum(v));
         });
       } else {
@@ -646,10 +699,10 @@ class LocalMongoEngine {
         // document becomes the provided map, so omitted fields are removed.
         // `_id` is always preserved.
         map = <String, dynamic>{
-          for (final entry in update.entries)
+          for (final entry in normalizedUpdate.entries)
             if (!entry.key.toString().startsWith('\$'))
               entry.key.toString(): entry.value,
-          '_id': d.id,
+          '_id': d.data['_id'] ?? d.id,
         };
       }
       coll.documents[i] = MongoDocument.fromMap(map);
@@ -698,11 +751,13 @@ class LocalMongoEngine {
   }
 
   /// Tolerant JSON parser mirroring `mongoEngine.tolerantParse` (supports
-  /// unquoted keys and single-quoted strings).
+  /// unquoted keys, single-quoted strings, and mongosh constructors such as
+  /// `ObjectId("...")` / `ISODate("...")`).
   dynamic tolerantParse(String jsonStr) {
     if (jsonStr.trim().isEmpty) return {};
     final trimmed = jsonStr.trim();
-    final cleaned = trimmed
+    final preprocessed = preprocessMongoJson(trimmed);
+    final cleaned = preprocessed
         .replaceAllMapped(
           RegExp(r'([{,]\s*)([a-zA-Z0-9_$.]+)\s*:'),
           (m) => '${m[1]}"${m[2]}":',
@@ -711,8 +766,46 @@ class LocalMongoEngine {
     try {
       return jsonDecode(cleaned);
     } catch (_) {
-      return jsonDecode(trimmed);
+      return jsonDecode(preprocessed);
     }
+  }
+
+  /// Converts Extended JSON wrappers (`{"$oid": ...}`, `{"$date": ...}`,
+  /// `{"$timestamp": ...}`) into the values the in-memory mirror stores:
+  /// ObjectIds keep their BSON type ([MongoObjectId]) and dates become ISO-8601
+  /// strings. [RealMongoService] applies the same shape to server documents and
+  /// reverses it when writing back.
+  dynamic _normalizeExtendedJson(dynamic value) {
+    if (value is Map) {
+      if (value.length == 1) {
+        if (value.containsKey(r'$oid')) {
+          final oid = value[r'$oid'];
+          if (oid is String) return MongoObjectId(oid);
+        }
+        if (value.containsKey(r'$date')) {
+          final date = value[r'$date'];
+          if (date is String) return date;
+          if (date is int) {
+            return DateTime.fromMillisecondsSinceEpoch(date).toIso8601String();
+          }
+        }
+        if (value.containsKey(r'$timestamp')) {
+          final ts = value[r'$timestamp'];
+          if (ts is Map && ts['t'] is int) {
+            return DateTime.fromMillisecondsSinceEpoch((ts['t'] as int) * 1000)
+                .toIso8601String();
+          }
+        }
+      }
+      return <String, dynamic>{
+        for (final entry in value.entries)
+          entry.key.toString(): _normalizeExtendedJson(entry.value),
+      };
+    }
+    if (value is List) {
+      return value.map(_normalizeExtendedJson).toList();
+    }
+    return value;
   }
 
   // ---------------------------------------------------------------------------
@@ -726,7 +819,8 @@ class LocalMongoEngine {
     }
     final stopwatch = Stopwatch()..start();
     try {
-      final results = _runPipeline(coll.documents, pipeline, dbName);
+      final normalizedPipeline = _normalizeExtendedJson(pipeline) as List;
+      final results = _runPipeline(coll.documents, normalizedPipeline, dbName);
       stopwatch.stop();
       return QueryResult(
         documents: results,
@@ -962,10 +1056,10 @@ class LocalMongoEngine {
           final opVal = opEntry.value;
           switch (op) {
             case '\$eq':
-              if (val != opVal) return false;
+              if (!_sameValue(val, opVal, looseId: key == '_id')) return false;
               break;
             case '\$ne':
-              if (val == opVal) return false;
+              if (_sameValue(val, opVal, looseId: key == '_id')) return false;
               break;
             case '\$gt':
               final c = _compare(val, opVal);
@@ -986,8 +1080,11 @@ class LocalMongoEngine {
             case '\$in':
               if (opVal is List) {
                 if (val is List) {
-                  if (!val.any((item) => opVal.contains(item))) return false;
-                } else if (!opVal.contains(val)) {
+                  if (!val.any((item) =>
+                      _anySameValue(opVal, item, looseId: key == '_id'))) {
+                    return false;
+                  }
+                } else if (!_anySameValue(opVal, val, looseId: key == '_id')) {
                   return false;
                 }
               }
@@ -995,8 +1092,11 @@ class LocalMongoEngine {
             case '\$nin':
               if (opVal is List) {
                 if (val is List) {
-                  if (val.any((item) => opVal.contains(item))) return false;
-                } else if (opVal.contains(val)) {
+                  if (val.any((item) =>
+                      _anySameValue(opVal, item, looseId: key == '_id'))) {
+                    return false;
+                  }
+                } else if (_anySameValue(opVal, val, looseId: key == '_id')) {
                   return false;
                 }
               }
@@ -1017,8 +1117,10 @@ class LocalMongoEngine {
         }
       } else {
         if (val is List) {
-          if (!val.contains(expected)) return false;
-        } else if (val != expected) {
+          if (!val.any((item) => _sameValue(item, expected, looseId: key == '_id'))) {
+            return false;
+          }
+        } else if (!_sameValue(val, expected, looseId: key == '_id')) {
           return false;
         }
       }
@@ -1091,6 +1193,25 @@ class LocalMongoEngine {
     }
     return null;
   }
+
+  /// Equality used by the filter matcher.
+  ///
+  /// For `_id`, a hex string and an [MongoObjectId] with the same value compare
+  /// equal, so the app's string-based id lookups keep working. For every other
+  /// field the types must match, which is what keeps a string field distinct
+  /// from an ObjectId field.
+  bool _sameValue(dynamic a, dynamic b, {required bool looseId}) {
+    if (a == b) return true;
+    if (looseId) {
+      final sa = a?.toString();
+      final sb = b?.toString();
+      if (sa != null && sb != null && sa == sb) return true;
+    }
+    return false;
+  }
+
+  bool _anySameValue(List candidates, dynamic value, {required bool looseId}) =>
+      candidates.any((candidate) => _sameValue(candidate, value, looseId: looseId));
 
   dynamic _resolvePath(dynamic obj, String path) {
     if (obj == null || path.isEmpty) return null;

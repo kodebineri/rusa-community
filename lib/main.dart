@@ -766,7 +766,7 @@ class _CompassAppState extends State<CompassApp> {
     setState(() {
       _editingDoc = null;
       _clonedDoc = Map<String, dynamic>.from(doc.data)
-        ..['_id'] = mongoEngine.generateObjectId();
+        ..['_id'] = MongoObjectId(mongoEngine.generateObjectId());
       _isInsertDocModalOpen = true;
     });
   }

@@ -1,11 +1,11 @@
-import 'dart:convert';
-
 import 'package:flutter/widgets.dart';
 import '../../icons/compass_svg_icons.dart';
+import '../../models/mongo_models.dart';
 import '../../services/mongo_engine.dart';
 import '../../theme/compass_theme.dart';
 import '../../theme/compass_typography.dart';
 import '../../utils/json_syntax_text_controller.dart';
+import '../../utils/mongo_json_encoder.dart';
 import 'compass_modal.dart';
 
 /// Converted from src/components/InsertDocModal.tsx
@@ -48,15 +48,13 @@ class _InsertDocumentModalState extends State<InsertDocumentModal> {
   bool _initializedController = false;
   String? _errorMsg;
 
-  static const JsonEncoder _encoder = JsonEncoder.withIndent('  ');
-
   String _defaultText() {
     final initial = widget.initialDoc;
     if (initial != null) {
-      return _encoder.convert(initial);
+      return encodeMongoJson(initial);
     }
-    return _encoder.convert({
-      '_id': mongoEngine.generateObjectId(),
+    return encodeMongoJson({
+      '_id': MongoObjectId(mongoEngine.generateObjectId()),
       'title': 'New Entry',
       'createdAt': DateTime.now().toIso8601String(),
       'status': 'active',
@@ -97,7 +95,7 @@ class _InsertDocumentModalState extends State<InsertDocumentModal> {
 
   void _submit() {
     try {
-      final parsed = jsonDecode(_controller.text);
+      final parsed = mongoEngine.tolerantParse(_controller.text);
       if (parsed is! Map) {
         setState(() => _errorMsg = 'Document must be a JSON object.');
         return;
@@ -115,10 +113,10 @@ class _InsertDocumentModalState extends State<InsertDocumentModal> {
 
   void _generateNewId() {
     try {
-      final parsed = jsonDecode(_controller.text);
+      final parsed = mongoEngine.tolerantParse(_controller.text);
       if (parsed is Map) {
-        parsed['_id'] = mongoEngine.generateObjectId();
-        _controller.text = _encoder.convert(parsed);
+        parsed['_id'] = MongoObjectId(mongoEngine.generateObjectId());
+        _controller.text = encodeMongoJson(parsed);
         setState(() => _errorMsg = null);
       }
     } catch (_) {

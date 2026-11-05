@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'package:flutter/widgets.dart';
 import '../../theme/compass_colors.dart';
 import '../../theme/compass_density.dart';
@@ -6,7 +5,9 @@ import '../../theme/compass_theme.dart';
 import '../../theme/compass_typography.dart';
 import '../../icons/compass_svg_icons.dart';
 import '../../models/mongo_models.dart';
+import '../../services/mongo_engine.dart';
 import '../../utils/json_syntax_text_controller.dart';
+import '../../utils/mongo_json_encoder.dart';
 import '../compass_icon_button.dart';
 import '../modals/compass_modal.dart';
 
@@ -44,8 +45,6 @@ class DocumentJsonView extends StatefulWidget {
 }
 
 class _DocumentJsonViewState extends State<DocumentJsonView> {
-  static const JsonEncoder _jsonEncoder = JsonEncoder.withIndent('  ');
-
   String? _editingId;
 
   /// Reused across edits so it is never disposed while an [EditableText] still
@@ -78,7 +77,7 @@ class _DocumentJsonViewState extends State<DocumentJsonView> {
   }
 
   void _startEditing(MongoDocument doc) {
-    _editController.text = _jsonEncoder.convert(doc.data);
+    _editController.text = encodeMongoJson(doc.data);
     setState(() {
       _editingId = doc.id;
       _editError = null;
@@ -95,7 +94,7 @@ class _DocumentJsonViewState extends State<DocumentJsonView> {
   void _saveEditing(MongoDocument doc) {
     Object? decoded;
     try {
-      decoded = jsonDecode(_editController.text);
+      decoded = mongoEngine.tolerantParse(_editController.text);
     } catch (_) {
       decoded = null;
     }
@@ -139,7 +138,7 @@ class _DocumentJsonViewState extends State<DocumentJsonView> {
   Widget _buildJsonCard(MongoDocument doc, int index) {
     final density = CompassDensity.of(context);
     final isEditing = _editingId == doc.id;
-    final formattedJson = _jsonEncoder.convert(doc.data);
+    final formattedJson = encodeMongoJson(doc.data);
 
     return Container(
       margin: EdgeInsets.only(bottom: density.isTouch ? 10.0 : 12.0),

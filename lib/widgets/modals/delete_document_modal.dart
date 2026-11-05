@@ -57,6 +57,13 @@ class _DeleteDocumentModalState extends State<DeleteDocumentModal> {
     });
   }
 
+  String get _idLabel {
+    final raw = widget.document?.data['_id'];
+    return raw is MongoObjectId
+        ? 'ObjectId("${widget.documentId}")'
+        : '"${widget.documentId}"';
+  }
+
   String get _docPreview {
     final doc = widget.document;
     if (doc == null) return '';
@@ -141,7 +148,7 @@ class _DeleteDocumentModalState extends State<DeleteDocumentModal> {
             children: [
               Expanded(
                 child: Text(
-                  'ObjectId("${widget.documentId}")',
+                  _idLabel,
                   overflow: TextOverflow.ellipsis,
                   style: CompassTypography.monoSmall(color: _theme.accent),
                 ),

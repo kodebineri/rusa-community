@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/services.dart';
 import 'package:rusa/utils/json_syntax_text_controller.dart';
+import 'package:rusa/utils/mongo_json_parser.dart';
 import '../theme/compass_colors.dart';
 import '../theme/compass_density.dart';
 import '../theme/compass_theme.dart';
@@ -212,7 +213,7 @@ class _CompassQueryBarState extends State<CompassQueryBar> {
     }
     var isValid = true;
     try {
-      final cleaned = value
+      final cleaned = preprocessMongoJson(value)
           .replaceAllMapped(
             RegExp(r'([{,]\s*)([a-zA-Z0-9_$.]+)\s*:'),
             (m) => '${m[1]}"${m[2]}":',

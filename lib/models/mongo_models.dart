@@ -2,6 +2,37 @@
 /// Equivalent to src/types/mongo.ts.
 library;
 
+/// A BSON ObjectId held in the in-memory mirror.
+///
+/// The bundled sample data stores ObjectIds as their 24-character hex strings,
+/// but a document read from a real MongoDB server keeps its ObjectId type as
+/// this wrapper. That preserves the distinction between a plain string and an
+/// ObjectId when a document is round-tripped through an editor: the JSON view
+/// renders it as Extended JSON (`{"$oid": "..."}`) and the parser turns
+/// `ObjectId("...")` back into a [MongoObjectId].
+class MongoObjectId implements Comparable<MongoObjectId> {
+  final String hex;
+
+  const MongoObjectId(this.hex);
+
+  @override
+  String toString() => hex;
+
+  /// Serialised by `dart:convert` as Extended JSON so it survives a
+  /// `JsonEncoder` round-trip through the document editors.
+  Map<String, dynamic> toJson() => {r'$oid': hex};
+
+  @override
+  int compareTo(MongoObjectId other) => hex.compareTo(other.hex);
+
+  @override
+  bool operator ==(Object other) =>
+      other is MongoObjectId && other.hex == hex;
+
+  @override
+  int get hashCode => hex.hashCode;
+}
+
 class MongoDocument {
   final String id;
   final Map<String, dynamic> data;

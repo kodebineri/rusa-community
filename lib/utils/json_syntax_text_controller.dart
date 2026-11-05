@@ -18,9 +18,10 @@ TextSpan buildJsonSyntaxSpan(
   final numberStyle = style?.copyWith(color: const Color(0xFFB5CEA8));
   final boolNullStyle = style?.copyWith(color: const Color(0xFF569CD6));
   final punctuationStyle = style?.copyWith(color: theme.textMuted);
+  final constructorStyle = style?.copyWith(color: theme.bsonObjectId);
 
   final regex = RegExp(
-    r'("(?:[^"\\]|\\.)*")\s*:|("(?:[^"\\]|\\.)*")|(\b-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?\b)|(\btrue\b|\bfalse\b|\bnull\b)|([{}\[\]:,])',
+    r'((?:new\s+)?ObjectId\s*\(\s*"(?:[^"\\]|\\.)*"\s*\)|(?:ISODate|new\s+Date)\s*\(\s*"(?:[^"\\]|\\.)*"\s*\))|("(?:[^"\\]|\\.)*")\s*:|("(?:[^"\\]|\\.)*")|(\b-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?\b)|(\btrue\b|\bfalse\b|\bnull\b)|([{}\[\]:,])',
     multiLine: true,
   );
 
@@ -37,17 +38,19 @@ TextSpan buildJsonSyntaxSpan(
     final fullMatch = match.group(0)!;
 
     if (match.group(1) != null) {
-      final keyText = match.group(1)!;
+      children.add(TextSpan(text: fullMatch, style: constructorStyle));
+    } else if (match.group(2) != null) {
+      final keyText = match.group(2)!;
       final colonText = fullMatch.substring(keyText.length);
       children.add(TextSpan(text: keyText, style: keyStyle));
       children.add(TextSpan(text: colonText, style: punctuationStyle));
-    } else if (match.group(2) != null) {
-      children.add(TextSpan(text: fullMatch, style: stringStyle));
     } else if (match.group(3) != null) {
-      children.add(TextSpan(text: fullMatch, style: numberStyle));
+      children.add(TextSpan(text: fullMatch, style: stringStyle));
     } else if (match.group(4) != null) {
-      children.add(TextSpan(text: fullMatch, style: boolNullStyle));
+      children.add(TextSpan(text: fullMatch, style: numberStyle));
     } else if (match.group(5) != null) {
+      children.add(TextSpan(text: fullMatch, style: boolNullStyle));
+    } else if (match.group(6) != null) {
       children.add(TextSpan(text: fullMatch, style: punctuationStyle));
     }
 

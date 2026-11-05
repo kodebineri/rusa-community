@@ -30,6 +30,23 @@ import 'package:rusa/widgets/views/document_tree_view.dart';
 import 'package:rusa/widgets/views/indexes_view.dart';
 import 'package:rusa/widgets/views/schema_view.dart';
 
+/// Parses the mongosh-flavoured text an editor shows and unwraps the Extended
+/// JSON constructors (`ObjectId("...")` / `ISODate("...")`) back to the plain
+/// values the engine stores, so tests can compare against `doc.data`.
+dynamic unwrapMongoEditorText(String text) =>
+    _unwrapExtended(mongoEngine.tolerantParse(text));
+
+dynamic _unwrapExtended(dynamic value) {
+  if (value is MongoObjectId) return value.hex;
+  if (value is Map) {
+    if (value.length == 1 && value[r'$oid'] is String) return value[r'$oid'];
+    if (value.length == 1 && value.containsKey(r'$date')) return value[r'$date'];
+    return value.map((k, v) => MapEntry(k.toString(), _unwrapExtended(v)));
+  }
+  if (value is List) return value.map(_unwrapExtended).toList();
+  return value;
+}
+
 /// A fresh `CompassApp` boots into the connection popup (`_isConnectModalOpen
 /// = true`), which covers the shell. Close it before driving the shell, or the
 /// taps land on the modal backdrop instead of the header/sidebar/tabs.
@@ -631,9 +648,9 @@ void main() {
       matching: find.byType(EditableText),
     );
     expect(editor, findsOneWidget);
-    final parsed =
-        jsonDecode(tester.widget<EditableText>(editor).controller.text)
-            as Map<String, dynamic>;
+    final parsed = unwrapMongoEditorText(
+      tester.widget<EditableText>(editor).controller.text,
+    ) as Map<String, dynamic>;
     final existingIds = booksColl.documents.map((d) => d.id).toSet();
     expect(
       existingIds.contains(parsed['_id']),
@@ -642,7 +659,9 @@ void main() {
     );
     bool isCopyOf(Map<String, dynamic> candidate, MongoDocument doc) {
       final a = Map<String, dynamic>.from(candidate)..remove('_id');
-      final b = Map<String, dynamic>.from(doc.data)..remove('_id');
+      final b = Map<String, dynamic>.from(
+        _unwrapExtended(doc.data) as Map<String, dynamic>,
+      )..remove('_id');
       return jsonEncode(a) == jsonEncode(b);
     }
 
@@ -1080,9 +1099,9 @@ void main() {
     // Only the edited card swaps its pencil for Save/Cancel.
     expect(editIcon, findsNWidgets(originalCount - 1));
 
-    final edited =
-        jsonDecode(tester.widget<EditableText>(editor).controller.text)
-            as Map<String, dynamic>;
+    final edited = unwrapMongoEditorText(
+      tester.widget<EditableText>(editor).controller.text,
+    ) as Map<String, dynamic>;
     edited['copies_available'] = 1234;
     edited.remove('rating'); // deleting a field must delete it persistently
     await tester.enterText(editor, jsonEncode(edited));
@@ -1105,7 +1124,7 @@ void main() {
         reason: 'the edited field must be persisted to the engine');
     expect(saved.data.containsKey('rating'), isFalse,
         reason: 'a field removed from the JSON must be removed persistently');
-    expect(saved.data['_id'], firstId,
+    expect(saved.id, firstId,
         reason: 'the document identity must be preserved');
     // The editor closes and the pencil returns.
     expect(
@@ -1136,7 +1155,7 @@ void main() {
     final first = books.documents.firstWhere((d) => d.id == firstId);
     expect(first.data['title'], 'Rewritten');
     expect(first.data['copies_available'], 7);
-    expect(first.data['_id'], firstId);
+    expect(first.id, firstId);
     expect(first.data.containsKey('author'), isFalse,
         reason: 'a plain update document replaces, it does not merge');
     expect(first.data.containsKey('rating'), isFalse);

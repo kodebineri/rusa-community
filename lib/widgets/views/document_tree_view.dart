@@ -101,7 +101,9 @@ class DocumentTreeView extends StatelessWidget {
                             border: Border.all(color: theme.greenBadgeBorder, width: 1.0),
                           ),
                           child: Text(
-                            'ObjectId("${doc.id}")',
+                            doc.data['_id'] is MongoObjectId
+                                ? 'ObjectId("${doc.id}")'
+                                : '"${doc.id}"',
                             overflow: TextOverflow.ellipsis,
                             maxLines: 1,
                             style: CompassTypography.monoBold(color: theme.accent, size: 11.0),
@@ -191,10 +193,8 @@ class _TreeNodeWidgetState extends State<_TreeNodeWidget> {
     if (val == null) return 'null';
     if (val is bool) return 'Boolean';
     if (val is int || val is double) return 'number';
+    if (val is MongoObjectId) return 'ObjectId';
     if (val is String) {
-      if (val.length == 24 && RegExp(r'^[a-fA-F0-9]{24}$').hasMatch(val)) {
-        return 'ObjectId';
-      }
       // Detect ISO 8601 date strings
       if (RegExp(r'^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:?\d{2})?$').hasMatch(val)) {
         return 'Date';
@@ -224,6 +224,23 @@ class _TreeNodeWidgetState extends State<_TreeNodeWidget> {
       default:
         return theme.textSecondary;
     }
+  }
+
+  /// The raw value as a leaf row shows it. ObjectId / Date keep the plain
+  /// string form (quoted) — the type is conveyed by the separate type badge and
+  /// the value colour, not by a `ObjectId(...)` / `ISODate(...)` wrapper.
+  String _displayValue(String type) {
+    final value = widget.value;
+    if (type == 'String') return '"$value"';
+    if (type == 'Date') {
+      final raw = value is DateTime ? value.toIso8601String() : '$value';
+      return '"$raw"';
+    }
+    if (type == 'ObjectId') {
+      final hex = value is MongoObjectId ? value.hex : '$value';
+      return '"$hex"';
+    }
+    return '$value';
   }
 
   @override
@@ -293,7 +310,7 @@ class _TreeNodeWidgetState extends State<_TreeNodeWidget> {
                   Expanded(
                     flex: 5,
                     child: Text(
-                      type == 'String' ? '"${widget.value}"' : type == 'Date' ? 'ISODate("${widget.value}")' : '${widget.value}',
+                      _displayValue(type),
                       overflow: TextOverflow.ellipsis,
                       maxLines: 1,
                       style: CompassTypography.monoRegular(
@@ -333,7 +350,7 @@ class _TreeNodeWidgetState extends State<_TreeNodeWidget> {
                 if (!isExpandable)
                   Expanded(
                     child: Text(
-                      type == 'String' ? '"${widget.value}"' : type == 'Date' ? 'ISODate("${widget.value}")' : '${widget.value}',
+                      _displayValue(type),
                       style: CompassTypography.monoRegular(
                         color: _getTypeColor(type, _theme),
                         size: 12.0,

@@ -454,7 +454,13 @@ class RealMongoService extends LocalMongoEngine {
   @override
   MongoDocument insertDocument(String dbName, String collName, Map<String, dynamic> doc) {
     final inserted = super.insertDocument(dbName, collName, doc);
-    _fireCollection(dbName, collName, (c) => c.insertOne(_denormalizeDoc(inserted.data)));
+    // Send the *original* values (including `{"$oid": ...}` wrappers) so the
+    // server stores real ObjectIds; a string `_id` is left as a string.
+    final serverDoc = _denormalizeDoc(<String, dynamic>{
+      ...doc,
+      '_id': doc['_id'] ?? inserted.data['_id'],
+    });
+    _fireCollection(dbName, collName, (c) => c.insertOne(serverDoc));
     return inserted;
   }
 
@@ -467,23 +473,26 @@ class RealMongoService extends LocalMongoEngine {
   ) {
     final ok = super.updateDocument(dbName, collName, docId, updatedFields);
     if (!ok) return false;
+    // Preserve the `_id` type of the stored document: a string `_id` stays a
+    // string even if it looks like a 24-char hex ObjectId.
+    final serverId = _serverId(dbName, collName, docId);
     final hasOperator =
         updatedFields.keys.any((k) => k.toString().startsWith(r'$'));
     if (hasOperator) {
       _fireCollection(
         dbName,
         collName,
-        (c) => c.updateOne({'_id': _toObjectId(docId)}, _toServerUpdate(updatedFields)),
+        (c) => c.updateOne({'_id': serverId}, _toServerUpdate(updatedFields)),
       );
     } else {
       // A plain map is a full replacement, so fields omitted from it are
       // removed on the server too (matching the local mirror).
-      final replacement = _denormalizeDoc({...updatedFields, '_id': docId});
-      replacement['_id'] = _toObjectId(docId);
+      final replacement = _denormalizeDoc({...updatedFields, '_id': serverId});
+      replacement['_id'] = serverId;
       _fireCollection(
         dbName,
         collName,
-        (c) => c.replaceOne({'_id': _toObjectId(docId)}, replacement),
+        (c) => c.replaceOne({'_id': serverId}, replacement),
       );
     }
     return true;
@@ -491,25 +500,32 @@ class RealMongoService extends LocalMongoEngine {
 
   @override
   bool deleteDocument(String dbName, String collName, String docId) {
+    // Resolve the server id *before* the mirror document is removed.
+    final serverId = _serverId(dbName, collName, docId);
     final ok = super.deleteDocument(dbName, collName, docId);
     if (ok) {
-      _fireCollection(dbName, collName, (c) => c.deleteOne({'_id': _toObjectId(docId)}));
+      _fireCollection(dbName, collName, (c) => c.deleteOne({'_id': serverId}));
     }
     return ok;
   }
 
   @override
   bool deleteOne(String dbName, String collName, Map filter) {
+    // Resolve the filter against the mirror *before* it is mutated.
+    final serverFilter = _denormalizeFilter(dbName, collName, filter);
     final ok = super.deleteOne(dbName, collName, filter);
-    if (ok) _fireCollection(dbName, collName, (c) => c.deleteOne(_denormalizeFilter(filter)));
+    if (ok) {
+      _fireCollection(dbName, collName, (c) => c.deleteOne(serverFilter));
+    }
     return ok;
   }
 
   @override
   int deleteMany(String dbName, String collName, Map filter) {
+    final serverFilter = _denormalizeFilter(dbName, collName, filter);
     final removed = super.deleteMany(dbName, collName, filter);
     if (removed > 0) {
-      _fireCollection(dbName, collName, (c) => c.deleteMany(_denormalizeFilter(filter)));
+      _fireCollection(dbName, collName, (c) => c.deleteMany(serverFilter));
     }
     return removed;
   }
@@ -517,6 +533,9 @@ class RealMongoService extends LocalMongoEngine {
   @override
   int updateMany(String dbName, String collName, Map filter, Map update) {
     final hasOperator = update.keys.any((k) => k.toString().startsWith(r'$'));
+
+    // Resolve everything that depends on the mirror *before* it is mutated.
+    final serverFilter = _denormalizeFilter(dbName, collName, filter);
 
     // For a replacement update, capture the matching ids *before* the mirror is
     // mutated: replacing can change the field the filter matched on, so a later
@@ -534,6 +553,11 @@ class RealMongoService extends LocalMongoEngine {
             .documents
             .map((d) => d.id)
             .toList(growable: false);
+    // Resolve each id's server representation now, while the mirror still holds
+    // the original `_id` type.
+    final serverIdByTarget = <String, Object>{
+      for (final id in targetIds) id: _serverId(dbName, collName, id),
+    };
 
     final count = super.updateMany(dbName, collName, filter, update);
     if (count == 0) return count;
@@ -542,22 +566,23 @@ class RealMongoService extends LocalMongoEngine {
       _fireCollection(
         dbName,
         collName,
-        (c) => c.updateMany(_denormalizeFilter(filter), _toServerUpdate(update)),
+        (c) => c.updateMany(serverFilter, _toServerUpdate(update)),
       );
     } else {
       // A plain map is a full replacement: replay one `replaceOne` per matched
       // document so fields omitted from the replacement are removed on the
       // server too (matching the local mirror).
       for (final id in targetIds) {
+        final serverId = serverIdByTarget[id] ?? _toObjectId(id);
         final replacement = _denormalizeDoc(<String, dynamic>{
           for (final entry in update.entries) entry.key.toString(): entry.value,
-          '_id': id,
+          '_id': serverId,
         });
-        replacement['_id'] = _toObjectId(id);
+        replacement['_id'] = serverId;
         _fireCollection(
           dbName,
           collName,
-          (c) => c.replaceOne({'_id': _toObjectId(id)}, replacement),
+          (c) => c.replaceOne({'_id': serverId}, replacement),
         );
       }
     }
@@ -598,10 +623,14 @@ class RealMongoService extends LocalMongoEngine {
       final db = getDatabase(dbName);
       final coll = db?.collections[initialCollName];
       if (coll != null && coll.documents.isNotEmpty) {
+        final seed = coll.documents.first.data;
         _fireCollection(
           dbName,
           initialCollName,
-          (c) => c.insertOne(_denormalizeDoc(coll.documents.first.data)),
+          (c) => c.insertOne(_denormalizeDoc(<String, dynamic>{
+            ...seed,
+            '_id': _toObjectId(seed['_id'].toString()),
+          })),
         );
       }
     }
@@ -690,7 +719,11 @@ class RealMongoService extends LocalMongoEngine {
     if (ok) {
       _fireDb(
         dbName,
-        (db) => db.createView(viewName.trim(), sourceCollName, pipeline),
+        (db) => db.createView(
+          viewName.trim(),
+          sourceCollName,
+          _denormalizeValue(pipeline) as List,
+        ),
       );
     }
     return ok;
@@ -898,7 +931,7 @@ class RealMongoService extends LocalMongoEngine {
 
   dynamic _normalizeValue(dynamic value) {
     if (value == null) return null;
-    if (value is mdb.ObjectId) return value.oid;
+    if (value is mdb.ObjectId) return MongoObjectId(value.oid);
     if (value is DateTime) return value.toIso8601String();
     if (value is Uint8List) return base64Encode(value);
     if (value is Map) return _normalizeMap(value);
@@ -917,6 +950,7 @@ class RealMongoService extends LocalMongoEngine {
 
   dynamic _denormalizeValue(dynamic value) {
     if (value == null) return null;
+    if (value is MongoObjectId) return _toObjectId(value.hex);
     if (value is String) {
       // Try to detect ISO date strings that should become DateTime for server
       if (RegExp(r'^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:?\d{2})?$').hasMatch(value)) {
@@ -975,27 +1009,77 @@ class RealMongoService extends LocalMongoEngine {
     return value;
   }
 
-  Map<String, dynamic> _denormalizeFilter(Map filter) {
+  /// Resolves the server-side `_id` for a mirrored document: it becomes a BSON
+  /// ObjectId only when the mirror actually holds a [MongoObjectId]. A document
+  /// stored with a string `_id` (even a 24-char hex one) is sent back as a
+  /// string.
+  Object _serverId(String dbName, String collName, String docId) {
+    final coll = getCollection(dbName, collName);
+    if (coll != null) {
+      for (final doc in coll.documents) {
+        if (doc.id == docId) {
+          final raw = doc.data['_id'];
+          if (raw is MongoObjectId) return _toObjectId(raw.hex);
+          if (raw is String) return raw;
+          break;
+        }
+      }
+    }
+    // Unknown document: keep a valid ObjectId-shaped id as an ObjectId.
+    return _toObjectId(docId);
+  }
+
+  /// Same as [_serverId] but for a filter value, and without the ObjectId
+  /// fallback: a string `_id` filter stays a string unless the mirror shows the
+  /// document's `_id` is an ObjectId.
+  Object _serverIdValue(String dbName, String collName, String id) {
+    final coll = getCollection(dbName, collName);
+    if (coll != null) {
+      for (final doc in coll.documents) {
+        if (doc.id == id) {
+          final raw = doc.data['_id'];
+          if (raw is MongoObjectId) return _toObjectId(raw.hex);
+          break;
+        }
+      }
+    }
+    return id;
+  }
+
+  Map<String, dynamic> _denormalizeFilter(
+    String dbName,
+    String collName,
+    Map filter,
+  ) {
     final out = <String, dynamic>{};
     filter.forEach((k, v) {
       final key = k.toString();
       final denorm = _denormalizeValue(v);
-      out[key] = key == '_id' && denorm is String ? _toObjectId(denorm) : denorm;
+      out[key] = key == '_id' && denorm is String
+          ? _serverIdValue(dbName, collName, denorm)
+          : denorm;
     });
     return out;
   }
 
   Map<String, dynamic> _toServerUpdate(Map fields) {
     final hasOperator = fields.keys.any((k) => k.toString().startsWith(r'$'));
-    if (hasOperator) return fields.map((k, v) => MapEntry(k.toString(), v));
+    if (hasOperator) {
+      return fields.map(
+        (k, v) => MapEntry(k.toString(), _denormalizeValue(v)),
+      );
+    }
     return {
-      r'$set': fields.map((k, v) => MapEntry(k.toString(), v)),
+      r'$set': fields.map(
+        (k, v) => MapEntry(k.toString(), _denormalizeValue(v)),
+      ),
     };
   }
 
   Object _toObjectId(String hex) => mdb.ObjectId.tryParse(hex) ?? hex;
 
   String _bsonTypeName(dynamic value) {
+    if (value is MongoObjectId) return 'ObjectId';
     if (value is String) return 'String';
     if (value is bool) return 'Boolean';
     if (value is int) return 'Int32';
