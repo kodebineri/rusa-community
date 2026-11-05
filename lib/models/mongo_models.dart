@@ -92,6 +92,16 @@ class MongoCollection {
   String? viewOn;
   List<dynamic>? pipeline;
 
+  /// True while a live server is still fetching this collection's documents.
+  /// The UI shows a loading state instead of a "0 documents" count.
+  bool isLoading;
+
+  /// The server's total document count, when known.
+  ///
+  /// The in-memory mirror may hold fewer documents than this (very large
+  /// collections are capped), so the sidebar shows this value when available.
+  int? documentCount;
+
   MongoCollection({
     required this.name,
     required this.documents,
@@ -102,6 +112,8 @@ class MongoCollection {
     this.isView = false,
     this.viewOn,
     this.pipeline,
+    this.isLoading = false,
+    this.documentCount,
   });
 }
 

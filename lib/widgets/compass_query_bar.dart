@@ -32,6 +32,10 @@ class CompassQueryBar extends StatefulWidget {
   final double? executionTimeMs;
   final int? totalResultsCount;
 
+  /// True while the active collection's documents are still loading from a live
+  /// server, so the stats ribbon can show progress instead of "0".
+  final bool isLoading;
+
   /// Whether the options panel (project / sort / skip / limit) is expanded.
   ///
   /// The state lives in the host so that the overflow action sheet — which
@@ -60,6 +64,7 @@ class CompassQueryBar extends StatefulWidget {
     required this.onOpenOverflow,
     this.executionTimeMs,
     this.totalResultsCount,
+    this.isLoading = false,
   });
 
   @override
@@ -454,7 +459,7 @@ class _CompassQueryBarState extends State<CompassQueryBar> {
                         style: CompassTypography.monoSmall(
                             color: theme.textSecondary)),
                     Text(
-                      '${widget.totalResultsCount ?? 0}',
+                      widget.isLoading ? '…' : '${widget.totalResultsCount ?? 0}',
                       style: CompassTypography.monoBold(
                           color: theme.textPrimary, size: 11.0),
                     ),

@@ -7,6 +7,7 @@ import '../icons/compass_svg_icons.dart';
 import '../models/mongo_models.dart';
 import 'compass_hover.dart';
 import 'compass_icon_button.dart';
+import 'compass_spinner.dart';
 
 /// Converted from src/components/Sidebar.tsx
 /// Adheres strictly to:
@@ -29,6 +30,10 @@ class CompassSidebar extends StatefulWidget {
   final Function(String dbName, String collName) onDropColl;
   final VoidCallback onRefresh;
 
+  /// Called when a database is expanded, so the host can lazily fetch that
+  /// database's collection counts (counts are not pre-fetched at connect).
+  final Function(String dbName)? onExpandDb;
+
   const CompassSidebar({
     super.key,
     required this.databases,
@@ -43,6 +48,7 @@ class CompassSidebar extends StatefulWidget {
     required this.onDropDb,
     required this.onDropColl,
     required this.onRefresh,
+    this.onExpandDb,
   });
 
   @override
@@ -54,15 +60,52 @@ class _CompassSidebarState extends State<CompassSidebar> {
     'library': true,
     'social_networks': true,
   };
+
+  /// Databases whose collection counts have already been requested, so they are
+  /// not fetched again on every rebuild.
+  final Set<String> _countsRequested = {};
+
   String _searchQuery = '';
   final TextEditingController _searchController = TextEditingController();
 
   CompassTheme get _theme => CompassTheme.of(context);
 
+  @override
+  void initState() {
+    super.initState();
+    _requestCountsForExpanded();
+  }
+
+  @override
+  void didUpdateWidget(covariant CompassSidebar oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Collections can appear after the database was expanded; fetch their
+    // counts once they exist.
+    _requestCountsForExpanded();
+  }
+
+  /// Asks the host to lazily fetch counts for every expanded database that has
+  /// collections but hasn't been counted yet.
+  void _requestCountsForExpanded() {
+    if (widget.onExpandDb == null) return;
+    for (final db in widget.databases) {
+      if ((_expandedDbs[db.name] ?? false) &&
+          db.collections.isNotEmpty &&
+          _countsRequested.add(db.name)) {
+        widget.onExpandDb!(db.name);
+      }
+    }
+  }
+
   void _toggleDb(String dbName) {
+    final willExpand = !(_expandedDbs[dbName] ?? false);
     setState(() {
-      _expandedDbs[dbName] = !(_expandedDbs[dbName] ?? false);
+      _expandedDbs[dbName] = willExpand;
+      if (willExpand) {
+        _countsRequested.remove(dbName);
+      }
     });
+    if (willExpand) _requestCountsForExpanded();
   }
 
   @override
@@ -416,6 +459,23 @@ class _CompassSidebarState extends State<CompassSidebar> {
     );
   }
 
+  /// Trailing document count for a collection row.
+  ///
+  /// Shows the server count once known, the mirror length for the bundled
+  /// sample data, a spinner while the collection is being opened, and a neutral
+  /// dash before the count has been fetched (never a misleading "0").
+  Widget _buildCollectionCount(MongoCollection coll) {
+    if (coll.isLoading) {
+      return CompassSpinner(size: 11.0, color: _theme.textMuted);
+    }
+    final int? count = coll.documentCount ??
+        (coll.documents.isNotEmpty ? coll.documents.length : null);
+    return Text(
+      count?.toString() ?? '—',
+      style: CompassTypography.monoSmall(color: _theme.textMuted),
+    );
+  }
+
   Widget _buildCollectionItem(String dbName, MongoCollection coll) {
     final isSelected =
         widget.selectedDb == dbName && widget.selectedColl == coll.name;
@@ -468,10 +528,7 @@ class _CompassSidebarState extends State<CompassSidebar> {
             Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text(
-                  '${coll.documents.length}',
-                  style: CompassTypography.monoSmall(color: _theme.textMuted),
-                ),
+                _buildCollectionCount(coll),
                 const SizedBox(width: 6.0),
                 CompassIconButton(
                   svgString: CompassSvgIcons.pencil,

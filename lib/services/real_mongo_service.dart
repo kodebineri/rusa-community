@@ -26,9 +26,13 @@ class RealMongoService extends LocalMongoEngine {
     }
   }
 
-  /// Maximum number of documents mirrored per collection, to keep very large
-  /// collections (e.g. an oplog) from freezing the UI.
+  /// Maximum number of documents mirrored per collection during the eager
+  /// background load, to keep very large collections from freezing the UI.
+  /// When the user opens a collection, up to [maxDocsWhenOpened] are loaded.
   static const int maxDocsPerCollection = 5000;
+
+  /// Cap for the on-demand load performed when the user opens a collection.
+  static const int maxDocsWhenOpened = 50000;
 
   final String uri;
   final mdb.Db _primary;
@@ -97,9 +101,10 @@ class RealMongoService extends LocalMongoEngine {
     return service;
   }
 
-  /// Fast reload: list DBs and collection names immediately so the UI tree
-  /// accurately represents every database right away, then defer loading
-  /// documents/indexes to the background.
+  /// Fast reload: list databases and collection names immediately so the UI
+  /// tree is accurate right away. Documents are **not** preloaded (that was
+  /// memory-heavy); they load only when the user opens a collection. A cheap
+  /// per-collection `count()` is fetched so the sidebar can show real counts.
   Future<void> reloadFast() async {
     try {
       final names = await _primary.listDatabases().timeout(const Duration(seconds: 10));
@@ -128,8 +133,8 @@ class RealMongoService extends LocalMongoEngine {
         dbNames.add(dbName);
       }
 
-      // For faster first connect, create DB entries immediately with empty collections
-      // and load collections in background
+      // Create DB entries immediately with empty collections; names and counts
+      // are filled in the background.
       for (final dbName in dbNames) {
         result.add(MongoDatabase(name: dbName, collections: const {}));
       }
@@ -137,9 +142,10 @@ class RealMongoService extends LocalMongoEngine {
       databases = result;
       if (!_disposed) onDataChanged?.call();
 
-      // Load collection names and documents in background (non-blocking)
+      // List collection names in the background. Counts are fetched lazily,
+      // only for a database the user expands (or the collection they open), so
+      // connecting never pre-counts or pre-loads every collection.
       unawaited(_loadCollectionsFast(dbNames));
-      unawaited(_loadAllDataInBackground());
     } catch (e) {
       rethrow;
     }
@@ -170,7 +176,7 @@ class RealMongoService extends LocalMongoEngine {
           );
         }
         final idx = databases.indexWhere((d) => d.name == dbName);
-        if (idx >= 0 && !_disposed) {
+        if (idx >= 0 && !_disposed && databases[idx].collections.isEmpty) {
           databases[idx] = MongoDatabase(name: dbName, collections: colls);
           onDataChanged?.call();
         }
@@ -199,95 +205,71 @@ class RealMongoService extends LocalMongoEngine {
     return await dbHandle.getCollectionInfos().timeout(const Duration(seconds: 8));
   }
 
-  Future<void> _loadAllDataInBackground() async {
+  /// Fetches the server's document count for every collection in [dbName].
+  ///
+  /// Called when the user expands a database (and after opening a collection),
+  /// so counts are never pre-fetched for the whole server at connect time.
+  Future<void> loadCollectionCounts(String dbName) async {
     if (_disposed) return;
-    for (final db in List<MongoDatabase>.from(databases)) {
+    // Skip system databases to prevent slow scans or permission errors
+    if (dbName == 'admin' || dbName == 'config' || dbName == 'local') return;
+
+    final db = getDatabase(dbName);
+    if (db == null) return;
+
+    mdb.Db dbHandle;
+    try {
+      dbHandle = await _openDb(dbName);
+    } catch (_) {
+      return;
+    }
+    if (_disposed) return;
+
+    var changed = false;
+    for (final coll in List<MongoCollection>.from(db.collections.values)) {
       if (_disposed) break;
-      // Skip system databases to prevent slow scans or permission errors
-      if (db.name == 'admin' || db.name == 'config' || db.name == 'local') continue;
-
       try {
-        final dbHandle = await _openDb(db.name);
-        if (_disposed) break;
-
-        final currentDb = databases.firstWhere((d) => d.name == db.name, orElse: () => db);
-        final updatedColls = Map<String, MongoCollection>.from(currentDb.collections);
-
-        // If collections were not populated during reloadFast, get them now
-        if (updatedColls.isEmpty) {
-          final infos = await _getCollectionInfos(db.name).timeout(const Duration(seconds: 10));
-          for (final info in infos) {
-            final collName = info['name']?.toString() ?? '';
-            if (collName.isEmpty || collName.startsWith('system.')) continue;
-            final isView = info['type']?.toString() == 'view';
-            final options = info['options'];
-            final optionsMap = options is Map
-                ? options.map((k, v) => MapEntry(k.toString(), v))
-                : const <String, dynamic>{};
-            updatedColls[collName] = MongoCollection(
-              name: collName,
-              documents: const [],
-              indexes: [MongoIndex(name: '_id_', keys: const {'_id': 1})],
-              isView: isView,
-              viewOn: isView ? optionsMap['viewOn']?.toString() : null,
-              pipeline: isView ? (optionsMap['pipeline'] as List?)?.toList() : null,
-            );
-          }
-        }
-
-        for (final collEntry in updatedColls.entries) {
-          if (_disposed) break;
-          final collName = collEntry.key;
-          final meta = collEntry.value;
-
-          try {
-            final coll = dbHandle.collection(collName);
-            final docs = await _loadDocuments(coll).timeout(const Duration(seconds: 10));
-            final indexes = meta.isView
-                ? [MongoIndex(name: '_id_', keys: const {'_id': 1})]
-                : await _loadIndexes(coll).timeout(const Duration(seconds: 8));
-
-            updatedColls[collName] = MongoCollection(
-              name: collName,
-              documents: docs,
-              indexes: indexes,
-              isView: meta.isView,
-              viewOn: meta.viewOn,
-              pipeline: meta.pipeline,
-            );
-          } catch (_) {
-            // Keep collection as-is if loading documents fails
-          }
-        }
-
-        final idx = databases.indexWhere((d) => d.name == db.name);
-        if (idx >= 0) {
-          databases[idx] = MongoDatabase(name: db.name, collections: updatedColls);
-          if (!_disposed) onDataChanged?.call();
-        }
+        final count = await dbHandle
+            .collection(coll.name)
+            .count()
+            .timeout(const Duration(seconds: 15));
+        coll.documentCount = count;
+        changed = true;
       } catch (_) {
-        continue;
+        // Leave the count unknown; the sidebar shows a placeholder.
       }
     }
-    if (!_disposed) onDataChanged?.call();
+    if (changed && !_disposed) onDataChanged?.call();
   }
 
   /// Loads documents and indexes for a specific collection on-demand.
   Future<void> loadCollectionData(String dbName, String collName) async {
     final coll = getCollection(dbName, collName);
     if (coll == null) return;
+    final showSpinner = coll.documents.isEmpty;
+    if (showSpinner && !coll.isLoading) {
+      coll.isLoading = true;
+      if (!_disposed) onDataChanged?.call();
+    }
     try {
       final dbHandle = await _openDb(dbName);
       final c = dbHandle.collection(collName);
-      final docs = await _loadDocuments(c).timeout(const Duration(seconds: 10));
+      final docs = await _loadDocuments(c, limit: maxDocsWhenOpened)
+          .timeout(const Duration(seconds: 30));
       final indexes = coll.isView
           ? [MongoIndex(name: '_id_', keys: const {'_id': 1})]
           : await _loadIndexes(c).timeout(const Duration(seconds: 8));
+      final count = await _loadDocumentCount(c);
 
       coll.documents = docs;
       coll.indexes = indexes;
+      coll.documentCount = count ?? coll.documentCount;
+      coll.isLoading = false;
       if (!_disposed) onDataChanged?.call();
-    } catch (_) {}
+    } catch (_) {
+      coll.isLoading = false;
+      if (!_disposed) onDataChanged?.call();
+    }
   }
 
   /// Re-reads every database, collection, document and index from the server.
@@ -334,6 +316,7 @@ class RealMongoService extends LocalMongoEngine {
             final indexes = isView
                 ? [MongoIndex(name: '_id_', keys: const {'_id': 1})]
                 : await _loadIndexes(coll);
+            final count = await _loadDocumentCount(coll);
 
             colls[collName] = MongoCollection(
               name: collName,
@@ -342,6 +325,7 @@ class RealMongoService extends LocalMongoEngine {
               isView: isView,
               viewOn: isView ? optionsMap['viewOn']?.toString() : null,
               pipeline: isView ? (optionsMap['pipeline'] as List?)?.toList() : null,
+              documentCount: count,
             );
           } catch (_) {
             colls[collName] = MongoCollection(
@@ -417,14 +401,26 @@ class RealMongoService extends LocalMongoEngine {
     return db;
   }
 
-  Future<List<MongoDocument>> _loadDocuments(mdb.DbCollection coll) async {
+  Future<List<MongoDocument>> _loadDocuments(
+    mdb.DbCollection coll, {
+    int limit = maxDocsPerCollection,
+  }) async {
     final docs = <MongoDocument>[];
-    final stream = coll.find(mdb.where.limit(maxDocsPerCollection));
+    final stream = coll.find(mdb.where.limit(limit));
     await for (final raw in stream) {
       docs.add(MongoDocument.fromMap(_normalizeMap(raw)));
-      if (docs.length >= maxDocsPerCollection) break;
+      if (docs.length >= limit) break;
     }
     return docs;
+  }
+
+  /// The server's total document count for [coll], or null if it can't be read.
+  Future<int?> _loadDocumentCount(mdb.DbCollection coll) async {
+    try {
+      return await coll.count().timeout(const Duration(seconds: 10));
+    } catch (_) {
+      return null;
+    }
   }
 
   Future<List<MongoIndex>> _loadIndexes(mdb.DbCollection coll) async {

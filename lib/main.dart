@@ -19,6 +19,7 @@ import 'widgets/compass_hover.dart';
 import 'widgets/compass_icon_button.dart';
 import 'widgets/collection_tab_bar.dart';
 import 'widgets/compass_sidebar.dart';
+import 'widgets/compass_spinner.dart';
 import 'widgets/compass_query_bar.dart';
 import 'widgets/compass_terminal.dart';
 import 'widgets/views/document_tree_view.dart';
@@ -1010,6 +1011,10 @@ class _CompassAppState extends State<CompassApp> {
         final activeDb = service.getDatabase(_selectedDbName);
         final activeColl = activeDb?.collections[_selectedCollName];
         final docs = activeColl?.documents ?? [];
+        // A live collection that is still streaming documents down.
+        final isCollLoading = activeColl != null &&
+            activeColl.isLoading &&
+            activeColl.documents.isEmpty;
         final queryResult = service.findDocuments(
             _selectedDbName, _selectedCollName, _queryOptions);
         final pageDocs = queryResult.documents;
@@ -1101,6 +1106,12 @@ class _CompassAppState extends State<CompassApp> {
                             onRefresh: () {
                               setState(() {});
                             },
+                            onExpandDb: (dbName) {
+                              final service = mongoEngine;
+                              if (service is RealMongoService) {
+                                unawaited(service.loadCollectionCounts(dbName));
+                              }
+                            },
                           ),
 
                         // Active Collection Main Pane
@@ -1150,12 +1161,14 @@ class _CompassAppState extends State<CompassApp> {
                                   },
                                   executionTimeMs: queryResult.executionTimeMs,
                                   totalResultsCount: queryResult.totalCount,
+                                  isLoading: isCollLoading,
                                 ),
 
                               // Documents View Sub-Header: Pagination
                               if (_activeTabIndex >= 0 &&
                                   _activeTab == 'documents')
-                                _buildDocumentsPagination(queryResult),
+                                _buildDocumentsPagination(queryResult,
+                                    isLoading: isCollLoading),
 
                               // Active Tab Content View
                               Expanded(
@@ -1896,14 +1909,16 @@ class _CompassAppState extends State<CompassApp> {
   /// the left, and the result range with the Prev/Next page navigator sits on
   /// the right. The page controls adjust the `skip` value on the shared
   /// [QueryFilterOptions]; `limit` acts as the page size.
-  Widget _buildDocumentsPagination(QueryResult result) {
+  Widget _buildDocumentsPagination(QueryResult result, {bool isLoading = false}) {
     final total = result.totalCount;
     final pageSize = _queryOptions.limit < 1 ? 1 : _queryOptions.limit;
     final skip = _queryOptions.skip < 0 ? 0 : _queryOptions.skip;
     final pageCount = result.documents.length;
 
     String rangeLabel;
-    if (pageCount == 0 || total == 0) {
+    if (isLoading) {
+      rangeLabel = 'Loading documents…';
+    } else if (pageCount == 0 || total == 0) {
       rangeLabel = '0 documents';
     } else {
       final start = skip + 1;
@@ -1911,8 +1926,8 @@ class _CompassAppState extends State<CompassApp> {
       rangeLabel = '$start – $end of $total';
     }
 
-    final canGoPrev = skip > 0 && total > 0;
-    final canGoNext = (skip + pageSize) < total;
+    final canGoPrev = !isLoading && skip > 0 && total > 0;
+    final canGoNext = !isLoading && (skip + pageSize) < total;
 
     final viewModeSwitcher = Container(
       padding: const EdgeInsets.all(2.0),
@@ -2060,6 +2075,39 @@ class _CompassAppState extends State<CompassApp> {
     );
   }
 
+  /// Loading state shown while a live server is still streaming a collection's
+  /// documents into the mirror (avoids a scary "0 documents" / "empty" view).
+  Widget _buildCollectionLoadingState(MongoCollection activeColl) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(vertical: 64.0, horizontal: 24.0),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          CompassSpinner(
+            size: 28.0,
+            color: _theme.accent,
+            strokeWidth: 2.4,
+          ),
+          const SizedBox(height: 16.0),
+          Text(
+            'Loading documents…',
+            style: CompassTypography.header(color: _theme.textPrimary),
+          ),
+          const SizedBox(height: 6.0),
+          ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 360.0),
+            child: Text(
+              'Fetching "${activeColl.name}" from the server. Large collections can take a moment.',
+              textAlign: TextAlign.center,
+              style: CompassTypography.bodyMedium(color: _theme.textMuted),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildActiveTabView(
     MongoCollection? activeColl,
     List<MongoDocument> docs,
@@ -2073,6 +2121,12 @@ class _CompassAppState extends State<CompassApp> {
           style: CompassTypography.bodyMedium(color: _theme.textMuted),
         ),
       );
+    }
+
+    // A live collection whose documents are still inbound: show progress rather
+    // than the "no documents" empty state.
+    if (activeColl.isLoading && activeColl.documents.isEmpty) {
+      return _buildCollectionLoadingState(activeColl);
     }
 
     switch (_activeTab) {
