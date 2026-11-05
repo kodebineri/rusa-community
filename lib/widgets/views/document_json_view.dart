@@ -6,6 +6,7 @@ import '../../theme/compass_theme.dart';
 import '../../theme/compass_typography.dart';
 import '../../icons/compass_svg_icons.dart';
 import '../../models/mongo_models.dart';
+import '../../utils/json_syntax_text_controller.dart';
 import '../compass_icon_button.dart';
 import '../modals/compass_modal.dart';
 
@@ -48,8 +49,11 @@ class _DocumentJsonViewState extends State<DocumentJsonView> {
   String? _editingId;
 
   /// Reused across edits so it is never disposed while an [EditableText] still
-  /// references it (only disposed in [dispose]).
-  final TextEditingController _editController = TextEditingController();
+  /// references it (only disposed in [dispose]). It is a
+  /// [JsonSyntaxTextController] so the inline editor is syntax-coloured exactly
+  /// like the read-only body and the query bar's JSON fields.
+  late final JsonSyntaxTextController _editController =
+      JsonSyntaxTextController(theme: _theme);
 
   String? _editError;
 
@@ -112,6 +116,8 @@ class _DocumentJsonViewState extends State<DocumentJsonView> {
   @override
   Widget build(BuildContext context) {
     final density = CompassDensity.of(context);
+    // Keep the inline editor's syntax colours in sync with the active theme.
+    _editController.theme = _theme;
     if (widget.documents.isEmpty) {
       return Container(
         alignment: Alignment.center,
@@ -248,6 +254,7 @@ class _DocumentJsonViewState extends State<DocumentJsonView> {
                         maxLines: 24,
                         minLines: 8,
                         autofocus: true,
+                        autoIndent: true,
                       ),
                       if (_editError != null) ...[
                         const SizedBox(height: 8.0),
@@ -255,11 +262,14 @@ class _DocumentJsonViewState extends State<DocumentJsonView> {
                       ],
                     ],
                   )
-                : Text(
-                    formattedJson,
-                    style: CompassTypography.monoRegular(
-                      color: _theme.textSecondary,
-                      size: 12.0,
+                : Text.rich(
+                    buildJsonSyntaxSpan(
+                      formattedJson,
+                      style: CompassTypography.monoRegular(
+                        color: _theme.textSecondary,
+                        size: 12.0,
+                      ),
+                      theme: _theme,
                     ),
                   ),
           ),

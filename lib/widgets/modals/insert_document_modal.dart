@@ -5,6 +5,7 @@ import '../../icons/compass_svg_icons.dart';
 import '../../services/mongo_engine.dart';
 import '../../theme/compass_theme.dart';
 import '../../theme/compass_typography.dart';
+import '../../utils/json_syntax_text_controller.dart';
 import 'compass_modal.dart';
 
 /// Converted from src/components/InsertDocModal.tsx
@@ -43,7 +44,8 @@ class InsertDocumentModal extends StatefulWidget {
 }
 
 class _InsertDocumentModalState extends State<InsertDocumentModal> {
-  late final TextEditingController _controller = TextEditingController();
+  late final JsonSyntaxTextController _controller;
+  bool _initializedController = false;
   String? _errorMsg;
 
   static const JsonEncoder _encoder = JsonEncoder.withIndent('  ');
@@ -63,9 +65,19 @@ class _InsertDocumentModalState extends State<InsertDocumentModal> {
   }
 
   @override
-  void initState() {
-    super.initState();
-    _controller.text = _defaultText();
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final theme = CompassTheme.of(context);
+    if (!_initializedController) {
+      _controller = JsonSyntaxTextController(
+        text: _defaultText(),
+        theme: theme,
+      );
+      _initializedController = true;
+    } else {
+      // Keep syntax colours in sync when the app theme changes.
+      _controller.theme = theme;
+    }
   }
 
   @override
@@ -150,6 +162,7 @@ class _InsertDocumentModalState extends State<InsertDocumentModal> {
           minLines: 12,
           minLinesAuto: false,
           autofocus: true,
+          autoIndent: true,
           placeholder: '{ "_id": "...", "title": "..." }',
           onChanged: (_) {
             if (_errorMsg != null) setState(() => _errorMsg = null);

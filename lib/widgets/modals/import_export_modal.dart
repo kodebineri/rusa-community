@@ -343,6 +343,7 @@ class _ImportExportModalState extends State<ImportExportModal> {
         controller: _importController,
         placeholder: "[ { title: 'Document 1' }, { title: 'Document 2' } ]",
         maxLines: 8,
+        autoIndent: true,
         onChanged: (_) {
           if (_statusText != null) setState(() => _statusText = null);
         },

@@ -4,6 +4,7 @@ import '../../theme/compass_colors.dart';
 import '../../theme/compass_density.dart';
 import '../../theme/compass_theme.dart';
 import '../../theme/compass_typography.dart';
+import '../../utils/json_auto_indent_formatter.dart';
 import '../../widgets/compass_hover.dart';
 import '../../widgets/compass_icon_button.dart';
 import '../../widgets/compass_text_menu.dart';
@@ -220,6 +221,7 @@ class CompassInput extends StatefulWidget {
   final int? minLines;
   final bool mono;
   final bool obscureText;
+  final bool autoIndent;
   final ValueChanged<String>? onChanged;
   final ValueChanged<String>? onSubmitted;
 
@@ -233,6 +235,7 @@ class CompassInput extends StatefulWidget {
     this.minLines,
     this.mono = true,
     this.obscureText = false,
+    this.autoIndent = false,
     this.onChanged,
     this.onSubmitted,
   });
@@ -300,6 +303,9 @@ class _CompassInputState extends State<CompassInput> {
                   maxLines: widget.maxLines,
                   minLines: resolvedMinLines,
                   obscureText: widget.obscureText,
+                  inputFormatters: widget.autoIndent
+                      ? const [JsonAutoIndentFormatter()]
+                      : null,
                   onChanged: widget.onChanged,
                   onSubmitted: widget.onSubmitted,
                   onTapOutside: (event) =>

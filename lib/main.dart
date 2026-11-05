@@ -55,6 +55,7 @@ void main() {
   // characters but ignore those editing keys.
   runApp(const DefaultTextEditingShortcuts(child: CompassApp()));
 }
+
 /// Root Rusa application — an independent MongoDB database client.
 /// Converted from React TSX (src/App.tsx) adhering strictly to:
 /// 1. Layout & Flexbox (LayoutBuilder, Column, Row, Wrap, exact gaps)
@@ -220,7 +221,7 @@ class _CompassAppState extends State<CompassApp> {
 
   /// Bug reports open the upstream GitHub issue tracker in the system browser.
   static final Uri _bugReportUri =
-      Uri.parse('https://github.com/mongodb-js/compass/issues');
+      Uri.parse('https://github.com/kodebineri/rusa/issues');
 
   /// Opens [_bugReportUri] in the system browser.
   ///
@@ -254,6 +255,7 @@ class _CompassAppState extends State<CompassApp> {
       copyValue: _bugReportUri.toString(),
     );
   }
+
   /// Selected colour theme. Defaults to Dracula (dark); changed from the
   /// header options menu or the touch action sheet.
   CompassThemeVariant _themeVariant = CompassThemeVariant.defaultVariant;
@@ -409,7 +411,8 @@ class _CompassAppState extends State<CompassApp> {
   /// Opens `dbName`.`collName` in a new tab — or focuses the existing tab when
   /// that collection is already open (like a browser's "open link" behavior).
   void _openCollectionTab(String dbName, String collName) {
-    final existing = _openTabs.indexWhere((t) => t.isSameTarget(dbName, collName));
+    final existing =
+        _openTabs.indexWhere((t) => t.isSameTarget(dbName, collName));
     if (existing >= 0) {
       _activateTabIndex(existing);
       // Try to load data if it's a real service
@@ -451,7 +454,8 @@ class _CompassAppState extends State<CompassApp> {
     if (wasActive) {
       // Activate the neighbor without saving into the removed tab.
       _activeTabIndex = -1;
-      _activateTabIndex(index >= _openTabs.length ? _openTabs.length - 1 : index);
+      _activateTabIndex(
+          index >= _openTabs.length ? _openTabs.length - 1 : index);
     } else if (index < _activeTabIndex) {
       _activeTabIndex--;
     }
@@ -547,15 +551,20 @@ class _CompassAppState extends State<CompassApp> {
         text.contains('TimeoutException')) {
       return 'Could not reach the MongoDB server. Check network, DNS (SRV), IP allowlist, and credentials.';
     }
-    if (text.contains('Authentication failed') || text.contains('auth') || text.contains('bad auth')) {
+    if (text.contains('Authentication failed') ||
+        text.contains('auth') ||
+        text.contains('bad auth')) {
       return 'Authentication failed. Check the username, password and auth source.';
     }
-    return text.replaceFirst('MongoDartError: ', '').replaceFirst('Exception: ', '');
+    return text
+        .replaceFirst('MongoDartError: ', '')
+        .replaceFirst('Exception: ', '');
   }
 
   void _handleSaveConnection(ConnectionProfile profile) {
     setState(() {
-      final existingIndex = _savedConnections.indexWhere((c) => c.uri == profile.uri);
+      final existingIndex =
+          _savedConnections.indexWhere((c) => c.uri == profile.uri);
       if (existingIndex >= 0) {
         _savedConnections[existingIndex] = profile;
       } else {
@@ -595,7 +604,9 @@ class _CompassAppState extends State<CompassApp> {
 
   void _openCreateCollection([String? targetDb]) {
     final dbToUse = targetDb ??
-        (_selectedDbName.isNotEmpty ? _selectedDbName : (mongoEngine.getDatabases().firstOrNull?.name ?? ''));
+        (_selectedDbName.isNotEmpty
+            ? _selectedDbName
+            : (mongoEngine.getDatabases().firstOrNull?.name ?? ''));
     setState(() {
       _createCollTargetDb = dbToUse;
       _isCreateCollModalOpen = true;
@@ -699,7 +710,8 @@ class _CompassAppState extends State<CompassApp> {
 
   void _confirmDropIndex() {
     mongoEngine.dropIndex(_selectedDbName, _selectedCollName, _dropIndexName);
-    setState(() {}); // re-read `activeColl.indexes` so the dropped row disappears
+    setState(
+        () {}); // re-read `activeColl.indexes` so the dropped row disappears
   }
 
   void _openInsertDocument() {
@@ -775,7 +787,8 @@ class _CompassAppState extends State<CompassApp> {
   }
 
   void _confirmDeleteDocument() {
-    mongoEngine.deleteDocument(_selectedDbName, _selectedCollName, _deleteDocId);
+    mongoEngine.deleteDocument(
+        _selectedDbName, _selectedCollName, _deleteDocId);
     setState(() {
       _deleteDocTarget = null;
       _deleteDocId = '';
@@ -785,7 +798,8 @@ class _CompassAppState extends State<CompassApp> {
   void _handleUpdateDocument(String docId, Map<String, dynamic> updatedFields) {
     if (_selectedDbName.isEmpty || _selectedCollName.isEmpty) return;
     try {
-      mongoEngine.updateDocument(_selectedDbName, _selectedCollName, docId, updatedFields);
+      mongoEngine.updateDocument(
+          _selectedDbName, _selectedCollName, docId, updatedFields);
     } catch (_) {}
     setState(() {});
   }
@@ -831,7 +845,8 @@ class _CompassAppState extends State<CompassApp> {
     });
   }
 
-  void _requestTerminalConfirmation(RiskyOperationDetails operation, VoidCallback onConfirm) {
+  void _requestTerminalConfirmation(
+      RiskyOperationDetails operation, VoidCallback onConfirm) {
     setState(() {
       _pendingTerminalOperation = operation;
       _pendingTerminalConfirm = onConfirm;
@@ -864,7 +879,8 @@ class _CompassAppState extends State<CompassApp> {
       return;
     }
     if (cmd.startsWith('use ')) {
-      final dbName = cmd.substring(4).trim().replaceAll(RegExp(r';$'), '').trim();
+      final dbName =
+          cmd.substring(4).trim().replaceAll(RegExp(r';$'), '').trim();
       if (dbName.isNotEmpty && service.getDatabase(dbName) != null) {
         setState(() {
           _selectedDbName = dbName;
@@ -895,7 +911,9 @@ class _CompassAppState extends State<CompassApp> {
       return;
     }
 
-    final match = RegExp(r'db\.([A-Za-z0-9_]+)\.(\w+)\s*\((.*)\)\s*;?\s*$', dotAll: true).firstMatch(cmd);
+    final match =
+        RegExp(r'db\.([A-Za-z0-9_]+)\.(\w+)\s*\((.*)\)\s*;?\s*$', dotAll: true)
+            .firstMatch(cmd);
     if (match == null) return;
     final collName = match.group(1)!;
     final method = match.group(2)!;
@@ -904,7 +922,9 @@ class _CompassAppState extends State<CompassApp> {
     Map<String, dynamic> parseArgs() {
       try {
         final parsed = service.tolerantParse(args);
-        return parsed is Map ? Map<String, dynamic>.from(parsed) : <String, dynamic>{};
+        return parsed is Map
+            ? Map<String, dynamic>.from(parsed)
+            : <String, dynamic>{};
       } catch (_) {
         return <String, dynamic>{};
       }
@@ -920,7 +940,8 @@ class _CompassAppState extends State<CompassApp> {
       service.deleteOne(_selectedDbName, collName, parseArgs());
     } else if (method == 'updateMany' || method == 'updateOne') {
       final split = _splitArgs(args);
-      service.updateMany(_selectedDbName, collName, _parseMap(split.$1), _parseMap(split.$2));
+      service.updateMany(
+          _selectedDbName, collName, _parseMap(split.$1), _parseMap(split.$2));
     } else if (method == 'insertOne') {
       try {
         service.insertDocument(_selectedDbName, collName, parseArgs());
@@ -946,7 +967,9 @@ class _CompassAppState extends State<CompassApp> {
   Map<String, dynamic> _parseMap(String text) {
     try {
       final parsed = mongoEngine.tolerantParse(text);
-      return parsed is Map ? Map<String, dynamic>.from(parsed) : <String, dynamic>{};
+      return parsed is Map
+          ? Map<String, dynamic>.from(parsed)
+          : <String, dynamic>{};
     } catch (_) {
       return <String, dynamic>{};
     }
@@ -987,7 +1010,8 @@ class _CompassAppState extends State<CompassApp> {
         final activeDb = service.getDatabase(_selectedDbName);
         final activeColl = activeDb?.collections[_selectedCollName];
         final docs = activeColl?.documents ?? [];
-        final queryResult = service.findDocuments(_selectedDbName, _selectedCollName, _queryOptions);
+        final queryResult = service.findDocuments(
+            _selectedDbName, _selectedCollName, _queryOptions);
         final pageDocs = queryResult.documents;
 
         final appShell = Container(
@@ -1015,7 +1039,8 @@ class _CompassAppState extends State<CompassApp> {
                       setState(() => _themeVariant = variant);
                     },
                     onToggleMobileSidebar: () {
-                      setState(() => _isMobileSidebarOpen = !_isMobileSidebarOpen);
+                      setState(
+                          () => _isMobileSidebarOpen = !_isMobileSidebarOpen);
                     },
                     isMobile: !isDesktop,
                     onOpenActions: () {
@@ -1048,7 +1073,8 @@ class _CompassAppState extends State<CompassApp> {
                             onSelectDatabase: (dbName) {
                               setState(() {
                                 final db = service.getDatabase(dbName);
-                                final collName = db?.collections.keys.firstOrNull ?? '';
+                                final collName =
+                                    db?.collections.keys.firstOrNull ?? '';
                                 if (collName.isNotEmpty) {
                                   _openCollectionTab(dbName, collName);
                                 } else {
@@ -1065,7 +1091,8 @@ class _CompassAppState extends State<CompassApp> {
                               });
                             },
                             onOpenCreateDb: _openCreateDb,
-                            onOpenCreateColl: (dbName) => _openCreateCollection(dbName),
+                            onOpenCreateColl: (dbName) =>
+                                _openCreateCollection(dbName),
                             onRenameDb: _openRenameDb,
                             onRenameColl: (dbName, collName, isView) =>
                                 _openRenameColl(dbName, collName, isView),
@@ -1098,7 +1125,8 @@ class _CompassAppState extends State<CompassApp> {
                                 _buildCollectionHeader(activeDb, activeColl),
 
                               // Query Bar (only shown while a collection tab is open)
-                              if (_activeTabIndex >= 0 && _activeTab == 'documents')
+                              if (_activeTabIndex >= 0 &&
+                                  _activeTab == 'documents')
                                 CompassQueryBar(
                                   options: _queryOptions,
                                   onChangeOptions: (updated) {
@@ -1108,13 +1136,14 @@ class _CompassAppState extends State<CompassApp> {
                                     setState(() {});
                                   },
                                   onResetQuery: () {
-                                    setState(() => _queryOptions = QueryFilterOptions());
+                                    setState(() =>
+                                        _queryOptions = QueryFilterOptions());
                                   },
                                   onExportToLanguage: _openExportLanguage,
                                   optionsExpanded: _isQueryOptionsExpanded,
                                   onToggleOptions: () {
-                                    setState(() =>
-                                        _isQueryOptionsExpanded = !_isQueryOptionsExpanded);
+                                    setState(() => _isQueryOptionsExpanded =
+                                        !_isQueryOptionsExpanded);
                                   },
                                   onOpenOverflow: () {
                                     setState(() => _isQueryActionsOpen = true);
@@ -1124,7 +1153,8 @@ class _CompassAppState extends State<CompassApp> {
                                 ),
 
                               // Documents View Sub-Header: Pagination
-                              if (_activeTabIndex >= 0 && _activeTab == 'documents')
+                              if (_activeTabIndex >= 0 &&
+                                  _activeTab == 'documents')
                                 _buildDocumentsPagination(queryResult),
 
                               // Active Tab Content View
@@ -1132,10 +1162,12 @@ class _CompassAppState extends State<CompassApp> {
                                 child: Container(
                                   color: _theme.bgApp,
                                   child: _activeTab == 'documents'
-                                      ? _buildActiveTabView(activeColl, pageDocs)
+                                      ? _buildActiveTabView(
+                                          activeColl, pageDocs)
                                       : SingleChildScrollView(
                                           padding: const EdgeInsets.all(16.0),
-                                          child: _buildActiveTabView(activeColl, pageDocs),
+                                          child: _buildActiveTabView(
+                                              activeColl, pageDocs),
                                         ),
                                 ),
                               ),
@@ -1152,8 +1184,11 @@ class _CompassAppState extends State<CompassApp> {
                     onClose: () {
                       setState(() => _isTerminalOpen = false);
                     },
-                    activeDbName: _selectedDbName.isEmpty ? (mongoEngine.getDatabases().firstOrNull?.name ?? '') : _selectedDbName,
-                    onExecuteCommand: (command) => _executeTerminalCommand(command),
+                    activeDbName: _selectedDbName.isEmpty
+                        ? (mongoEngine.getDatabases().firstOrNull?.name ?? '')
+                        : _selectedDbName,
+                    onExecuteCommand: (command) =>
+                        _executeTerminalCommand(command),
                     onRequestConfirmation: _requestTerminalConfirmation,
                   ),
                 ],
@@ -1214,7 +1249,8 @@ class _CompassAppState extends State<CompassApp> {
                 onClose: () => setState(() => _isDropDbModalOpen = false),
                 onConfirm: _confirmDropDb,
                 dbName: _dropDbName,
-                collectionsCount: service.getDatabase(_dropDbName)?.collections.length ?? 0,
+                collectionsCount:
+                    service.getDatabase(_dropDbName)?.collections.length ?? 0,
               ),
               DropCollectionModal(
                 isOpen: _isDropCollModalOpen,
@@ -1240,7 +1276,8 @@ class _CompassAppState extends State<CompassApp> {
               ),
               PrivacyPolicyModal(
                 isOpen: _isPrivacyPolicyModalOpen,
-                onClose: () => setState(() => _isPrivacyPolicyModalOpen = false),
+                onClose: () =>
+                    setState(() => _isPrivacyPolicyModalOpen = false),
               ),
               AboutModal(
                 isOpen: _isAboutModalOpen,
@@ -1339,10 +1376,13 @@ class _CompassAppState extends State<CompassApp> {
                   // Theme picker: one row per variant, above Report Bug.
                   for (final variant in CompassThemeVariant.values)
                     CompassActionSheetItem(
-                      label: '${variant.label} (${variant.isDark ? 'dark' : 'light'})',
+                      label:
+                          '${variant.label} (${variant.isDark ? 'dark' : 'light'})',
                       svg: _themeVariant == variant
                           ? CompassSvgIcons.check
-                          : (variant.isDark ? CompassSvgIcons.moon : CompassSvgIcons.sun),
+                          : (variant.isDark
+                              ? CompassSvgIcons.moon
+                              : CompassSvgIcons.sun),
                       color: _themeVariant == variant ? _theme.accent : null,
                       onTap: () {
                         setState(() => _themeVariant = variant);
@@ -1492,8 +1532,10 @@ class _CompassAppState extends State<CompassApp> {
 
     final overlayStyle = SystemUiOverlayStyle(
       statusBarColor: const Color(0x00000000),
-      statusBarIconBrightness: _themeVariant.isDark ? Brightness.light : Brightness.dark,
-      statusBarBrightness: _themeVariant.isDark ? Brightness.dark : Brightness.light,
+      statusBarIconBrightness:
+          _themeVariant.isDark ? Brightness.light : Brightness.dark,
+      statusBarBrightness:
+          _themeVariant.isDark ? Brightness.dark : Brightness.light,
       systemNavigationBarColor: _theme.bgApp,
       systemNavigationBarIconBrightness:
           _themeVariant.isDark ? Brightness.light : Brightness.dark,
@@ -1505,7 +1547,8 @@ class _CompassAppState extends State<CompassApp> {
     );
   }
 
-  Widget _buildCollectionHeader(MongoDatabase? activeDb, MongoCollection? activeColl) {
+  Widget _buildCollectionHeader(
+      MongoDatabase? activeDb, MongoCollection? activeColl) {
     return Container(
       decoration: BoxDecoration(
         color: _theme.bgPanel,
@@ -1518,7 +1561,8 @@ class _CompassAppState extends State<CompassApp> {
         children: [
           // Breadcrumbs Bar
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
+            padding:
+                const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
@@ -1538,11 +1582,14 @@ class _CompassAppState extends State<CompassApp> {
                           _selectedDbName,
                           overflow: TextOverflow.ellipsis,
                           maxLines: 1,
-                          style: CompassTypography.header(color: _theme.textPrimary),
+                          style: CompassTypography.header(
+                              color: _theme.textPrimary),
                         ),
                       ),
                       const SizedBox(width: 8.0),
-                      Text('>', style: CompassTypography.caption(color: _theme.textMuted)),
+                      Text('>',
+                          style: CompassTypography.caption(
+                              color: _theme.textMuted)),
                       const SizedBox(width: 8.0),
                       CompassSvg(
                         svgString: CompassSvgIcons.table,
@@ -1555,21 +1602,25 @@ class _CompassAppState extends State<CompassApp> {
                           _selectedCollName,
                           overflow: TextOverflow.ellipsis,
                           maxLines: 1,
-                          style: CompassTypography.title(color: _theme.textPrimary),
+                          style: CompassTypography.title(
+                              color: _theme.textPrimary),
                         ),
                       ),
                       if (!_isTouchLayout) ...[
                         const SizedBox(width: 8.0),
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6.0, vertical: 2.0),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 6.0, vertical: 2.0),
                           decoration: BoxDecoration(
                             color: _theme.bgSubtle,
                             borderRadius: BorderRadius.circular(4.0),
-                            border: Border.all(color: _theme.border, width: 1.0),
+                            border:
+                                Border.all(color: _theme.border, width: 1.0),
                           ),
                           child: Text(
                             '${activeColl?.documents.length ?? 0} docs',
-                            style: CompassTypography.caption(color: _theme.textMuted),
+                            style: CompassTypography.caption(
+                                color: _theme.textMuted),
                           ),
                         ),
                       ],
@@ -1592,16 +1643,21 @@ class _CompassAppState extends State<CompassApp> {
                         onTap: () => _openCreateCollection(_selectedDbName),
                       ),
                       _buildHeaderAction(
-                        svg: activeColl.isView ? CompassSvgIcons.eye : CompassSvgIcons.pencil,
-                        label: activeColl.isView ? 'Rename View' : 'Rename Coll',
+                        svg: activeColl.isView
+                            ? CompassSvgIcons.eye
+                            : CompassSvgIcons.pencil,
+                        label:
+                            activeColl.isView ? 'Rename View' : 'Rename Coll',
                         iconColor: _theme.accent,
-                        onTap: () => _openRenameColl(_selectedDbName, _selectedCollName, activeColl.isView),
+                        onTap: () => _openRenameColl(_selectedDbName,
+                            _selectedCollName, activeColl.isView),
                       ),
                       _buildHeaderAction(
                         svg: CompassSvgIcons.trash,
                         label: activeColl.isView ? 'Drop View' : 'Drop Coll',
                         iconColor: _theme.textMuted,
-                        onTap: () => _openDropColl(_selectedDbName, _selectedCollName),
+                        onTap: () =>
+                            _openDropColl(_selectedDbName, _selectedCollName),
                       ),
                     ],
                   ],
@@ -1620,8 +1676,10 @@ class _CompassAppState extends State<CompassApp> {
                   padding: const EdgeInsets.only(left: 16.0),
                   child: Row(
                     children: [
-                      _buildTab('documents', 'Documents', CompassSvgIcons.table),
-                      _buildTab('aggregations', 'Aggregations', CompassSvgIcons.layers),
+                      _buildTab(
+                          'documents', 'Documents', CompassSvgIcons.table),
+                      _buildTab('aggregations', 'Aggregations',
+                          CompassSvgIcons.layers),
                       _buildTab('schema', 'Schema', CompassSvgIcons.barChart),
                       _buildTab('indexes', 'Indexes', CompassSvgIcons.key),
                     ],
@@ -1682,7 +1740,8 @@ class _CompassAppState extends State<CompassApp> {
         decoration: BoxDecoration(
           color: CompassColors.warningAmberBg,
           borderRadius: BorderRadius.circular(6.0),
-          border: Border.all(color: CompassColors.warningAmberBorder, width: 1.0),
+          border:
+              Border.all(color: CompassColors.warningAmberBorder, width: 1.0),
         ),
         child: Row(
           children: [
@@ -1694,7 +1753,8 @@ class _CompassAppState extends State<CompassApp> {
             const SizedBox(width: 6.0),
             Text(
               'Read-Only View',
-              style: CompassTypography.bodyMedium(color: CompassColors.warningAmber),
+              style: CompassTypography.bodyMedium(
+                  color: CompassColors.warningAmber),
             ),
           ],
         ),
@@ -1808,7 +1868,8 @@ class _CompassAppState extends State<CompassApp> {
         decoration: BoxDecoration(
           color: isActive ? _theme.bgPanel : const Color(0x00000000),
           borderRadius: BorderRadius.circular(4.0),
-          border: isActive ? Border.all(color: _theme.border, width: 1.0) : null,
+          border:
+              isActive ? Border.all(color: _theme.border, width: 1.0) : null,
         ),
         child: Row(
           children: [
@@ -1875,7 +1936,8 @@ class _CompassAppState extends State<CompassApp> {
     final pager = Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Text(rangeLabel, style: CompassTypography.monoSmall(color: _theme.textMuted)),
+        Text(rangeLabel,
+            style: CompassTypography.monoSmall(color: _theme.textMuted)),
         const SizedBox(width: 12.0),
         _buildPageButton(
           svg: CompassSvgIcons.chevronLeft,
@@ -1894,7 +1956,8 @@ class _CompassAppState extends State<CompassApp> {
           tooltip: 'Next page',
           enabled: canGoNext,
           onTap: () {
-            setState(() => _queryOptions = _queryOptions.copyWith(skip: skip + pageSize));
+            setState(() =>
+                _queryOptions = _queryOptions.copyWith(skip: skip + pageSize));
           },
         ),
       ],
@@ -1971,7 +2034,8 @@ class _CompassAppState extends State<CompassApp> {
             ),
           ),
           const SizedBox(height: 12.0),
-          Text('No Documents Found', style: CompassTypography.header(color: _theme.textPrimary)),
+          Text('No Documents Found',
+              style: CompassTypography.header(color: _theme.textPrimary)),
           const SizedBox(height: 6.0),
           ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 360.0),

@@ -8,6 +8,7 @@ import '../../services/mongo_engine.dart';
 import '../../theme/compass_colors.dart';
 import '../../theme/compass_theme.dart';
 import '../../theme/compass_typography.dart';
+import '../../utils/json_syntax_text_controller.dart';
 import '../compass_icon_button.dart';
 import '../modals/compass_modal.dart';
 
@@ -98,8 +99,9 @@ class _AggregationsViewState extends State<AggregationsView> {
     ),
   ];
 
-  final Map<String, TextEditingController> _stageControllers = {};
-  late final TextEditingController _rawController;
+  final Map<String, JsonSyntaxTextController> _stageControllers = {};
+  late final JsonSyntaxTextController _rawController;
+  bool _initializedControllers = false;
 
   String? _operatorPickerStageId;
   List<MongoDocument> _results = [];
@@ -167,10 +169,28 @@ class _AggregationsViewState extends State<AggregationsView> {
   @override
   void initState() {
     super.initState();
-    _rawController = TextEditingController(text: _pipelineJsonString());
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _runAggregation();
     });
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final theme = _theme;
+    if (!_initializedControllers) {
+      _rawController = JsonSyntaxTextController(
+        text: _pipelineJsonString(),
+        theme: theme,
+      );
+      _initializedControllers = true;
+    } else {
+      // Keep syntax colours in sync when the app theme changes.
+      _rawController.theme = theme;
+      for (final c in _stageControllers.values) {
+        c.theme = theme;
+      }
+    }
   }
 
   @override
@@ -190,10 +210,13 @@ class _AggregationsViewState extends State<AggregationsView> {
     super.dispose();
   }
 
-  TextEditingController _getStageController(PipelineStage stage) {
+  JsonSyntaxTextController _getStageController(PipelineStage stage) {
     var controller = _stageControllers[stage.id];
     if (controller == null) {
-      controller = TextEditingController(text: stage.content);
+      controller = JsonSyntaxTextController(
+        text: stage.content,
+        theme: _theme,
+      );
       _stageControllers[stage.id] = controller;
     }
     return controller;
@@ -1011,6 +1034,7 @@ class _AggregationsViewState extends State<AggregationsView> {
               minLines: 3,
               minLinesAuto: false,
               mono: true,
+              autoIndent: true,
               placeholder: '{\n  // stage definition\n}',
               onChanged: (newText) {
                 stage.content = newText;
@@ -1085,6 +1109,7 @@ class _AggregationsViewState extends State<AggregationsView> {
               minLines: 8,
               minLinesAuto: false,
               mono: true,
+              autoIndent: true,
               placeholder: '[\n  { "\$match": { ... } }\n]',
               onChanged: (_) {
                 // Update on typing
@@ -1266,9 +1291,15 @@ class _AggregationsViewState extends State<AggregationsView> {
               color: _theme.bgInput,
               constraints: const BoxConstraints(maxHeight: 400.0),
               child: SingleChildScrollView(
-                child: Text(
-                  formattedResultsJson,
-                  style: CompassTypography.monoRegular(color: _theme.textPrimary, size: 12.0),
+                child: Text.rich(
+                  buildJsonSyntaxSpan(
+                    formattedResultsJson,
+                    style: CompassTypography.monoRegular(
+                      color: _theme.textPrimary,
+                      size: 12.0,
+                    ),
+                    theme: _theme,
+                  ),
                 ),
               ),
             )
@@ -1290,9 +1321,15 @@ class _AggregationsViewState extends State<AggregationsView> {
                           borderRadius: BorderRadius.circular(4.0),
                           border: Border.all(color: _theme.border, width: 1.0),
                         ),
-                        child: Text(
-                          jsonEncode(_results[i].data),
-                          style: CompassTypography.monoRegular(color: _theme.textPrimary, size: 11.0),
+                        child: Text.rich(
+                          buildJsonSyntaxSpan(
+                            jsonEncode(_results[i].data),
+                            style: CompassTypography.monoRegular(
+                              color: _theme.textPrimary,
+                              size: 11.0,
+                            ),
+                            theme: _theme,
+                          ),
                         ),
                       ),
                   ],
