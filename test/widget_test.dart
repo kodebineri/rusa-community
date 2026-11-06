@@ -27,7 +27,7 @@ import 'package:rusa/widgets/modals/compass_modal.dart';
 import 'package:rusa/widgets/modals/connection_modal.dart';
 import 'package:rusa/widgets/modals/create_index_modal.dart';
 import 'package:rusa/widgets/modals/drop_index_modal.dart';
-import 'package:rusa/widgets/modals/eula_acceptance_modal.dart';
+import 'package:rusa/widgets/modals/onboarding_modal.dart';
 import 'package:rusa/widgets/modals/insert_document_modal.dart';
 import 'package:rusa/widgets/views/aggregations_view.dart';
 import 'package:rusa/widgets/views/document_json_view.dart';
@@ -1439,7 +1439,24 @@ void main() {
         reason: r'an $set update must not remove other fields');
   });
 
-  testWidgets('first-time user must accept the EULA before using the app',
+  // Text inside the welcome tour (the shell behind it is still mounted, so
+  // finders have to be scoped or they match the sidebar too).
+  Finder inTour(Finder finder) => find.descendant(
+        of: find.byType(OnboardingModal),
+        matching: finder,
+      );
+
+  /// Pumps until [finder] matches (the licence body is loaded from the asset
+  /// bundle asynchronously, so a fixed number of pumps is flaky under load).
+  Future<void> pumpUntilFound(WidgetTester tester, Finder finder,
+      {int maxPumps = 30}) async {
+    for (var i = 0; i < maxPumps; i++) {
+      if (finder.evaluate().isNotEmpty) return;
+      await tester.pump();
+    }
+  }
+
+  testWidgets('first-time user lands on the welcome tour and accepts the EULA',
       (WidgetTester tester) async {
     // A brand-new install: nothing stored yet.
     SharedPreferences.setMockInitialValues(const {});
@@ -1451,12 +1468,45 @@ void main() {
     await tester.pumpWidget(const CompassApp());
     await tester.pump();
     for (var i = 0; i < 50 && tester.takeException() != null; i++) {}
-    await tester.pump();
 
-    // The gate blocks the app: it is on screen and cannot be dismissed.
-    expect(find.byType(EulaAcceptanceModal), findsOneWidget);
-    expect(find.text('I Accept'), findsOneWidget);
-    expect(find.text('End User License Agreement'), findsWidgets);
+    // Slide 1 — welcome. The connect popup must NOT be auto-opened: the tour
+    // tells the user to explore the sample data first.
+    expect(find.byType(OnboardingModal), findsOneWidget);
+    expect(inTour(find.text('Step 1 of 4')), findsOneWidget);
+    expect(inTour(find.text('a MongoDB database client')), findsOneWidget);
+    expect(find.text('Connect to MongoDB'), findsNothing);
+
+    // Slide 2 — the bundled sample databases.
+    await tester.tap(find.text('Next'));
+    await tester.pump();
+    expect(inTour(find.text('Sample data is already here')), findsOneWidget);
+    expect(inTour(find.text('library')), findsOneWidget);
+    expect(inTour(find.text('social_networks')), findsOneWidget);
+
+    // Slide 3 — the theme preview applies immediately and is remembered.
+    await tester.tap(find.text('Next'));
+    await tester.pump();
+    expect(inTour(find.text('Pick a look')), findsOneWidget);
+    await tester.tap(find.text('Material Light'));
+    await tester.pump();
+    expect(tester.widget<CompassTheme>(find.byType(CompassTheme)).variant,
+        CompassThemeVariant.materialLight);
+
+    // Slide 4 — the licence, ending in acceptance.
+    await tester.tap(find.text('Next'));
+    await tester.pump();
+    await tester.pump();
+    for (var i = 0; i < 50 && tester.takeException() != null; i++) {}
+    final licenceBody =
+        inTour(find.textContaining('LICENSE GRANT', findRichText: true));
+    await pumpUntilFound(tester, licenceBody);
+    expect(inTour(find.text('Terms of use')), findsOneWidget);
+    expect(inTour(find.text('I Accept')), findsOneWidget);
+    expect(
+      licenceBody,
+      findsWidgets,
+      reason: 'the licence body comes from the bundled EULA.md',
+    );
 
     // Nothing is persisted until the user accepts.
     expect(
@@ -1464,20 +1514,154 @@ void main() {
       isNull,
     );
 
-    // Accept (the button sits at the end of the scrollable licence text).
-    await tester.ensureVisible(find.text('I Accept'));
-    await tester.pump();
     await tester.tap(find.text('I Accept'));
     await tester.pump();
     for (var i = 0; i < 50 && tester.takeException() != null; i++) {}
-    await tester.pump();
 
-    // The gate is gone and acceptance is persisted for the next launch.
-    expect(find.text('I Accept'), findsNothing);
+    // The tour is gone, consent is stored, and the user lands in the shell on
+    // sample data (still no connect popup).
+    expect(find.text('Terms of use'), findsNothing);
+    expect(find.text('Connect to MongoDB'), findsNothing);
+    final prefs = await SharedPreferences.getInstance();
+    expect(prefs.getBool('eula_accepted'), isTrue);
+    expect(prefs.getBool('onboarding_done'), isTrue,
+        reason: 'the "don\'t show this again" box is ticked by default');
+    expect(prefs.getString('theme_variant'), 'materialLight',
+        reason: 'the theme picked in the tour is persisted for next launch');
+  });
+
+  testWidgets("the welcome tour's Skip jumps to the licence slide",
+      (WidgetTester tester) async {
+    SharedPreferences.setMockInitialValues(const {});
+    tester.view.physicalSize = const Size(1920.0, 1080.0);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(const CompassApp());
+    await tester.pump();
+    for (var i = 0; i < 50 && tester.takeException() != null; i++) {}
+
+    expect(inTour(find.text('Step 1 of 4')), findsOneWidget);
+    await tester.tap(find.text('Skip'));
+    await tester.pump();
+    await tester.pump();
+    for (var i = 0; i < 50 && tester.takeException() != null; i++) {}
+
+    // Skip never bypasses consent: it lands *on* the licence slide.
+    expect(find.text('Terms of use'), findsOneWidget);
+    expect(find.text('I Accept'), findsOneWidget);
+    expect(find.text('Skip'), findsNothing);
+    // Still a first-time user, so nothing is stored yet.
     expect(
       (await SharedPreferences.getInstance()).getBool('eula_accepted'),
-      isTrue,
+      isNull,
     );
+  });
+
+  testWidgets('unticking "don\'t show this again" replays the tour without re-asking for consent',
+      (WidgetTester tester) async {
+    // Consent given, but the user asked to see the tour again.
+    SharedPreferences.setMockInitialValues(
+        {'eula_accepted': true, 'onboarding_done': false});
+    tester.view.physicalSize = const Size(1920.0, 1080.0);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(const CompassApp());
+    await tester.pump();
+    for (var i = 0; i < 50 && tester.takeException() != null; i++) {}
+
+    expect(inTour(find.text('Step 1 of 4')), findsOneWidget);
+
+    await tester.tap(find.text('Skip'));
+    await tester.pump();
+    await tester.pump();
+    for (var i = 0; i < 50 && tester.takeException() != null; i++) {}
+
+    // Already accepted: the action is Done, not a fresh acceptance.
+    expect(find.text('I Accept'), findsNothing);
+    expect(find.text('Done'), findsOneWidget);
+
+    await tester.tap(find.text('Done'));
+    await tester.pump();
+    for (var i = 0; i < 50 && tester.takeException() != null; i++) {}
+
+    expect(find.text('Terms of use'), findsNothing);
+    expect((await SharedPreferences.getInstance()).getBool('onboarding_done'),
+        isFalse,
+        reason: 'the box stays unticked, so the tour replays next time');
+  });
+
+  testWidgets('a returning user skips the tour and gets the connect popup',
+      (WidgetTester tester) async {
+    // The default setUp stores eula_accepted only — the upgrade case, where no
+    // onboarding_done key exists yet.
+    tester.view.physicalSize = const Size(1920.0, 1080.0);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(const CompassApp());
+    await tester.pump();
+    for (var i = 0; i < 50 && tester.takeException() != null; i++) {}
+
+    expect(find.textContaining('Step 1 of 4'), findsNothing);
+    expect(find.text('Connect to MongoDB'), findsOneWidget,
+        reason: 'without the tour the connect popup still opens at boot');
+
+    await closeConnectionPopup(tester);
+    expect(find.text('Connect to MongoDB'), findsNothing);
+  });
+
+  testWidgets('the theme stored on the device is restored on the next launch',
+      (WidgetTester tester) async {
+    SharedPreferences.setMockInitialValues(
+        {'eula_accepted': true, 'theme_variant': 'monokaiLight'});
+    tester.view.physicalSize = const Size(1920.0, 1080.0);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(const CompassApp());
+    await tester.pump();
+    for (var i = 0; i < 50 && tester.takeException() != null; i++) {}
+    await closeConnectionPopup(tester);
+
+    expect(tester.widget<CompassTheme>(find.byType(CompassTheme)).variant,
+        CompassThemeVariant.monokaiLight);
+  });
+
+  testWidgets('"Show Welcome Screen" in the header menu replays the tour',
+      (WidgetTester tester) async {
+    tester.view.physicalSize = const Size(1920.0, 1080.0);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(const CompassApp());
+    await tester.pump();
+    for (var i = 0; i < 50 && tester.takeException() != null; i++) {}
+    await closeConnectionPopup(tester);
+
+    await tester.tap(
+      find.descendant(
+        of: find.byType(CompassHeader),
+        matching: find.byWidgetPredicate(
+          (w) => w is CompassSvg && w.svgString == CompassSvgIcons.moreVertical,
+        ),
+      ),
+    );
+    await tester.pump();
+
+    // The entry sits above About.
+    expect(find.text('Show Welcome Screen'), findsOneWidget);
+    await tester.tap(find.text('Show Welcome Screen'));
+    await tester.pump();
+    for (var i = 0; i < 50 && tester.takeException() != null; i++) {}
+
+    expect(find.text('Step 1 of 4'), findsOneWidget);
   });
 
   testWidgets('saved connections can be edited from the connect popup',

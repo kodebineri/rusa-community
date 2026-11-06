@@ -8,7 +8,7 @@ level (no unit tests, no integration tests, no golden tests).
 ## Commands
 
 ```bash
-flutter test                              # all — expect 18/18
+flutter test                              # all — expect 60/60
 flutter test test/widget_test.dart        # the only test file
 flutter analyze                           # expect "No issues found!"
 ```
@@ -27,12 +27,13 @@ These were introduced recently; tests written before them silently fail.
    **Find** is tapped (`_executeWithCurrentFilter`); `_handleFilterChange` merely validates.
    Test 2 therefore taps `find.text('Find')` before asserting `onChangeOptions` fired — typing
    alone leaves `last` null.
-3. **The first run is gated by the EULA.** The app reads `SharedPreferences` on startup; if
-   `eula_accepted` is unset, `EulaAcceptanceModal` covers everything. `main()` has a global
-   `setUp` that calls `SharedPreferences.setMockInitialValues({'eula_accepted': true})`, so
-   every test except test 18 sees an already-accepted user. Without the plugin mock the read
-   throws and the app would deadlock behind the gate.
-   (`closeConnectionPopup` also does one extra `pump()` to let the stored flag load and clear
+3. **The first run is the welcome tour, which ends in EULA acceptance.** The app reads
+   `SharedPreferences` on startup; if `eula_accepted` is unset (or `onboarding_done` is
+   `false`), `OnboardingModal` covers everything. `main()` has a global `setUp` that calls
+   `SharedPreferences.setMockInitialValues({'eula_accepted': true})`, so every test except the
+   onboarding ones sees a returning user (an absent `onboarding_done` counts as *done*).
+   Without the plugin mock the read throws and the app would deadlock behind the cover.
+   (`closeConnectionPopup` also does one extra `pump()` to let the stored flags load and clear
    the startup cover.)
 
 Run `flutter analyze` before `flutter test` — analyzer errors usually mean a finder or API
@@ -59,7 +60,12 @@ misuse that would fail the test anyway.
 | 15 | `tree view starts with data structures collapsed` | default `library.books` tree: zero `chevronDown`, two `chevronRight` (one `genre_ids` per doc), `[ ... 2 items ]` + `[ ... 1 items ]` summaries, no `0:` child rows; tap chevron → child rows `0:`/`1:` appear + summary gone; tap again → summary restored |
 | 16 | `json view edit button saves changes to the document` | switch to **JSON** mode → one pencil per card; tap pencil → body becomes an `EditableText` (pencil replaced by check/close on that card only); edit `copies_available`, **remove `rating`**, enterText, tap **check** → engine doc updated, `rating` gone (replacement semantics), `_id` preserved, editor closes, pencil returns. Uses `resetToDefaults` teardown |
 | 17 | `updateMany with a plain map replaces matched documents` | engine-level: `mongoEngine.updateMany(db, coll, {_id:…}, {title, copies_available})` → matched doc has only those fields (+`_id`), `author`/`rating` gone, the other doc untouched; a `$set` update then merges without removing fields. Uses `resetToDefaults` teardown |
-| 18 | `first-time user must accept the EULA before using the app` | overrides the prefs mock with `{}` → `EulaAcceptanceModal` + `I Accept` shown, `eula_accepted` still unset; `ensureVisible` + tap **I Accept** → gate gone and `eula_accepted == true` persisted |
+| 18 | `first-time user lands on the welcome tour and accepts the EULA` | overrides the prefs mock with `{}` → `OnboardingModal` slide 1 (`Step 1 of 4`), **no** connect popup; **Next** → sample data (`library`, `social_networks`) → theme (tap **Material Light**, root `CompassTheme` switches) → terms (`EULA.md` body + **I Accept**); `eula_accepted` still unset until the tap, then `eula_accepted`/`onboarding_done`/`theme_variant` persisted and the shell revealed |
+| 19 | `the welcome tour's Skip jumps to the licence slide` | `{}` → **Skip** lands on the terms slide (`I Accept` present, `Skip` gone) and nothing is persisted yet |
+| 20 | `unticking "don't show this again" replays the tour without re-asking for consent` | `{eula_accepted: true, onboarding_done: false}` → tour shown, last slide reads **Done** (not `I Accept`), finishing leaves `onboarding_done == false` |
+| 21 | `a returning user skips the tour and gets the connect popup` | default prefs (no `onboarding_done`) → no tour, connect popup open at boot |
+| 22 | `the theme stored on the device is restored on the next launch` | `{eula_accepted: true, theme_variant: 'monokaiLight'}` → root `CompassTheme.variant == monokaiLight` |
+| 23 | `"Show Welcome Screen" in the header menu replays the tour` | returning user → `⋮` menu → **Show Welcome Screen** → `Step 1 of 4` |
 
 ## Recurring techniques (copy these patterns)
 

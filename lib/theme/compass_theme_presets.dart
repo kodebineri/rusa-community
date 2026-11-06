@@ -255,4 +255,15 @@ enum CompassThemeVariant {
   /// Light variants, in menu order.
   static List<CompassThemeVariant> get lightThemes =>
       values.where((variant) => !variant.isDark).toList(growable: false);
+
+  /// Resolves a persisted variant [name] (an enum `name`, see
+  /// `AppPreferences.themeVariantKey`) back to a variant, falling back to
+  /// [defaultVariant] for a missing or unknown name.
+  static CompassThemeVariant fromName(String? name) {
+    if (name == null) return defaultVariant;
+    for (final variant in values) {
+      if (variant.name == name) return variant;
+    }
+    return defaultVariant;
+  }
 }

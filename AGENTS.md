@@ -17,10 +17,11 @@ connect to a **real MongoDB server** (via `mongo_dart`) which swaps the engine i
 - Active product: `lib/` (Dart/Flutter) — this is what you modify.
 - Original React reference: `src/` (TSX) — read-only reference for intended behavior;
   not compiled by Flutter. Comments in Dart files say "Converted from `src/components/X.tsx`".
-- Tests: `test/widget_test.dart` (18 widget tests, single file).
+- Tests: `test/widget_test.dart` (widget tests) plus `test/compass_density_test.dart` and
+  `test/json_auto_indent_formatter_test.dart` — 60 tests in total.
 - Sample data sources of truth: `sample_library.json`, `sample_social_network.json` (repo root).
 - Legal text: `EULA.md` and `PRIVACY.md` (repo root) — bundled as Flutter assets
-  (`pubspec.yaml`) and rendered by `EulaModal` / `EulaAcceptanceModal` /
+  (`pubspec.yaml`) and rendered by `EulaModal` / `OnboardingModal` (its last slide) /
   `PrivacyPolicyModal` via `CompassMarkdownView`; edit the Markdown, not the widgets.
 - `README.md` at repo root is **stale AI Studio boilerplate** — ignore it.
 - **Branding:** the product name is **Rusa**, tagline "a MongoDB database client". User-visible
@@ -35,25 +36,33 @@ connect to a **real MongoDB server** (via `mongo_dart`) which swaps the engine i
 
 _(Last verified 2026-11-03, after commit `382656d` "enable preset themes".)_
 
-- **`flutter analyze` is clean** and **`flutter test` is 18/18.** Keep both that way; the
+- **`flutter analyze` is clean** and **`flutter test` is 60/60.** Keep both that way; the
   recurring test patterns live in `docs/testing.md`.
-- **The app boots into the connection popup** (`_isConnectModalOpen = true`). Full-app widget
-  tests must dismiss it first — use the `closeConnectionPopup(tester)` helper in
-  `test/widget_test.dart`, or shell taps land on the modal backdrop.
+- **A returning user boots into the connection popup** (`_isConnectModalOpen = true`, decided
+  by `_loadPreferences`). Full-app widget tests must dismiss it first — use the
+  `closeConnectionPopup(tester)` helper in `test/widget_test.dart`, or shell taps land on the
+  modal backdrop. A first-time user boots into the welcome tour instead (see below).
 - **Queries do not execute on type.** `CompassQueryBar` commits filter/options only on
   **Find** (`_executeWithCurrentFilter`); typing just validates. Tests must tap Find before
   asserting `onChangeOptions`.
-- **First run is gated by the EULA.** Until the user taps **I Accept**,
-  `EulaAcceptanceModal` covers everything (no close button, no backdrop dismiss). Acceptance
-  is persisted with `shared_preferences` under key `eula_accepted` via
-  `AppPreferences` (`lib/services/app_preferences.dart`), so it is asked once per device.
+- **First run is the welcome tour, which ends in EULA acceptance.** `OnboardingModal`
+  (`lib/widgets/modals/onboarding_modal.dart`) covers the whole window with four slides —
+  welcome → sample data → theme → terms — and its last slide is the only way past it (no
+  close button, no backdrop dismiss; **Skip** jumps *to* the terms slide, never past it).
+  Accepting persists `eula_accepted`; the "don't show this again" box persists
+  `onboarding_done`; the theme slide persists `theme_variant`. All three go through
+  `AppPreferences` (`lib/services/app_preferences.dart`). The tour is shown when
+  `!eula_accepted || !onboarding_done` (an absent `onboarding_done` means *done*, so
+  upgrades never see it), and while it is shown the **connect popup does not auto-open** —
+  the user lands on the sample data and opens Connect from the header. Re-open the tour from
+  the header `⋮` menu / touch action sheet → **Show Welcome Screen** (above About).
 
 ## Commands
 
 | Task | Command |
 |---|---|
 | Static analysis (must be clean) | `flutter analyze` |
-| Tests (must be 18/18) | `flutter test` |
+| Tests (must be 60/60) | `flutter test` |
 | Run desktop app | `flutter run -d windows` |
 | Run on Android | `flutter run -d <device>` (needs `INTERNET` — already in the main manifest) |
 | Run a single test file | `flutter test test/widget_test.dart` |
@@ -93,8 +102,10 @@ the legacy `src/` React app; `npm` is not needed for Flutter work).
    afterwards. All reads are synchronous during `build()` — never make the engine async.
 5. **Closed modals render `SizedBox.shrink()`.** `CompassModalShell.build` returns shrink when
    `!isOpen`, so closed modal children are constructed but **not mounted** (finders won't see
-   them; no stray hit-testing). All 17 modals plus **two** `CompassActionSheet` overlays (header
-   + query-bar) live permanently in the root `Stack` (`main.dart` ~L1123–1367).
+   them; no stray hit-testing). All 16 modals plus **two** `CompassActionSheet` overlays (header
+   + query-bar) live permanently in the root `Stack` (`main.dart` ~L1123–1367). The
+   `OnboardingModal` follows the same rule (it returns shrink when closed) but is a
+   full-window cover, not a `CompassModalShell`.
 6. **`InsertDocumentModal.onInsert` returns `String?`**: `null` = success (modal closes
    itself), non-null = error message shown in the modal's `CompassErrorBanner`. The handler in
    `main.dart` (`_handleInsertDocument`) must NOT close the modal.
@@ -171,7 +182,7 @@ is mutable and filters the DB tree client-side (`compass_sidebar.dart`).
 | `CollectionTab` | `lib/models/collection_tab.dart` |
 | Modal primitives (`CompassModalShell`, `CompassInput`, buttons) | `lib/widgets/modals/compass_modal.dart` |
 | `EulaModal` (renders the bundled `EULA.md`) | `lib/widgets/modals/eula_modal.dart` |
-| `EulaAcceptanceModal` (first-run gate) | `lib/widgets/modals/eula_acceptance_modal.dart` |
+| `OnboardingModal` (first-run welcome tour + EULA acceptance) | `lib/widgets/modals/onboarding_modal.dart` |
 | `PrivacyPolicyModal` (renders the bundled `PRIVACY.md`) | `lib/widgets/modals/privacy_policy_modal.dart` |
 | `AboutModal` (logo, app name, version) | `lib/widgets/modals/about_modal.dart` |
 | `appPreferences` (`shared_preferences` wrapper) | `lib/services/app_preferences.dart` |

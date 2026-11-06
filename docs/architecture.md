@@ -56,8 +56,9 @@ the connection popup), `_isTerminalOpen` (docked mongosh shell), `_isMobileSideb
 (off-canvas sidebar < 768px), `_isHeaderActionsOpen` (touch-only header overflow sheet),
 `_isEulaModalOpen`, `_isAboutModalOpen`, `_isPrivacyPolicyModalOpen`, `_isQueryActionsOpen` (touch-only query-bar overflow
 sheet), `_isQueryOptionsExpanded` (query-bar options panel; owned here so the overflow sheet
-can toggle it), and `_eulaAccepted` (`bool?` — first-run EULA flag: `null` = still loading,
-`false` = gate shown, `true` = accepted).
+can toggle it), `_eulaAccepted` (`bool?` — first-run consent flag: `null` = still loading,
+`false` = not accepted, `true` = accepted), `_onboardingDone` (the tour's "don't show this
+again" choice) and `_isOnboardingOpen` (the welcome tour is covering the app).
 
 **Layout flags (refreshed by the root `LayoutBuilder` on every layout pass):**
 
@@ -95,12 +96,14 @@ can toggle it), and `_eulaAccepted` (`bool?` — first-run EULA flag: `null` = s
 **Not a state field:** `mongoEngine` is a mutable *top-level global* in
 `lib/services/mongo_engine.dart`. Assigned during connect/disconnect inside `setState`.
 
-State initializes via field initializers; the only `initState` loads the stored EULA flag
-(`_loadEulaStatus` → `appPreferences.hasAcceptedEula()`). The shell lays out `library.books`
-Documents/tree with an empty query on the local engine immediately, but on first launch it is
-covered by the **EULA gate** (`EulaAcceptanceModal`) and, behind it, the **connection popup**
-(`_isConnectModalOpen = true`). Until the gate is accepted, `_eulaAccepted` is `null` (loading,
-blank cover) or `false` (gate shown) and the app is not interactive.
+State initializes via field initializers; the only `initState` reads the stored flags
+(`_loadPreferences` → `appPreferences.load()`: consent, tour, theme). The shell lays out
+`library.books` Documents/tree with an empty query on the local engine immediately, but on
+first launch it is covered by the **welcome tour** (`OnboardingModal`, whose last slide is the
+EULA acceptance). While the flags load, `_eulaAccepted` is `null` and a blank cover hides
+everything. `_loadPreferences` then decides what covers the app: the tour
+(`_isOnboardingOpen = true`, and the **connection popup stays closed** so the user lands on the
+sample data) or, for a returning user, the **connection popup** (`_isConnectModalOpen = true`).
 
 ## Layout tree — `build()` (~L1381) hosts `_buildShell()` (~L940) in an `OverlayEntry`
 
@@ -120,10 +123,10 @@ Shell Stack
 │        ├ _buildDocumentsPagination    (Tree/JSON/Table switcher + Prev/Next) — same condition
 │        └ Expanded > SingleChildScrollView(16) > _buildActiveTabView(...)
 │  3. CompassTerminal                   (docked mongosh drawer; the only "footer" region)
-└─ 17 modal overlays + TWO CompassActionSheet overlays (header actions, query actions)
+└─ 16 modal overlays + TWO CompassActionSheet overlays (header actions, query actions)
    (always-installed children; each closed one renders SizedBox.shrink)
-   + the conditionally-rendered first-run EULA gate (blank cover while the flag loads, then
-     EulaAcceptanceModal) as the LAST child, so it paints above everything until accepted
+   + the conditionally-rendered first-run welcome tour (blank cover while the flags load,
+     then OnboardingModal) as the LAST child, so it paints above everything until finished
 ```
 
 Data derived at the top of `_buildShell()` (~L947–953), all synchronous:
@@ -266,10 +269,11 @@ Two modals hand-roll their own `Positioned.fill` overlay instead of `CompassModa
 Both are root-`Stack` children (a `Positioned.fill` sheet hosted inside a widget would be
 squeezed into a sliver).
 
-Separately, the **first-run EULA gate** (`EulaAcceptanceModal`) is *conditionally* rendered as
-the last `Stack` child while `_eulaAccepted != true` (with a blank `ColoredBox` cover while the
-flag is still `null`). It is **not** one of the 17 permanently-installed modals: accepting it
-(`_acceptEula`) persists the flag and reveals the connection popup.
+Separately, the **first-run welcome tour** (`OnboardingModal`) is *conditionally* rendered as
+the last `Stack` child while `_isOnboardingOpen` (with a blank `ColoredBox` cover while the
+flags are still `null`). It is **not** one of the 16 permanently-installed modals: finishing it
+(`_finishOnboarding`) persists consent + the "don't show this again" choice and reveals the
+shell on the sample data (no connect popup).
 
 Payload-clearing asymmetry to remember: most `onClose` closures only flip the boolean;
 delete payload clears on confirm; insert payload (`_editingDoc`) clears on open/success.

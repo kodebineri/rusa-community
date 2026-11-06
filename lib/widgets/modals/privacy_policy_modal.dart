@@ -35,14 +35,25 @@ class _PrivacyPolicyModalState extends State<PrivacyPolicyModal> {
 
   String? _markdown;
   String? _error;
+  bool _loadStarted = false;
 
   @override
   void initState() {
     super.initState();
-    _load();
+    // Load lazily: this modal is a permanent child of the root Stack and is
+    // closed most of the time, so reading the asset at startup is wasted work.
+    if (widget.isOpen) _load();
+  }
+
+  @override
+  void didUpdateWidget(PrivacyPolicyModal oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.isOpen && !oldWidget.isOpen) _load();
   }
 
   Future<void> _load() async {
+    if (_loadStarted) return;
+    _loadStarted = true;
     try {
       final text = await rootBundle.loadString(_assetPath);
       if (!mounted) return;

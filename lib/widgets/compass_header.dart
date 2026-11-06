@@ -42,6 +42,9 @@ class CompassHeader extends StatelessWidget {
   final VoidCallback? onShowPrivacyPolicy;
   final VoidCallback? onShowAbout;
 
+  /// Re-opens the first-run welcome tour. Listed directly above About.
+  final VoidCallback? onShowWelcome;
+
   const CompassHeader({
     super.key,
     required this.connection,
@@ -60,6 +63,7 @@ class CompassHeader extends StatelessWidget {
     this.onShowEula,
     this.onShowPrivacyPolicy,
     this.onShowAbout,
+    this.onShowWelcome,
   });
 
   @override
@@ -497,6 +501,14 @@ class CompassHeader extends StatelessWidget {
                                           onTap: () {
                                             entry.remove();
                                             onShowPrivacyPolicy?.call();
+                                          },
+                                        ),
+                                        _buildHeaderMenuItem(
+                                          themeMenu,
+                                          label: 'Show Welcome Screen',
+                                          onTap: () {
+                                            entry.remove();
+                                            onShowWelcome?.call();
                                           },
                                         ),
                                         _buildHeaderMenuItem(

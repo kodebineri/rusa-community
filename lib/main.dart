@@ -43,7 +43,7 @@ import 'widgets/modals/import_export_modal.dart';
 import 'widgets/modals/save_view_modal.dart';
 import 'widgets/modals/mongosh_confirmation_modal.dart';
 import 'widgets/modals/eula_modal.dart';
-import 'widgets/modals/eula_acceptance_modal.dart';
+import 'widgets/modals/onboarding_modal.dart';
 import 'widgets/modals/privacy_policy_modal.dart';
 import 'widgets/modals/about_modal.dart';
 import 'widgets/modals/compass_modal.dart';
@@ -77,38 +77,74 @@ class _CompassAppState extends State<CompassApp> {
   /// `Overlay.of(context)` finds no overlay and throws.
   final GlobalKey<OverlayState> _overlayKey = GlobalKey<OverlayState>();
 
-  /// Whether the user has accepted the EULA. `null` while the stored flag is
-  /// being read; the first-run gate blocks the app while it is `null` or
-  /// `false`.
+  /// Whether the user has accepted the EULA. `null` while the stored flags are
+  /// being read; the first-run cover blocks the app while it is `null`.
   bool? _eulaAccepted;
+
+  /// Whether the welcome tour has been dismissed for good (`onboarding_done`).
+  bool _onboardingDone = false;
+
+  /// True while the welcome tour covers the app. Decided at startup and
+  /// re-armed by the header's "Show Welcome Screen" entry.
+  bool _isOnboardingOpen = false;
 
   @override
   void initState() {
     super.initState();
-    _loadEulaStatus();
+    _loadPreferences();
   }
 
-  Future<void> _loadEulaStatus() async {
-    bool accepted;
+  /// Reads every persisted flag once (consent, tour, theme) and decides what
+  /// covers the app: the welcome tour, or the connection popup as before.
+  Future<void> _loadPreferences() async {
+    StoredPreferences stored;
     try {
-      accepted = await appPreferences.hasAcceptedEula();
+      stored = await appPreferences.load();
     } catch (_) {
       // Never leave the user locked out if the store is unavailable.
-      accepted = false;
+      stored = const StoredPreferences(
+        eulaAccepted: false,
+        onboardingDone: false,
+      );
     }
     if (!mounted) return;
-    setState(() => _eulaAccepted = accepted);
+    // A first-time user reads the tour (which ends in licence acceptance)
+    // instead of being dropped straight into the connect popup — the tour's
+    // second slide is about exploring the bundled sample data first.
+    final showTour = stored.shouldShowOnboarding;
+    setState(() {
+      _eulaAccepted = stored.eulaAccepted;
+      _onboardingDone = stored.onboardingDone;
+      _themeVariant = CompassThemeVariant.fromName(stored.themeVariantName);
+      _isOnboardingOpen = showTour;
+      _isConnectModalOpen = !showTour;
+    });
   }
 
-  /// Called by [EulaAcceptanceModal] when the user accepts the licence. The
-  /// acceptance is persisted, so the gate never returns on this device.
-  void _acceptEula() {
+  /// Called by the welcome tour's last slide. Persists consent (first run only)
+  /// and the "don't show this again" choice, then reveals the app shell.
+  void _finishOnboarding({required bool dontShowAgain}) {
+    final needsConsent = _eulaAccepted != true;
     setState(() {
       _eulaAccepted = true;
-      // First-run flow: after the gate, present the connection popup.
-      _isConnectModalOpen = true;
+      _onboardingDone = dontShowAgain;
+      _isOnboardingOpen = false;
+      // Finishing the tour lands on the sample data, not the connect popup.
+      _isConnectModalOpen = false;
     });
-    unawaited(appPreferences.setEulaAccepted(true));
+    if (needsConsent) unawaited(appPreferences.setEulaAccepted(true));
+    unawaited(appPreferences.setOnboardingDone(dontShowAgain));
+  }
+
+  /// Re-opens the welcome tour from the header / action sheet.
+  void _showOnboarding() {
+    setState(() => _isOnboardingOpen = true);
+  }
+
+  /// Applies a theme and remembers it for the next launch.
+  void _selectTheme(CompassThemeVariant variant) {
+    setState(() => _themeVariant = variant);
+    unawaited(appPreferences.setThemeVariant(variant.name));
   }
 
   /// Shows a transient message dialog above the app shell.
@@ -266,7 +302,10 @@ class _CompassAppState extends State<CompassApp> {
   /// the bundled sample data).
   RealMongoService? _realService;
 
-  bool _isConnectModalOpen = true;
+  /// Whether the connection popup is open. Started **false**: `_loadPreferences`
+  /// decides between the welcome tour and the popup, so the popup can no longer
+  /// flash before the stored flags are read.
+  bool _isConnectModalOpen = false;
   bool _isTerminalOpen = false;
   bool _isMobileSidebarOpen = false;
 
@@ -1113,9 +1152,7 @@ class _CompassAppState extends State<CompassApp> {
                         setState(() => _isTerminalOpen = !_isTerminalOpen);
                       },
                       themeVariant: _themeVariant,
-                      onSelectTheme: (variant) {
-                        setState(() => _themeVariant = variant);
-                      },
+                      onSelectTheme: _selectTheme,
                       onToggleMobileSidebar: () {
                         setState(
                             () => _isMobileSidebarOpen = !_isMobileSidebarOpen);
@@ -1136,6 +1173,7 @@ class _CompassAppState extends State<CompassApp> {
                       onShowAbout: () {
                         setState(() => _isAboutModalOpen = true);
                       },
+                      onShowWelcome: _showOnboarding,
                     ),
   
                     // Main Body: Side-by-side on desktop, or off-canvas sidebar
@@ -1476,9 +1514,7 @@ class _CompassAppState extends State<CompassApp> {
                               ? CompassSvgIcons.moon
                               : CompassSvgIcons.sun),
                       color: _themeVariant == variant ? _theme.accent : null,
-                      onTap: () {
-                        setState(() => _themeVariant = variant);
-                      },
+                      onTap: () => _selectTheme(variant),
                     ),
 
                   CompassActionSheetItem(
@@ -1503,6 +1539,14 @@ class _CompassAppState extends State<CompassApp> {
                     onTap: () {
                       setState(() => _isHeaderActionsOpen = false);
                       setState(() => _isPrivacyPolicyModalOpen = true);
+                    },
+                  ),
+                  CompassActionSheetItem(
+                    label: 'Show Welcome Screen',
+                    svg: CompassSvgIcons.rusa,
+                    onTap: () {
+                      setState(() => _isHeaderActionsOpen = false);
+                      _showOnboarding();
                     },
                   ),
                   CompassActionSheetItem(
@@ -1546,11 +1590,11 @@ class _CompassAppState extends State<CompassApp> {
                 ],
               ),
 
-              // First-run EULA gate: the last child so it paints above every
-              // other overlay and blocks all interaction until accepted. While
-              // the stored flag is still being read (`null`) a blank cover
-              // prevents a flash of the app (or the licence) for returning
-              // users.
+              // First-run welcome tour / EULA gate: the last child so it paints
+              // above every other overlay and blocks all interaction. It owns
+              // licence acceptance (its final slide). While the stored flags
+              // are still being read (`null`) a blank cover prevents a flash of
+              // the app, the tour or the licence for returning users.
               if (_eulaAccepted == null)
                 Positioned.fill(
                   child: GestureDetector(
@@ -1559,10 +1603,13 @@ class _CompassAppState extends State<CompassApp> {
                     child: ColoredBox(color: _theme.bgApp),
                   ),
                 )
-              else if (!_eulaAccepted!)
-                EulaAcceptanceModal(
-                  isOpen: true,
-                  onAccept: _acceptEula,
+              else
+                OnboardingModal(
+                  isOpen: _isOnboardingOpen,
+                  needsEulaConsent: _eulaAccepted != true,
+                  initialDontShowAgain: _onboardingDone,
+                  onSelectTheme: _selectTheme,
+                  onFinish: _finishOnboarding,
                 ),
             ],
           ),
