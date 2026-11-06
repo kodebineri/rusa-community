@@ -1,5 +1,6 @@
 import 'package:flutter/widgets.dart';
 
+import 'compass_colors.dart';
 import 'compass_theme_presets.dart';
 
 /// InheritedWidget that propagates the selected [CompassThemeVariant] down the
@@ -80,6 +81,15 @@ class CompassTheme extends InheritedWidget {
 
   Color get greenBadgeBg => palette.greenBadgeBg;
   Color get greenBadgeBorder => palette.greenBadgeBorder;
+
+  // --- Branding --------------------------------------------------------------
+
+  /// Colour for the Rusa brand mark (`CompassSvgIcons.rusa`) when it is drawn
+  /// straight on the app background — the header and the About modal — so it
+  /// stays visible in both modes: white on dark variants, near-black on light
+  /// ones. (The connection modal's green-gradient badge keeps a fixed white.)
+  Color get brandMark =>
+      isDarkMode ? CompassColors.darkBrandMark : CompassColors.lightBrandMark;
 
   // --- BSON syntax colours ---------------------------------------------------
 

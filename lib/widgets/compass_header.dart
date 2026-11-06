@@ -118,10 +118,10 @@ class CompassHeader extends StatelessWidget {
                           width: 28.0,
                           height: 28.0,
                           alignment: Alignment.center,
-                          child: const CompassSvg(
+                          child: CompassSvg(
                             svgString: CompassSvgIcons.rusa,
                             size: 18.0,
-                            color: Color(0xFFFFFFFF),
+                            color: theme.brandMark,
                           ),
                         ),
                         const SizedBox(width: 8.0), // exact CSS gap

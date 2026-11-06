@@ -1,12 +1,14 @@
 // Basic smoke test for the Rusa (MongoDB database client) Flutter app.
 
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'package:rusa/app_info.dart';
 import 'package:rusa/main.dart';
 import 'package:rusa/icons/compass_svg_icons.dart';
 import 'package:rusa/models/collection_tab.dart';
@@ -20,6 +22,7 @@ import 'package:rusa/widgets/compass_header.dart';
 import 'package:rusa/widgets/compass_icon_button.dart';
 import 'package:rusa/widgets/compass_query_bar.dart';
 import 'package:rusa/widgets/compass_sidebar.dart';
+import 'package:rusa/widgets/modals/about_modal.dart';
 import 'package:rusa/widgets/modals/compass_modal.dart';
 import 'package:rusa/widgets/modals/connection_modal.dart';
 import 'package:rusa/widgets/modals/create_index_modal.dart';
@@ -103,6 +106,21 @@ void main() {
   // gate does not block the app shell. Test 18 overrides this.
   setUp(() {
     SharedPreferences.setMockInitialValues({'eula_accepted': true});
+  });
+
+  test('AboutModal.appVersion mirrors pubspec.yaml', () {
+    final pubspec = File('pubspec.yaml').readAsStringSync();
+    final match =
+        RegExp(r'^version:\s*(\S+)\s*$', multiLine: true).firstMatch(pubspec);
+    expect(match, isNotNull, reason: 'pubspec.yaml must declare a version');
+
+    final declared = match!.group(1)!; // e.g. "1.0.0+1"
+    final parts = declared.split('+');
+    expect(AppInfo.version, parts.first,
+        reason: 'AppInfo.version must match pubspec (bump both together)');
+    expect(AppInfo.buildNumber, parts.length > 1 ? parts[1] : '',
+        reason: 'AppInfo.buildNumber must match pubspec');
+    expect(AboutModal.appVersion, declared);
   });
 
   testWidgets('CompassApp builds without error', (WidgetTester tester) async {
@@ -349,6 +367,46 @@ void main() {
     );
     expect(scaler.scale(10.0), closeTo(13.0, 0.001),
         reason: 'an OS scale of 2.0 should be clamped to 1.3');
+  });
+
+  testWidgets('the brand mark flips colour with the theme brightness',
+      (WidgetTester tester) async {
+    Future<Color> markColour(CompassThemeVariant variant) async {
+      await tester.pumpWidget(
+        Directionality(
+          textDirection: TextDirection.ltr,
+          child: MediaQuery(
+            data: const MediaQueryData(size: Size(1920.0, 1080.0)),
+            child: CompassTheme(
+              variant: variant,
+              child: CompassHeader(
+                connection: null,
+                showResetSample: true,
+                onOpenConnectModal: () {},
+                onDisconnect: () {},
+                isTerminalOpen: false,
+                onToggleTerminal: () {},
+                themeVariant: variant,
+                onSelectTheme: (_) {},
+                onToggleMobileSidebar: () {},
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+      final mark = tester
+          .widgetList<CompassSvg>(find.byType(CompassSvg))
+          .firstWhere((svg) => svg.svgString == CompassSvgIcons.rusa);
+      return mark.color!;
+    }
+
+    expect(await markColour(CompassThemeVariant.dracula),
+        const Color(0xFFFFFFFF),
+        reason: 'the mark is white on dark variants');
+    expect(await markColour(CompassThemeVariant.monokaiLight),
+        const Color(0xFF2B2119),
+        reason: 'the mark is near-black on light variants');
   });
 
   testWidgets('CompassHeader hides Reset Samples button when showResetSample is false',

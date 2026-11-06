@@ -492,20 +492,11 @@ class _ConnectionModalState extends State<ConnectionModal> {
                 Container(
                   width: 32.0,
                   height: 32.0,
-                  decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      colors: [
-                        CompassColors.greenAccent,
-                        CompassColors.greenForest
-                      ],
-                    ),
-                    borderRadius: BorderRadius.circular(8.0),
-                  ),
                   alignment: Alignment.center,
-                  child: const CompassSvg(
+                  child: CompassSvg(
                     svgString: CompassSvgIcons.rusa,
-                    size: 18.0,
-                    color: Color(0xFFFFFFFF),
+                    size: 32.0,
+                    color: _theme.brandMark,
                   ),
                 ),
                 const SizedBox(width: 10.0),

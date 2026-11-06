@@ -1,4 +1,5 @@
 import 'package:flutter/widgets.dart';
+import '../../app_info.dart';
 import '../../icons/compass_svg_icons.dart';
 import '../../theme/compass_theme.dart';
 import '../../theme/compass_typography.dart';
@@ -14,8 +15,9 @@ class AboutModal extends StatelessWidget {
   final bool isOpen;
   final VoidCallback onClose;
 
-  /// Keep in sync with the version badge in `CompassHeader` (`7.0.8`).
-  static const String appVersion = '7.0.8';
+  /// The app version shown in the badge, mirroring `pubspec.yaml`'s `version:`
+  /// field via [AppInfo] (kept in sync by `test/widget_test.dart`).
+  static const String appVersion = AppInfo.fullVersion;
 
   const AboutModal({super.key, required this.isOpen, required this.onClose});
 
@@ -30,14 +32,15 @@ class AboutModal extends StatelessWidget {
       children: [
         const SizedBox(height: 8.0),
 
-        // Logo: the same leaf-on-green-gradient badge as the header, scaled up.
+        // Logo: the Rusa brand mark, tinted from the theme so it stays visible
+        // on both light and dark backgrounds.
         Center(
           child: Container(
             alignment: Alignment.center,
-            child: const CompassSvg(
+            child: CompassSvg(
               svgString: CompassSvgIcons.rusa,
               size: 72.0,
-              color: Color(0xFFFFFFFF),
+              color: theme.brandMark,
             ),
           ),
         ),
@@ -68,7 +71,7 @@ class AboutModal extends StatelessWidget {
 
         const SizedBox(height: 10.0),
 
-        // Version badge, same shape as the header's `7.0.8` chip.
+        // Version badge, mirroring `pubspec.yaml` (`AppInfo.fullVersion`).
         Center(
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 3.0),

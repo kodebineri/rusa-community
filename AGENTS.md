@@ -175,6 +175,7 @@ is mutable and filters the DB tree client-side (`compass_sidebar.dart`).
 | `PrivacyPolicyModal` (renders the bundled `PRIVACY.md`) | `lib/widgets/modals/privacy_policy_modal.dart` |
 | `AboutModal` (logo, app name, version) | `lib/widgets/modals/about_modal.dart` |
 | `appPreferences` (`shared_preferences` wrapper) | `lib/services/app_preferences.dart` |
+| `AppInfo` (app version, mirror of `pubspec.yaml`) | `lib/app_info.dart` |
 | `CompassMarkdownView` (dependency-free Markdown renderer) | `lib/widgets/compass_markdown_view.dart` |
 | `CompassActionSheet` (touch overflow sheet) | `lib/widgets/modals/compass_action_sheet.dart` |
 | `CompassIconButton`, `CompassHover` | `lib/widgets/compass_icon_button.dart`, `lib/widgets/compass_hover.dart` |

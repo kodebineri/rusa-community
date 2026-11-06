@@ -40,6 +40,11 @@ class CompassColors {
   // Content colour drawn on top of an accent-coloured fill
   static const Color lightOnAccent = Color(0xFFFFFFFF);
 
+  // Rusa brand mark (`CompassSvgIcons.rusa`) drawn straight on the app
+  // background (header, About modal) — resolved by `CompassTheme.brandMark`.
+  static const Color darkBrandMark = Color(0xFFFFFFFF);
+  static const Color lightBrandMark = Color(0xFF2B2119);
+
   // Light theme palette
   static const Color lightBgApp = Color(0xFFF9FBFA);
   static const Color lightBgSidebar = Color(0xFFF4F6F8);
