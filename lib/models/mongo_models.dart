@@ -102,6 +102,10 @@ class MongoCollection {
   /// collections are capped), so the sidebar shows this value when available.
   int? documentCount;
 
+  /// Set when the last on-demand load failed (e.g. a timeout), so the view can
+  /// offer a retry instead of showing a misleading "no documents".
+  String? loadError;
+
   MongoCollection({
     required this.name,
     required this.documents,
@@ -114,6 +118,7 @@ class MongoCollection {
     this.pipeline,
     this.isLoading = false,
     this.documentCount,
+    this.loadError,
   });
 }
 

@@ -19,6 +19,8 @@ import 'compass_modal.dart';
 ///  * Advanced Connection Options (host / port / username / password) that
 ///    compose the URI as they are edited.
 ///  * Per-saved-connection deletion.
+///  * Per-saved-connection editing: the form loads the saved profile and
+///    "Update & Connect" saves the changes back onto the same profile.
 ///  * A "Save & Connect" action in the footer next to "Connect".
 ///  * A "Sample Data" option that connects to the bundled local sample
 ///    datasets (the port of React's "Load Sample Datasets" affordance).
@@ -75,6 +77,11 @@ class _ConnectionModalState extends State<ConnectionModal> {
   String? _connectError;
   String? _testMessage;
 
+  /// The saved connection currently being edited, if any. When set, saving
+  /// updates that profile in place (same id) instead of adding a new one.
+  String? _editingId;
+  String? _editingName;
+
   @override
   void initState() {
     super.initState();
@@ -101,6 +108,8 @@ class _ConnectionModalState extends State<ConnectionModal> {
     _isTesting = false;
     _connectError = null;
     _testMessage = null;
+    _editingId = null;
+    _editingName = null;
     _syncingUri = false;
   }
 
@@ -169,14 +178,90 @@ class _ConnectionModalState extends State<ConnectionModal> {
     return typed.isEmpty ? _composeUri() : typed;
   }
 
+  ConnectionProfile? get _editingProfile {
+    final id = _editingId;
+    if (id == null) return null;
+    for (final c in widget.savedConnections) {
+      if (c.id == id) return c;
+    }
+    return null;
+  }
+
   ConnectionProfile _buildProfile() {
     final name = _nameController.text.trim();
+    // Editing keeps the saved profile's identity and metadata; saving then
+    // updates it in place instead of creating a duplicate.
+    final base = _editingProfile;
     return ConnectionProfile(
-      id: DateTime.now().microsecondsSinceEpoch.toString(),
-      name: name.isEmpty ? 'MongoDB Cluster' : name,
+      id: base?.id ?? DateTime.now().microsecondsSinceEpoch.toString(),
+      name: name.isEmpty ? (base?.name ?? 'MongoDB Cluster') : name,
       uri: _effectiveUri(),
-      lastConnected: 'Just now',
+      color: base?.color,
+      favorite: base?.favorite ?? false,
+      lastConnected: base?.lastConnected ?? 'Just now',
+      readOnly: base?.readOnly ?? false,
     );
+  }
+
+  /// Loads a saved connection into the form so it can be edited and re-saved.
+  void _startEditing(ConnectionProfile profile) {
+    final parts = _parseUri(profile.uri);
+    _syncingUri = true;
+    _uriController.text = profile.uri;
+    _nameController.text = profile.name;
+    _hostController.text = parts.host;
+    _portController.text = parts.port;
+    _usernameController.text = parts.user;
+    _passwordController.text = parts.password;
+    _syncingUri = false;
+    setState(() {
+      _editingId = profile.id;
+      _editingName = profile.name;
+      _connectError = null;
+      _testMessage = null;
+    });
+  }
+
+  void _cancelEditing() {
+    setState(_resetFields);
+  }
+
+  /// Best-effort split of a connection URI into the advanced-form fields.
+  ({String host, String port, String user, String password}) _parseUri(
+      String uri) {
+    var rest = uri.trim();
+    final scheme = rest.indexOf('://');
+    if (scheme >= 0) rest = rest.substring(scheme + 3);
+    // Drop the path, query string and any replica-set hosts after the first.
+    for (final sep in ['/', '?']) {
+      final i = rest.indexOf(sep);
+      if (i >= 0) rest = rest.substring(0, i);
+    }
+    var hostPort = rest.split(',').first;
+
+    var user = '';
+    var password = '';
+    final at = hostPort.lastIndexOf('@');
+    if (at >= 0) {
+      final userInfo = hostPort.substring(0, at);
+      hostPort = hostPort.substring(at + 1);
+      final colon = userInfo.indexOf(':');
+      if (colon >= 0) {
+        user = userInfo.substring(0, colon);
+        password = userInfo.substring(colon + 1);
+      } else {
+        user = userInfo;
+      }
+    }
+
+    var host = hostPort;
+    var port = '';
+    final colon = hostPort.lastIndexOf(':');
+    if (colon >= 0) {
+      host = hostPort.substring(0, colon);
+      port = hostPort.substring(colon + 1);
+    }
+    return (host: host, port: port, user: user, password: password);
   }
 
   Future<void> _connect() => _attemptConnect(_buildProfile());
@@ -327,6 +412,10 @@ class _ConnectionModalState extends State<ConnectionModal> {
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
                         _buildUriSection(),
+                        if (_editingId != null) ...[
+                          const SizedBox(height: 12.0),
+                          _buildEditingBanner(),
+                        ],
                         if (_connectError != null) ...[
                           const SizedBox(height: 12.0),
                           CompassErrorBanner(message: _connectError!),
@@ -470,6 +559,41 @@ class _ConnectionModalState extends State<ConnectionModal> {
           ],
         ),
       ],
+    );
+  }
+
+  /// Banner shown while a saved connection is loaded for editing.
+  Widget _buildEditingBanner() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),
+      decoration: BoxDecoration(
+        color: _theme.greenBadgeBg,
+        borderRadius: BorderRadius.circular(8.0),
+        border: Border.all(color: _theme.accent, width: 1.0),
+      ),
+      child: Row(
+        children: [
+          CompassSvg(
+            svgString: CompassSvgIcons.pencil,
+            size: 14.0,
+            color: _theme.accent,
+          ),
+          const SizedBox(width: 8.0),
+          Expanded(
+            child: Text(
+              'Editing “${_editingName ?? ''}”. Update & Connect to update it.',
+              style: CompassTypography.bodyMedium(color: _theme.textPrimary),
+            ),
+          ),
+          GestureDetector(
+            onTap: _isConnecting ? null : _cancelEditing,
+            child: Text(
+              'Cancel',
+              style: CompassTypography.header(color: _theme.accent),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -684,13 +808,17 @@ class _ConnectionModalState extends State<ConnectionModal> {
   }
 
   Widget _buildSavedItem(ConnectionProfile profile) {
+    final isEditing = profile.id == _editingId;
     return Container(
       margin: const EdgeInsets.only(bottom: 6.0),
       padding: const EdgeInsets.all(10.0),
       decoration: BoxDecoration(
-        color: _theme.bgSubtle,
+        color: isEditing ? _theme.greenBadgeBg : _theme.bgSubtle,
         borderRadius: BorderRadius.circular(8.0),
-        border: Border.all(color: _theme.border, width: 1.0),
+        border: Border.all(
+          color: isEditing ? _theme.accent : _theme.border,
+          width: 1.0,
+        ),
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -733,6 +861,16 @@ class _ConnectionModalState extends State<ConnectionModal> {
             ),
           ),
           const SizedBox(width: 8.0),
+          // Edit saved connection
+          CompassIconButton(
+            svgString: CompassSvgIcons.pencil,
+            onTap: _isConnecting ? null : () => _startEditing(profile),
+            size: 13.0,
+            padding: 4.0,
+            color: isEditing ? _theme.accent : _theme.textMuted,
+            semanticLabel: 'Edit saved connection',
+          ),
+          const SizedBox(width: 6.0),
           // Delete saved connection
           CompassIconButton(
             svgString: CompassSvgIcons.trash,
@@ -759,18 +897,26 @@ class _ConnectionModalState extends State<ConnectionModal> {
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Text(
-            'Rusa — a MongoDB database client',
+            'Rusa — a MongoDB client',
             style: CompassTypography.caption(color: _theme.textMuted),
           ),
           Row(
             children: [
+              if (_editingId != null) ...[
+                CompassSecondaryButton(
+                  label: 'Cancel',
+                  onTap: _isConnecting ? null : _cancelEditing,
+                ),
+                const SizedBox(width: 8.0),
+              ],
               CompassSecondaryButton(
                 label: _isTesting ? 'Testing…' : 'Test',
                 onTap: busy ? null : _testConnection,
               ),
               const SizedBox(width: 8.0),
               CompassSecondaryButton(
-                label: 'Save & Connect',
+                label:
+                    _editingId != null ? 'Update & Connect' : 'Save & Connect',
                 onTap: _isConnecting ? null : _saveAndConnect,
               ),
               const SizedBox(width: 8.0),

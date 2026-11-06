@@ -564,8 +564,12 @@ class _CompassAppState extends State<CompassApp> {
 
   void _handleSaveConnection(ConnectionProfile profile) {
     setState(() {
-      final existingIndex =
-          _savedConnections.indexWhere((c) => c.uri == profile.uri);
+      // Update an existing entry in place: prefer the id (editing a saved
+      // connection), otherwise match the URI so re-saving the same server
+      // doesn't create a duplicate.
+      final byId = _savedConnections.indexWhere((c) => c.id == profile.id);
+      final byUri = _savedConnections.indexWhere((c) => c.uri == profile.uri);
+      final existingIndex = byId >= 0 ? byId : byUri;
       if (existingIndex >= 0) {
         _savedConnections[existingIndex] = profile;
       } else {
@@ -1149,6 +1153,20 @@ class _CompassAppState extends State<CompassApp> {
                                   onResetQuery: () {
                                     setState(() =>
                                         _queryOptions = QueryFilterOptions());
+                                    // The circular-arrow button doubles as a
+                                    // refresh: reload the collection from the
+                                    // server (no-op for the sample engine).
+                                    final service = mongoEngine;
+                                    if (service is RealMongoService &&
+                                        _selectedDbName.isNotEmpty &&
+                                        _selectedCollName.isNotEmpty) {
+                                      final coll = service.getCollection(
+                                          _selectedDbName, _selectedCollName);
+                                      coll?.loadError = null;
+                                      unawaited(service.loadCollectionData(
+                                          _selectedDbName, _selectedCollName,
+                                          force: true));
+                                    }
                                   },
                                   onExportToLanguage: _openExportLanguage,
                                   optionsExpanded: _isQueryOptionsExpanded,
@@ -2108,6 +2126,69 @@ class _CompassAppState extends State<CompassApp> {
     );
   }
 
+  /// Error state shown when an on-demand load failed and nothing is loaded, so
+  /// the user can retry instead of seeing a misleading "no documents".
+  Widget _buildCollectionErrorState(MongoCollection activeColl) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(vertical: 64.0, horizontal: 24.0),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 48.0,
+            height: 48.0,
+            decoration: BoxDecoration(
+              color: _theme.bgPanel,
+              shape: BoxShape.circle,
+              border: Border.all(color: CompassColors.errorRed, width: 1.0),
+            ),
+            alignment: Alignment.center,
+            child: const CompassSvg(
+              svgString: CompassSvgIcons.activity,
+              size: 22.0,
+              color: CompassColors.errorRed,
+            ),
+          ),
+          const SizedBox(height: 12.0),
+          Text('Could not load "${activeColl.name}"',
+              style: CompassTypography.header(color: _theme.textPrimary)),
+          const SizedBox(height: 6.0),
+          ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 420.0),
+            child: Text(
+              activeColl.loadError ?? 'The server did not return the documents.',
+              textAlign: TextAlign.center,
+              style: CompassTypography.bodyMedium(color: _theme.textMuted),
+            ),
+          ),
+          const SizedBox(height: 16.0),
+          CompassPrimaryButton(
+            label: 'Retry',
+            iconSvg: CompassSvgIcons.rotateCcw,
+            onTap: _retryLoadCollection,
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Reloads the active collection from the server.
+  void _retryLoadCollection() {
+    final service = mongoEngine;
+    if (service is RealMongoService &&
+        _selectedDbName.isNotEmpty &&
+        _selectedCollName.isNotEmpty) {
+      final coll = service.getCollection(_selectedDbName, _selectedCollName);
+      if (coll != null) {
+        coll.loadError = null;
+      }
+      unawaited(service.loadCollectionData(_selectedDbName, _selectedCollName,
+          force: true));
+    }
+    setState(() {});
+  }
+
   Widget _buildActiveTabView(
     MongoCollection? activeColl,
     List<MongoDocument> docs,
@@ -2121,6 +2202,12 @@ class _CompassAppState extends State<CompassApp> {
           style: CompassTypography.bodyMedium(color: _theme.textMuted),
         ),
       );
+    }
+
+    // A failed load with nothing loaded: offer a retry rather than an empty
+    // state that looks like "this collection has no documents".
+    if (activeColl.loadError != null && activeColl.documents.isEmpty) {
+      return _buildCollectionErrorState(activeColl);
     }
 
     // A live collection whose documents are still inbound: show progress rather

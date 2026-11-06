@@ -34,6 +34,11 @@ class RealMongoService extends LocalMongoEngine {
   /// Cap for the on-demand load performed when the user opens a collection.
   static const int maxDocsWhenOpened = 50000;
 
+  /// How many documents are fetched per round-trip while opening a collection.
+  /// Small chunks keep each request fast, bound memory, and let the view fill
+  /// in progressively instead of blocking on one huge query.
+  static const int docLoadChunkSize = 200;
+
   final String uri;
   final mdb.Db _primary;
 
@@ -242,32 +247,81 @@ class RealMongoService extends LocalMongoEngine {
     if (changed && !_disposed) onDataChanged?.call();
   }
 
-  /// Loads documents and indexes for a specific collection on-demand.
-  Future<void> loadCollectionData(String dbName, String collName) async {
+  /// Loads a collection's documents on-demand, in bounded chunks.
+  ///
+  /// The first chunk is assigned to the mirror (and shown) immediately; the
+  /// rest stream in progressively. This keeps memory bounded and means a single
+  /// slow batch can't fail the whole load. A failure with nothing loaded records
+  /// [MongoCollection.loadError] so the view can offer a retry instead of
+  /// claiming the collection is empty.
+  Future<void> loadCollectionData(
+    String dbName,
+    String collName, {
+    bool force = false,
+  }) async {
     final coll = getCollection(dbName, collName);
-    if (coll == null) return;
-    final showSpinner = coll.documents.isEmpty;
-    if (showSpinner && !coll.isLoading) {
-      coll.isLoading = true;
-      if (!_disposed) onDataChanged?.call();
+    if (coll == null || coll.isLoading) return;
+    // Already fully loaded and not explicitly refreshing: nothing to do.
+    if (!force &&
+        coll.documentCount != null &&
+        coll.documents.length >= coll.documentCount!) {
+      return;
     }
+
+    coll.isLoading = true;
+    coll.loadError = null;
+    if (!_disposed) onDataChanged?.call();
+
     try {
       final dbHandle = await _openDb(dbName);
       final c = dbHandle.collection(collName);
-      final docs = await _loadDocuments(c, limit: maxDocsWhenOpened)
-          .timeout(const Duration(seconds: 30));
+
+      final loaded = <MongoDocument>[];
+      var skip = 0;
+      Object? firstError;
+
+      while (loaded.length < maxDocsWhenOpened) {
+        final want =
+            (maxDocsWhenOpened - loaded.length).clamp(0, docLoadChunkSize);
+        if (want == 0) break;
+
+        List<MongoDocument> batch;
+        try {
+          batch = await _loadDocuments(c, skip: skip, limit: want)
+              .timeout(const Duration(seconds: 20));
+        } catch (err) {
+          if (loaded.isEmpty) firstError = err;
+          break;
+        }
+
+        if (batch.isEmpty) break;
+        loaded.addAll(batch);
+        skip += batch.length;
+
+        // Show what has arrived so far instead of waiting for everything.
+        coll.documents = List<MongoDocument>.from(loaded);
+        if (!_disposed) onDataChanged?.call();
+
+        if (batch.length < want) break;
+      }
+
+      coll.isLoading = false;
+      if (loaded.isEmpty && firstError != null) {
+        coll.loadError = '$firstError';
+      }
+      if (!_disposed) onDataChanged?.call();
+
+      // Indexes and count are secondary: load them after the documents show.
       final indexes = coll.isView
           ? [MongoIndex(name: '_id_', keys: const {'_id': 1})]
-          : await _loadIndexes(c).timeout(const Duration(seconds: 8));
+          : await _loadIndexes(c);
       final count = await _loadDocumentCount(c);
-
-      coll.documents = docs;
       coll.indexes = indexes;
       coll.documentCount = count ?? coll.documentCount;
-      coll.isLoading = false;
       if (!_disposed) onDataChanged?.call();
-    } catch (_) {
+    } catch (err) {
       coll.isLoading = false;
+      if (coll.documents.isEmpty) coll.loadError = '$err';
       if (!_disposed) onDataChanged?.call();
     }
   }
@@ -404,9 +458,10 @@ class RealMongoService extends LocalMongoEngine {
   Future<List<MongoDocument>> _loadDocuments(
     mdb.DbCollection coll, {
     int limit = maxDocsPerCollection,
+    int skip = 0,
   }) async {
     final docs = <MongoDocument>[];
-    final stream = coll.find(mdb.where.limit(limit));
+    final stream = coll.find(mdb.where.skip(skip).limit(limit));
     await for (final raw in stream) {
       docs.add(MongoDocument.fromMap(_normalizeMap(raw)));
       if (docs.length >= limit) break;

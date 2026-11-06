@@ -1217,4 +1217,51 @@ void main() {
       isTrue,
     );
   });
+
+  testWidgets('saved connections can be edited from the connect popup',
+      (WidgetTester tester) async {
+    tester.view.physicalSize = const Size(1920.0, 1080.0);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(const CompassApp());
+    await tester.pump();
+    for (var i = 0; i < 50 && tester.takeException() != null; i++) {}
+
+    final modal = find.byType(ConnectionModal);
+    expect(modal, findsOneWidget);
+
+    // One edit (pencil) button per saved connection, alongside delete.
+    final editIcons = find.descendant(
+      of: modal,
+      matching: find.byWidgetPredicate(
+        (w) => w is CompassSvg && w.svgString == CompassSvgIcons.pencil,
+      ),
+    );
+    expect(editIcons, findsNWidgets(2));
+
+    // Edit the second saved connection (Atlas), whose URI differs from the
+    // default form values, so the assertion is meaningful.
+    await tester.ensureVisible(editIcons.last);
+    await tester.pump();
+    await tester.tap(editIcons.last);
+    await tester.pump();
+    for (var i = 0; i < 50 && tester.takeException() != null; i++) {}
+
+    final texts = find
+        .descendant(of: modal, matching: find.byType(EditableText))
+        .evaluate()
+        .map((e) => (e.widget as EditableText).controller.text)
+        .toList();
+    expect(texts, contains('mongodb+srv://admin@cluster0.mongodb.net/test'));
+    expect(texts, contains('Atlas Production ReplicaSet'));
+
+    // The footer switches to an in-place update while editing.
+    expect(find.text('Update & Connect'), findsOneWidget);
+    expect(
+      find.text('Editing “Atlas Production ReplicaSet”. Save to update it.'),
+      findsOneWidget,
+    );
+  });
 }
