@@ -222,6 +222,10 @@ class CompassInput extends StatefulWidget {
   final bool mono;
   final bool obscureText;
   final bool autoIndent;
+
+  /// Optional widget rendered inside the field, after the text (e.g. a copy
+  /// button). It sits within the field's border, not beside it.
+  final Widget? suffix;
   final ValueChanged<String>? onChanged;
   final ValueChanged<String>? onSubmitted;
 
@@ -236,6 +240,7 @@ class CompassInput extends StatefulWidget {
     this.mono = true,
     this.obscureText = false,
     this.autoIndent = false,
+    this.suffix,
     this.onChanged,
     this.onSubmitted,
   });
@@ -281,7 +286,7 @@ class _CompassInputState extends State<CompassInput> {
         child: ValueListenableBuilder<TextEditingValue>(
           valueListenable: widget.controller,
           builder: (context, value, _) {
-            return Stack(
+            final Widget field = Stack(
               alignment: Alignment.topLeft,
               children: [
                 if (value.text.isEmpty && widget.placeholder.isNotEmpty)
@@ -315,6 +320,18 @@ class _CompassInputState extends State<CompassInput> {
                     density: density,
                   ),
                 ),
+              ],
+            );
+            final Widget? suffix = widget.suffix;
+            if (suffix == null) return field;
+            return Row(
+              crossAxisAlignment: widget.maxLines > 1
+                  ? CrossAxisAlignment.start
+                  : CrossAxisAlignment.center,
+              children: [
+                Expanded(child: field),
+                const SizedBox(width: 8.0),
+                suffix,
               ],
             );
           },

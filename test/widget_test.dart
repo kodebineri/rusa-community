@@ -12,6 +12,7 @@ import 'package:rusa/icons/compass_svg_icons.dart';
 import 'package:rusa/models/collection_tab.dart';
 import 'package:rusa/models/mongo_models.dart';
 import 'package:rusa/services/mongo_engine.dart';
+import 'package:rusa/theme/compass_density.dart';
 import 'package:rusa/theme/compass_theme.dart';
 import 'package:rusa/theme/compass_theme_presets.dart';
 import 'package:rusa/widgets/collection_tab_bar.dart';
@@ -65,6 +66,36 @@ Future<void> closeConnectionPopup(WidgetTester tester) async {
   for (var i = 0; i < 50 && tester.takeException() != null; i++) {}
 }
 
+/// A standalone [CompassQueryBar] at [width], with a desktop or touch profile,
+/// so layout tests can exercise the inline vs. stacked action rows.
+Widget queryBarFor({required double width, required bool touch}) {
+  return Directionality(
+    textDirection: TextDirection.ltr,
+    child: Overlay(
+      initialEntries: [
+        OverlayEntry(
+          builder: (context) => CompassDensity.forWidth(
+            width: width,
+            touchDevice: touch,
+            child: MediaQuery(
+              data: MediaQueryData(size: Size(width, 1000.0)),
+              child: CompassQueryBar(
+                options: QueryFilterOptions(),
+                onChangeOptions: (_) {},
+                onExecuteQuery: () {},
+                onResetQuery: () {},
+                optionsExpanded: false,
+                onToggleOptions: () {},
+                onOpenOverflow: () {},
+              ),
+            ),
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
 void main() {
   // All tests run as a user who has already accepted the EULA, so the first-run
   // gate does not block the app shell. Test 18 overrides this.
@@ -113,7 +144,6 @@ void main() {
                   onChangeOptions: (updated) => last = updated,
                   onExecuteQuery: () {},
                   onResetQuery: () {},
-                  onExportToLanguage: () {},
                   optionsExpanded: false,
                   onToggleOptions: () {},
                   onOpenOverflow: () {},
@@ -164,6 +194,37 @@ void main() {
     expect(last?.filter, 'xy');
 
     for (var i = 0; i < 50 && tester.takeException() != null; i++) {}
+  });
+
+  testWidgets('tablet query bar keeps Options/Reset/Find inline',
+      (WidgetTester tester) async {
+    tester.view.physicalSize = const Size(800.0, 1000.0);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(queryBarFor(width: 800.0, touch: true));
+    await tester.pump();
+    for (var i = 0; i < 50 && tester.takeException() != null; i++) {}
+
+    // One inline row: the stacked layout is the only thing that uses a Wrap.
+    expect(find.byType(Wrap), findsNothing);
+    expect(find.text('Options'), findsOneWidget);
+    expect(find.text('Find'), findsOneWidget);
+  });
+
+  testWidgets('a narrow query bar wraps the action buttons',
+      (WidgetTester tester) async {
+    tester.view.physicalSize = const Size(600.0, 1000.0);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(queryBarFor(width: 600.0, touch: true));
+    await tester.pump();
+    for (var i = 0; i < 50 && tester.takeException() != null; i++) {}
+
+    expect(find.byType(Wrap), findsWidgets);
   });
 
   testWidgets('CompassInput handles Backspace and arrow keys (needs DefaultTextEditingShortcuts)',
@@ -1260,8 +1321,64 @@ void main() {
     // The footer switches to an in-place update while editing.
     expect(find.text('Update & Connect'), findsOneWidget);
     expect(
-      find.text('Editing “Atlas Production ReplicaSet”. Save to update it.'),
+      find.textContaining('Editing “Atlas Production ReplicaSet”'),
       findsOneWidget,
     );
+  });
+
+  testWidgets('the URI field copy button copies the connection string',
+      (WidgetTester tester) async {
+    tester.view.physicalSize = const Size(1920.0, 1080.0);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final copied = <String>[];
+    tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+      SystemChannels.platform,
+      (call) async {
+        if (call.method == 'Clipboard.setData') {
+          copied.add((call.arguments as Map)['text'] as String);
+        }
+        return null;
+      },
+    );
+    addTearDown(() => tester.binding.defaultBinaryMessenger
+        .setMockMethodCallHandler(SystemChannels.platform, null));
+
+    await tester.pumpWidget(const CompassApp());
+    await tester.pump();
+    for (var i = 0; i < 50 && tester.takeException() != null; i++) {}
+
+    final modal = find.byType(ConnectionModal);
+    expect(modal, findsOneWidget);
+
+    final copyIcon = find.descendant(
+      of: modal,
+      matching: find.byWidgetPredicate(
+        (w) => w is CompassSvg && w.svgString == CompassSvgIcons.copy,
+      ),
+    );
+    expect(copyIcon, findsWidgets);
+
+    await tester.tap(copyIcon.first);
+    await tester.pump();
+    for (var i = 0; i < 50 && tester.takeException() != null; i++) {}
+
+    expect(copied, contains('mongodb://localhost:27017'));
+
+    // The icon swaps to a checkmark to confirm the copy.
+    expect(
+      find.descendant(
+        of: modal,
+        matching: find.byWidgetPredicate(
+          (w) => w is CompassSvg && w.svgString == CompassSvgIcons.check,
+        ),
+      ),
+      findsWidgets,
+    );
+
+    // Let the 2-second reset timer fire so no timer is left pending.
+    await tester.pump(const Duration(seconds: 2));
   });
 }

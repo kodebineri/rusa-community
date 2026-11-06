@@ -39,7 +39,6 @@ import 'widgets/modals/drop_index_modal.dart';
 import 'widgets/modals/delete_document_modal.dart';
 import 'widgets/modals/insert_document_modal.dart';
 import 'widgets/modals/import_export_modal.dart';
-import 'widgets/modals/export_language_modal.dart';
 import 'widgets/modals/save_view_modal.dart';
 import 'widgets/modals/mongosh_confirmation_modal.dart';
 import 'widgets/modals/eula_modal.dart';
@@ -353,8 +352,6 @@ class _CompassAppState extends State<CompassApp> {
 
   bool _isImportExportModalOpen = false;
   ImportExportMode _importExportMode = ImportExportMode.export;
-
-  bool _isExportLangModalOpen = false;
 
   bool _isSaveViewModalOpen = false;
   List<dynamic> _saveViewPipeline = const [];
@@ -816,10 +813,6 @@ class _CompassAppState extends State<CompassApp> {
     });
   }
 
-  void _openExportLanguage() {
-    setState(() => _isExportLangModalOpen = true);
-  }
-
   void _openSaveView(List<dynamic> pipeline, String pipelineJson) {
     setState(() {
       _saveViewPipeline = pipeline;
@@ -1006,7 +999,11 @@ class _CompassAppState extends State<CompassApp> {
   Widget _buildShell(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final isDesktop = constraints.maxWidth >= 768;
+        // Touch platforms need more width before the docked desktop layout:
+        // an 8-inch tablet in portrait (~800 dp) keeps the touch layout.
+        final isTouchPlatform = CompassDensity.isTouchPrimaryPlatform;
+        final isDesktop = constraints.maxWidth >=
+            CompassDensity.desktopBreakpointFor(isTouchPlatform);
         _isTouchLayout = !isDesktop;
         _windowWidth = constraints.maxWidth;
 
@@ -1168,7 +1165,6 @@ class _CompassAppState extends State<CompassApp> {
                                           force: true));
                                     }
                                   },
-                                  onExportToLanguage: _openExportLanguage,
                                   optionsExpanded: _isQueryOptionsExpanded,
                                   onToggleOptions: () {
                                     setState(() => _isQueryOptionsExpanded =
@@ -1342,14 +1338,6 @@ class _CompassAppState extends State<CompassApp> {
                 documents: docs,
                 onImportComplete: () => setState(() {}),
               ),
-              ExportLanguageModal(
-                isOpen: _isExportLangModalOpen,
-                onClose: () => setState(() => _isExportLangModalOpen = false),
-                dbName: _selectedDbName,
-                collName: _selectedCollName,
-                filter: _queryOptions.filter,
-                sort: _queryOptions.sort,
-              ),
               SaveViewModal(
                 isOpen: _isSaveViewModalOpen,
                 onClose: () => setState(() => _isSaveViewModalOpen = false),
@@ -1481,11 +1469,6 @@ class _CompassAppState extends State<CompassApp> {
                     onTap: () {
                       setState(() => _queryOptions = QueryFilterOptions());
                     },
-                  ),
-                  CompassActionSheetItem(
-                    label: 'Show generated code',
-                    svg: CompassSvgIcons.code,
-                    onTap: _openExportLanguage,
                   ),
                 ],
               ),
@@ -2247,7 +2230,6 @@ class _CompassAppState extends State<CompassApp> {
           dbName: _selectedDbName,
           collName: _selectedCollName,
           onSaveAsView: _openSaveView,
-          onExportCode: _openExportLanguage,
         );
       case 'schema':
         // SchemaView owns its analysis state: it re-runs `analyzeSchema` on

@@ -120,9 +120,13 @@ the legacy `src/` React app; `npm` is not needed for Flutter work).
     (`documents|aggregations|schema|indexes`), view mode = `_docViewMode`
     (`tree|json|table`), tab index = `_activeTabIndex` (`-1` = none sentinel). There is no
     `_activeSection` or `_activeTabId`.
-13. **Touch layer (mobile):** metrics come from `CompassDensity.of(context)`
-    (`lib/theme/compass_density.dart`; tap target 20 dp desktop / **44 dp** touch, switched
-    by viewport width < 768). Icon-only controls use `CompassIconButton` (guarantees the hit
+13. **Touch layer (mobile/tablet):** metrics come from `CompassDensity.of(context)`
+    (`lib/theme/compass_density.dart`; tap target 20 dp desktop / **44 dp** touch). The touch
+    profile is used when the viewport is < 768 dp wide **or**
+    `CompassDensity.isTouchPrimaryPlatform` is true (Android/iOS/Fuchsia, read from `dart:io`
+    so `flutter test` stays on the desktop profile) — this keeps 8-inch tablets in landscape
+    finger-sized. The docked desktop layout switches at 1024 dp on touch platforms
+    (`desktopBreakpointFor`). Icon-only controls use `CompassIconButton` (guarantees the hit
     area without changing the glyph size); hover/tap feedback uses `CompassHover` (builder
     API — the control paints its own hover fill); actions that do not fit go into
     `CompassActionSheet`, which is a root-`Stack` child like the modals. Never hard-code

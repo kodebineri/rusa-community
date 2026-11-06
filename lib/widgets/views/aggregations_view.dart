@@ -59,14 +59,12 @@ class AggregationsView extends StatefulWidget {
   final String dbName;
   final String collName;
   final Function(List<dynamic> pipeline, String pipelineJson)? onSaveAsView;
-  final VoidCallback? onExportCode;
 
   const AggregationsView({
     super.key,
     required this.dbName,
     required this.collName,
     this.onSaveAsView,
-    this.onExportCode,
   });
 
   @override
@@ -512,34 +510,6 @@ class _AggregationsViewState extends State<AggregationsView> {
                           Text(
                             'Save as View',
                             style: CompassTypography.bodyMedium(color: CompassColors.warningAmber),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 8.0),
-
-                  // Export Code
-                  GestureDetector(
-                    onTap: widget.onExportCode,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10.0, vertical: 6.0),
-                      decoration: BoxDecoration(
-                        color: _theme.bgSubtle,
-                        borderRadius: BorderRadius.circular(6.0),
-                        border: Border.all(color: _theme.border, width: 1.0),
-                      ),
-                      child: Row(
-                        children: [
-                          CompassSvg(
-                            svgString: CompassSvgIcons.code,
-                            size: 13.0,
-                            color: _theme.accent,
-                          ),
-                          const SizedBox(width: 6.0),
-                          Text(
-                            'Export Code',
-                            style: CompassTypography.bodyMedium(color: _theme.textSecondary),
                           ),
                         ],
                       ),

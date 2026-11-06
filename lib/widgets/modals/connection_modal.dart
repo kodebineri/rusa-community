@@ -1,3 +1,4 @@
+import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import '../../theme/compass_colors.dart';
 import '../../theme/compass_theme.dart';
@@ -77,6 +78,9 @@ class _ConnectionModalState extends State<ConnectionModal> {
   String? _connectError;
   String? _testMessage;
 
+  /// Briefly true after the URI is copied, so the icon can show a check.
+  bool _uriCopied = false;
+
   /// The saved connection currently being edited, if any. When set, saving
   /// updates that profile in place (same id) instead of adding a new one.
   String? _editingId;
@@ -108,6 +112,7 @@ class _ConnectionModalState extends State<ConnectionModal> {
     _isTesting = false;
     _connectError = null;
     _testMessage = null;
+    _uriCopied = false;
     _editingId = null;
     _editingName = null;
     _syncingUri = false;
@@ -549,6 +554,7 @@ class _ConnectionModalState extends State<ConnectionModal> {
               child: CompassInput(
                 controller: _uriController,
                 placeholder: 'mongodb://localhost:27017 or mongodb+srv://...',
+                suffix: _buildUriCopyButton(),
               ),
             ),
             const SizedBox(width: 8.0),
@@ -559,6 +565,30 @@ class _ConnectionModalState extends State<ConnectionModal> {
           ],
         ),
       ],
+    );
+  }
+
+  /// Copies the connection string that Connect would use and briefly shows a
+  /// check in place of the icon.
+  void _copyUri() {
+    final uri = _effectiveUri();
+    if (uri.isEmpty) return;
+    Clipboard.setData(ClipboardData(text: uri));
+    setState(() => _uriCopied = true);
+    Future.delayed(const Duration(seconds: 2), () {
+      if (mounted) setState(() => _uriCopied = false);
+    });
+  }
+
+  /// The copy-to-clipboard icon shown inside the URI field.
+  Widget _buildUriCopyButton() {
+    return CompassIconButton(
+      svgString: _uriCopied ? CompassSvgIcons.check : CompassSvgIcons.copy,
+      onTap: _copyUri,
+      size: 14.0,
+      padding: 4.0,
+      color: _uriCopied ? _theme.accent : _theme.textMuted,
+      semanticLabel: _uriCopied ? 'Copied' : 'Copy connection string',
     );
   }
 

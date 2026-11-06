@@ -1,3 +1,5 @@
+import 'dart:io' show Platform;
+
 import 'package:flutter/widgets.dart';
 
 /// Adaptive density metrics for the whole UI.
@@ -70,10 +72,42 @@ class CompassDensity extends InheritedWidget {
   /// Viewport width below which the layout switches to the touch profile.
   static const double touchBreakpoint = 768.0;
 
+  /// Width at or above which the *docked* desktop layout is used.
+  ///
+  /// Touch platforms switch later (see [isTouchPrimaryPlatform]): an 8-inch
+  /// tablet in portrait is ~800 dp wide, and the docked sidebar plus dense
+  /// chrome is a poor fit there, so it keeps the roomier touch layout instead.
+  static double desktopBreakpointFor(bool isTouchPlatform) =>
+      isTouchPlatform ? 1024.0 : touchBreakpoint;
+
+  /// Whether the running platform's primary input is touch (phones/tablets).
+  ///
+  /// Android, iOS and Fuchsia are always treated as touch: an 8-inch tablet in
+  /// landscape is *wider* than [touchBreakpoint] yet still needs finger-sized
+  /// targets, so width alone is not enough. Desktop platforms keep the width
+  /// switch, so a narrow desktop window still promotes to the touch profile
+  /// while a normal mouse-driven window stays dense.
+  ///
+  /// This reads `dart:io`'s platform rather than `defaultTargetPlatform`,
+  /// because `flutter test` reports the latter as Android — which would force
+  /// every desktop-layout test into the touch profile. `dart:io` reports the
+  /// actual host (windows/linux/macOS in tests).
+  static bool get isTouchPrimaryPlatform =>
+      Platform.isAndroid || Platform.isIOS || Platform.isFuchsia;
+
   /// Wraps [child] in the profile that matches a viewport of [width] logical
   /// pixels.
-  static Widget forWidth({required double width, required Widget child}) {
-    final profile = width < touchBreakpoint ? touch : desktop;
+  ///
+  /// [touchDevice] overrides the platform detection (used by tests / previews);
+  /// when omitted, [isTouchPrimaryPlatform] decides.
+  static Widget forWidth({
+    required double width,
+    required Widget child,
+    bool? touchDevice,
+  }) {
+    final useTouch = touchDevice ?? isTouchPrimaryPlatform;
+    final profile =
+        (useTouch || width < touchBreakpoint) ? touch : desktop;
     return CompassDensity(
       isTouch: profile.isTouch,
       minTapTarget: profile.minTapTarget,

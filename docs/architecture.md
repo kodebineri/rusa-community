@@ -81,7 +81,6 @@ can toggle it), and `_eulaAccepted` (`bool?` — first-run EULA flag: `null` = s
 | Delete Doc | `_isDeleteDocModalOpen`, `_deleteDocId`, `_deleteDocTarget` (`MongoDocument?`) |
 | Insert/Edit/Clone Doc | `_isInsertDocModalOpen`, `_editingDoc?`, `_clonedDoc?` (clone set only by duplicate action) |
 | Import/Export | `_isImportExportModalOpen`, `_importExportMode` |
-| Export → Language | `_isExportLangModalOpen` |
 | Save View | `_isSaveViewModalOpen`, `_saveViewPipeline`, `_saveViewPipelineJson` |
 | Terminal confirm | `_pendingTerminalOperation?`, `_pendingTerminalConfirm?` (derived `isOpen`) |
 
@@ -152,7 +151,7 @@ section no longer derives data in `build()` — `SchemaView` owns its analysis a
     `onDeleteDocument: _requestDeleteDocument`
   - json: `onUpdateDocument: _handleUpdateDocument`, clone, delete
   - table: edit + delete only (**no clone callback** — table view has no copy icon)
-- `aggregations` → `AggregationsView(db, coll, onSaveAsView: _openSaveView, onExportCode: _openExportLanguage)`
+- `aggregations` → `AggregationsView(db, coll, onSaveAsView: _openSaveView)`
 - `schema` → `SchemaView(db, coll)` — stateful; no callbacks (it runs `analyzeSchema` via the
   global `mongoEngine` itself, see `docs/ui.md`)
 - `indexes` → `IndexesView(db, coll, indexes: activeColl.indexes, onCreateIndex: () => setState(…), onDropIndex: (name) => setState(…))`
@@ -245,9 +244,8 @@ DropDatabase, DropCollection, **DropIndex**, **Eula**, **Privacy Policy**, **Abo
 **InsertDocument**, ImportExport, ExportLanguage, SaveView, MongoshConfirmation
 (`isOpen: _pendingTerminalOperation != null`).
 
-Three modals hand-roll their own `Positioned.fill` overlay instead of `CompassModalShell`:
-`ConnectionModal` (fixed width 560), `ExportLanguageModal` (width 580),
-`MongoshConfirmationModal` (width 512).
+Two modals hand-roll their own `Positioned.fill` overlay instead of `CompassModalShell`:
+`ConnectionModal` (fixed width 560), `MongoshConfirmationModal` (width 512).
 
 **Two** `CompassActionSheet` overlays are installed after them:
 

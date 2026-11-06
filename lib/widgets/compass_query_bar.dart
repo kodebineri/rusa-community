@@ -28,7 +28,6 @@ class CompassQueryBar extends StatefulWidget {
   final Function(QueryFilterOptions updated) onChangeOptions;
   final VoidCallback onExecuteQuery;
   final VoidCallback onResetQuery;
-  final VoidCallback onExportToLanguage;
   final double? executionTimeMs;
   final int? totalResultsCount;
 
@@ -58,7 +57,6 @@ class CompassQueryBar extends StatefulWidget {
     required this.onChangeOptions,
     required this.onExecuteQuery,
     required this.onResetQuery,
-    required this.onExportToLanguage,
     required this.optionsExpanded,
     required this.onToggleOptions,
     required this.onOpenOverflow,
@@ -385,8 +383,12 @@ class _CompassQueryBarState extends State<CompassQueryBar> {
                   ],
                 );
               }
-              final stackActions =
-                  density.isTouch || constraints.maxWidth < 640.0;
+              // Only stack when there is genuinely not enough width for the
+              // single inline row (small phones). Wide touch devices — tablets —
+              // keep Options / Reset / Find inline with the filter, like
+              // desktop. Touch buttons are larger, so they need a bit more room.
+              final minInlineWidth = density.isTouch ? 700.0 : 640.0;
+              final stackActions = constraints.maxWidth < minInlineWidth;
               if (stackActions) {
                 return Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -401,7 +403,6 @@ class _CompassQueryBarState extends State<CompassQueryBar> {
                       children: [
                         _buildOptionsButton(theme, density),
                         _buildResetButton(theme),
-                        _buildShowCodeButton(theme, density),
                         _buildFindButton(theme, density,
                             onTap: _executeWithCurrentFilter),
                       ],
@@ -423,11 +424,6 @@ class _CompassQueryBarState extends State<CompassQueryBar> {
 
                   // Reset Button
                   _buildResetButton(theme),
-
-                  const SizedBox(width: 6.0),
-
-                  // Export to Language
-                  _buildShowCodeButton(theme, density),
 
                   const SizedBox(width: 8.0),
 
@@ -910,45 +906,6 @@ class _CompassQueryBarState extends State<CompassQueryBar> {
       borderColor: theme.border,
       color: theme.textMuted,
       semanticLabel: 'Reset query',
-    );
-  }
-
-  /// Opens the "export query to language" modal.
-  Widget _buildShowCodeButton(CompassTheme theme, CompassDensity density) {
-    return ConstrainedBox(
-      constraints: BoxConstraints(minHeight: density.minTapTarget),
-      child: CompassHover(
-        onTap: widget.onExportToLanguage,
-        semanticLabel: 'Show generated code',
-        builder: (hovered) => Container(
-          height: 36.0,
-          padding: const EdgeInsets.symmetric(horizontal: 12.0),
-          decoration: BoxDecoration(
-            color: hovered ? theme.bgHover : theme.bgSubtle,
-            borderRadius: BorderRadius.circular(8.0),
-            border: Border.all(
-              color: hovered ? theme.borderHover : theme.border,
-              width: 1.0,
-            ),
-          ),
-          child: Row(
-            children: [
-              CompassSvg(
-                svgString: CompassSvgIcons.code,
-                size: 14.0,
-                color: theme.accent,
-              ),
-              const SizedBox(width: 6.0),
-              Text(
-                'Show Code',
-                style: CompassTypography.bodyMedium(
-                  color: theme.textSecondary,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
     );
   }
 
