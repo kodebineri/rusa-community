@@ -74,7 +74,7 @@ A `MouseRegion` + optional `GestureDetector` + optional `Semantics(button: true)
 `{label, svg, onTap, color?, destructive = false}`.
 
 - A **bottom sheet** for the header actions that do not fit on a narrow screen
-  (change connection / reset samples / `_mongosh` / disconnect).
+  (change connection / reset samples / Shell / disconnect).
 - Like the modals it is a `Positioned.fill` child of the root `Stack` in `main.dart`
   (invariant 5) — there is no `Navigator` and no Material `showModalBottomSheet`.
   `if (!isOpen) return const SizedBox.shrink()` → closed sheets are never mounted.
@@ -85,7 +85,7 @@ A `MouseRegion` + optional `GestureDetector` + optional `Semantics(button: true)
 
 ### Layout rules that follow from the density
 
-- **Icon-only chrome on touch:** the header's Reset Samples / `_mongosh` / Disconnect move
+- **Icon-only chrome on touch:** the header's Reset Samples / Shell / Disconnect move
   into the action sheet; the collection breadcrumb actions (`New Coll`, `Rename Coll`,
   `Drop Coll`), the documents-tab `Insert Document`, `Import` and `Export` collapse into
   `CompassIconButton`s. Labelled chips are kept on wide windows.
@@ -137,7 +137,7 @@ Two small cross-cutting helpers make bare `EditableText`s usable (no Material
   `≥ density.minTapTarget`. Tapping the panel (not a row) closes it.
 - `compassTextContextMenuBuilderFor(LayerLink anchorLink, {required CompassDensity density})` —
   the `EditableTextContextMenuBuilder`. It anchors the menu to the field (`below` when it fits,
-  `above` otherwise for the bottom-docked mongosh prompt) via `CompositedTransformFollower`.
+  `above` otherwise for the bottom-docked Shell prompt) via `CompositedTransformFollower`.
   **The field must be wrapped in a `CompositedTransformTarget` with the same `LayerLink`**, or
   the menu opens in the window corner. Every action closes the menu (`ContextMenuController.removeAny`).
 - `compassHandleTapOutside(event, focusNode)` — the `onTapOutside` handler; closes the menu and
@@ -229,11 +229,87 @@ duplicate legal copy as Dart literals.
 
 | Widget | Props & behavior |
 |---|---|
-| `CompassHeader` | `connection, onOpenConnectModal, onDisconnect, onResetData?, showResetSample = true, isTerminalOpen, onToggleTerminal, themeVariant, onSelectTheme, onToggleMobileSidebar, isMobile = false, onOpenActions?, onReportBug?, onShowEula?, onShowPrivacyPolicy?, onShowAbout?, onShowWelcome?`. 56px bar: hamburger (`isMobile` only — the sidebar is docked on desktop), theme-tinted `rusa` mark + `r u s a` wordmark → connect modal, connection pill (or amber Connect), **Reset Samples** (only when `showResetSample` — passed as `_realService == null`), mongosh terminal toggle, Disconnect/Connect. Note: the selected theme is passed in as `themeVariant` (the header does not read it from `CompassTheme`). **Below a 1100 px window the bar collapses**: the divider and the connection pill are replaced by a status dot, the labelled actions move into the `CompassActionSheet` and a `⋮` (`moreVertical`) button opens it via `onOpenActions`. The `moreVertical` menu hosts the **theme picker above Report Bug** — a `DARK THEMES` section (`Dracula` / `Tokyo Night` / `Night Owl`) and a `LIGHT THEMES` section (`Monokai Light` / `Tokyo Night Light` / `Material Light`), each row a swatch + name + check for the active variant, selecting one calls `onSelectTheme(variant)`. Below a divider it also hosts **Report Bug** (opens the GitHub issue tracker in the system browser via `url_launcher`, falling back to an info dialog with a **Copy link** button when no handler exists), **EULA** (`EulaModal`), **Privacy Policy** (`PrivacyPolicyModal`), **Show Welcome Screen** (`onShowWelcome` → replays `OnboardingModal`) and **About** (`AboutModal`). The touch `CompassActionSheet` carries the same theme list (labelled `<name> (dark\|light)`) and the same Report Bug / EULA / Privacy Policy / Show Welcome Screen / About rows |
+| `CompassHeader` | `connection, onOpenConnectModal, onDisconnect, onResetData?, showResetSample = true, isTerminalOpen, onToggleTerminal, themeVariant, onSelectTheme, onToggleMobileSidebar, isMobile = false, onOpenActions?, onReportBug?, onShowEula?, onShowPrivacyPolicy?, onShowAbout?, onShowWelcome?`. 56px bar: hamburger (`isMobile` only — the sidebar is docked on desktop), theme-tinted `rusa` mark + `r u s a` wordmark → connect modal, connection pill (or amber Connect), **Reset Samples** (only when `showResetSample` — passed as `_realService == null`), Shell toggle, Disconnect/Connect. Note: the selected theme is passed in as `themeVariant` (the header does not read it from `CompassTheme`). **Below a 1100 px window the bar collapses**: the divider and the connection pill are replaced by a status dot, the labelled actions move into the `CompassActionSheet` and a `⋮` (`moreVertical`) button opens it via `onOpenActions`. The `moreVertical` menu hosts the **theme picker above Report Bug** — a `DARK THEMES` section (`Dracula` / `Tokyo Night` / `Night Owl`) and a `LIGHT THEMES` section (`Monokai Light` / `Tokyo Night Light` / `Material Light`), each row a swatch + name + check for the active variant, selecting one calls `onSelectTheme(variant)`. Below a divider it also hosts **Report Bug** (opens the GitHub issue tracker in the system browser via `url_launcher`, falling back to an info dialog with a **Copy link** button when no handler exists), **EULA** (`EulaModal`), **Privacy Policy** (`PrivacyPolicyModal`), **Show Welcome Screen** (`onShowWelcome` → replays `OnboardingModal`) and **About** (`AboutModal`). The touch `CompassActionSheet` carries the same theme list (labelled `<name> (dark\|light)`) and the same Report Bug / EULA / Privacy Policy / Show Welcome Screen / About rows |
 | `CompassSidebar` | 256px. Props: `databases, selectedDb, selectedColl, onSelectCollection, onSelectDatabase, onOpenCreateDb, onOpenCreateColl, onRenameDb, onRenameColl, onDropDb, onDropColl, onRefresh`. Sections: header (refresh + create-DB icons, **working search box** filtering the DB tree client-side on db name or any collection name), DB tree (chevron toggles `_expandedDbs`, **pre-seeded `library:true`, `social_networks:true`**; row tap → `onSelectDatabase` + auto-expand; trailing plus/pencil/trash; collections show doc counts, amber eye for views), footer Create Database button. **On touch it becomes an overlay drawer** of `min(320, 85 % of the viewport)` and the search input grows to 44 px |
 | `CompassQueryBar` | `options: QueryFilterOptions, onChangeOptions(fn), onExecuteQuery, onResetQuery, optionsExpanded, onToggleOptions, onOpenOverflow, executionTimeMs?, totalResultsCount?`. **Uses its own `EditableText`** (not `CompassInput`) wrapped in `Visibility(maintainState/maintainSize)` so the element identity survives empty↔non-empty (documented fix for test 2). FILTER / PROJECT / SORT use a `JsonSyntaxTextController` (**JSON syntax colouring**); filter/project/sort also get the custom context menu + **auto-close bracket pairs** (`_handleAutoClosePairs`) and Enter-between-brackets formatting (`_handleEnterFormatting`). **Nothing executes on type anymore** — `_handleFilterChange` only validates (amber/green status icon) and typing in SKIP/LIMIT is a no-op; values commit on **Find** via `_executeWithCurrentFilter` (Enter fires `onSubmitted`). Options toggle expands the panel (`optionsExpanded` lives in `main.dart` so the root query-action sheet can toggle it); skip clamps ≥0, limit ≥1; Reset / **Find** buttons; stats ribbon `Matches: n · Time: xms`. **Below 640 px (700 px on touch) the filter input takes the full width and the action buttons wrap onto a second row; the options panel stacks (PROJECT / SORT full width, SKIP + LIMIT side by side) and the "press Enter" hint disappears; a `onOpenOverflow` control opens the query-action sheet** |
 | `CollectionTabBar` | 36px strip. `tabs, activeIndex, onSelect(i), onClose(i)`. Tabs `minWidth 140/maxWidth 200`, active = `bgSubtle` + 2px accent bottom border; icon = `table` (or `database` when coll name empty); close = `CompassSvg(close, 11)`; right counter `'<n> open'`; active tab auto-revealed via `Scrollable.ensureVisible` post-frame |
-| `CompassTerminal` | Docked mongosh-like drawer. `isOpen, onClose, activeDbName, onExecuteCommand?, onRequestConfirmation?`. `SizedBox.shrink()` when closed; heights 220/380; hardcoded dark palette. Input line `<db>> ` + `EditableText`; `_simulateOutput` fakes `help`/`show dbs`/`show collections`/`db.*`/`use *`; `_detectRisky(command)` (regexes for `dropDatabase`, `drop/deleteMany/remove/deleteOne/updateMany/updateOne(`) → `RiskyOperationDetails` → deferred until confirmed via `onRequestConfirmation` |
+| `CompassTerminal` | Docked **Shell** drawer. `isOpen, onClose, activeDbName, onCommandExecuted?, onRequestConfirmation?`. `SizedBox.shrink()` when closed; heights 220/380; hardcoded dark palette. Input line `<db>> ` + `EditableText`. **All parsing/execution lives in `MongoshInterpreter`** (`lib/services/mongosh_interpreter.dart`), not in the widget: the widget runs the command once, appends the output (errors in `CompassColors.errorRed`) and hands the `MongoshResult` to `onCommandExecuted`, which `main.dart` uses only to apply UI side effects (switch database, close tabs for dropped targets) and `setState`. `_detectRisky` asks the interpreter's command table whether the command is risky, then builds the `RiskyOperationDetails` copy; the command is deferred until confirmed via `onRequestConfirmation`. The prompt supports ↑/↓ history, Tab completion, multi-line commands and Ctrl+L/Ctrl+C/Esc — see "Shell prompt" below |
+
+### `lib/services/mongosh_interpreter.dart` — `MongoshInterpreter`
+
+A deliberately small, **honest** shell (a mongosh-compatible command subset). It is *not* a
+JavaScript REPL:
+it recognises a fixed command table and says so when a command is unsupported, instead of
+pretending success (the old `"Command acknowledged."` fallback is gone).
+
+- **Two command tables** drive dispatch, `help` and the risky-operation confirmation, so they
+  cannot drift:
+  - `MongoshInterpreter.commands` (`List<MongoshCommand>`) — top-level commands. Each row is
+    `{name, usage, summary, pattern, risky, run}`; `pattern` matches the whole normalised
+    command (trailing `;` stripped).
+  - `MongoshInterpreter.collectionCommands` (`List<MongoshCollectionCommand>`) —
+    `db.<coll>.<method>` methods. Each row is
+    `{method, usage, summary, risky, supportsChain, run}`.
+- **Top-level commands:** `help [command]`, `show dbs`, `show collections`, `use <db>`,
+  `db.getName()`, `db.getCollectionNames()`, `print(value)`, `JSON.stringify(value)`,
+  `db.dropDatabase()`.
+- **Collection methods:** `find`, `findOne`, `countDocuments`, `count` (alias), `distinct`,
+  `aggregate`, `insertOne`, `insertMany`, `updateOne`, `updateMany`, `replaceOne`,
+  `deleteOne`, `deleteMany`, `remove` (legacy alias), `createIndex`, `getIndexes`,
+  `dropIndex`, `stats`, `drop`.
+- **Update operators:** `$set`, `$unset`, `$inc`, `$push` (including `$each`) and `$pull`; a
+  plain map is a full replacement. `updateDocument` and `updateMany` share one `_applyUpdate`
+  helper in the engine, so both understand the same operators.
+- **Cursor chains:** `find` is the only chainable method (`supportsChain`). A real call parser
+  (`_parseCollectionCall` + `_matchingParen`, string-aware) splits
+  `db.<coll>.find(args).sort(…).limit(n).skip(n).count()`; `sort`/`limit`/`skip` map onto
+  `QueryFilterOptions`, `count()` returns the total (ignoring skip/limit), and `pretty()` /
+  `toArray()` are accepted no-ops. Chaining a non-cursor method is rejected with
+  `does not support chaining`.
+- **Honest failures:** anything else returns `isError: true` with
+  `db.<coll>.<method>(...) is not supported by this shell yet.` (or `Unrecognized command`)
+  plus a pointer to `help`. `use` on a missing database reports that instead of claiming a
+  switch.
+- **Single executor:** the interpreter runs the command exactly once and returns
+  `MongoshResult{output, sideEffect?, isError}`. `main.dart` only applies the side effect
+  (`switchDatabase` / `dropDatabase` / `dropCollection`) and refreshes — it must never run
+  the command again (that double-execution bug made `deleteOne` delete two documents and
+  `updateOne` behave like `updateMany`).
+- **Testable:** pure Dart, no widgets. `test/mongosh_interpreter_test.dart` covers help,
+  honest errors, reads, cursor chains, writes, side effects and risky detection. Add a
+  top-level command to `_buildCommands()` or a collection method to
+  `_buildCollectionCommands()` — `help`, Tab completion and the confirmation gate pick it up
+  automatically.
+- **Output:** documents render mongosh-style — `ObjectId("…")` for BSON ids (the engine's
+  `MongoObjectId` type) and a `[n docs]` footer, with a `(of N — add .limit(n) to see more)`
+  hint when the page is truncated. `ISODate("…")` is deliberately not rendered: dates are
+  stored as plain ISO strings, so the BSON type is already lost.
+
+### Shell prompt — history, completion, multi-line
+
+`CompassTerminal` handles the prompt keys on its `FocusNode.onKeyEvent` (set in `initState`),
+which runs before the text field's own shortcuts:
+
+| Key | Action |
+|---|---|
+| `Enter` | submit — unless brackets are unbalanced, then insert a newline (multi-line command) |
+| `Shift+Enter` | always a newline |
+| `↑` / `↓` | recall command history (single-line input; on a multi-line command they move the caret except at the very start/end) |
+| `Tab` | complete the word at the end of the line |
+| `Ctrl+L` | clear the log |
+| `Ctrl+C` / `Esc` | clear the current line |
+
+- **History** is per session (`_commandHistory`), with the in-progress line kept as a draft so
+  `↓` past the newest command restores it.
+- **Completion** lives in `lib/services/mongosh_completer.dart` (`MongoshCompleter`, pure Dart,
+  unit-tested): `use <db>` → database names, `db.<coll>` → collection names,
+  `db.<coll>.<method>` → method names **from the interpreter's command table**, `show` →
+  `dbs`/`collections`, `help` → command names. A unique match is inserted (plus a space in the
+  word contexts); an ambiguous one extends to the common prefix and, when that changes
+  nothing, prints the candidates. Tab on an already-complete word is a no-op.
+- **Multi-line** is decided by `hasUnbalancedBrackets()` (same file), which ignores brackets
+  inside quoted strings. The input row grows from 38 px to at most 120 px and scrolls beyond
+  that.
 
 ## Icons — `lib/icons/compass_svg_icons.dart`
 

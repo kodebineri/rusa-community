@@ -17,8 +17,10 @@ connect to a **real MongoDB server** (via `mongo_dart`) which swaps the engine i
 - Active product: `lib/` (Dart/Flutter) — this is what you modify.
 - Original React reference: `src/` (TSX) — read-only reference for intended behavior;
   not compiled by Flutter. Comments in Dart files say "Converted from `src/components/X.tsx`".
-- Tests: `test/widget_test.dart` (widget tests) plus `test/compass_density_test.dart` and
-  `test/json_auto_indent_formatter_test.dart` — 60 tests in total.
+- Tests: `test/widget_test.dart` (widget tests) plus `test/compass_density_test.dart`,
+  `test/json_auto_indent_formatter_test.dart`, `test/mongo_json_parser_test.dart`,
+  `test/mongosh_interpreter_test.dart`, `test/mongosh_completer_test.dart` and
+  `test/terminal_test.dart` — 127 tests in total.
 - Sample data sources of truth: `sample_library.json`, `sample_social_network.json` (repo root).
 - Legal text: `EULA.md` and `PRIVACY.md` (repo root) — bundled as Flutter assets
   (`pubspec.yaml`) and rendered by `EulaModal` / `OnboardingModal` (its last slide) /
@@ -36,7 +38,7 @@ connect to a **real MongoDB server** (via `mongo_dart`) which swaps the engine i
 
 _(Last verified 2026-11-03, after commit `382656d` "enable preset themes".)_
 
-- **`flutter analyze` is clean** and **`flutter test` is 60/60.** Keep both that way; the
+- **`flutter analyze` is clean** and **`flutter test` is 127/127.** Keep both that way; the
   recurring test patterns live in `docs/testing.md`.
 - **A returning user boots into the connection popup** (`_isConnectModalOpen = true`, decided
   by `_loadPreferences`). Full-app widget tests must dismiss it first — use the
@@ -62,7 +64,7 @@ _(Last verified 2026-11-03, after commit `382656d` "enable preset themes".)_
 | Task | Command |
 |---|---|
 | Static analysis (must be clean) | `flutter analyze` |
-| Tests (must be 60/60) | `flutter test` |
+| Tests (must be 127/127) | `flutter test` |
 | Run desktop app | `flutter run -d windows` |
 | Run on Android | `flutter run -d <device>` (needs `INTERNET` — already in the main manifest) |
 | Run a single test file | `flutter test test/widget_test.dart` |
@@ -189,9 +191,12 @@ is mutable and filters the DB tree client-side (`compass_sidebar.dart`).
 | `AppInfo` (app version, mirror of `pubspec.yaml`) | `lib/app_info.dart` |
 | `CompassMarkdownView` (dependency-free Markdown renderer) | `lib/widgets/compass_markdown_view.dart` |
 | `CompassActionSheet` (touch overflow sheet) | `lib/widgets/modals/compass_action_sheet.dart` |
+| `MongoshInterpreter` (terminal command table + single executor) | `lib/services/mongosh_interpreter.dart` |
+| `MongoshCompleter` (Tab completion + `hasUnbalancedBrackets`) | `lib/services/mongosh_completer.dart` |
+| `CompassTerminal` (docked Shell drawer) | `lib/widgets/compass_terminal.dart` |
 | `CompassIconButton`, `CompassHover` | `lib/widgets/compass_icon_button.dart`, `lib/widgets/compass_hover.dart` |
 | `CompassTheme`, `CompassThemeVariant` / `CompassPalette`, `CompassColors`, `CompassTypography`, `CompassDensity` | `lib/theme/` |
 | `CompassSvg`, `CompassSvgIcons` | `lib/icons/compass_svg_icons.dart` |
 | `CompassTextContextMenu`, `compassTextContextMenuBuilderFor`, `compassHandleTapOutside` | `lib/widgets/compass_text_menu.dart` |
 | `JsonSyntaxTextController` (JSON syntax colouring) | `lib/utils/json_syntax_text_controller.dart` |
-| Tests | `test/widget_test.dart` |
+| Tests | `test/` (see `docs/testing.md`) |

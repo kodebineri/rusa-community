@@ -29,7 +29,7 @@ class CompassActionSheetItem {
 /// Why this exists
 /// ───────────────
 /// The desktop header carries five controls (logo, connection pill, reset
-/// samples, `_mongosh`, theme toggle, disconnect). On a phone that is roughly
+/// samples, Shell, theme toggle, disconnect). On a phone that is roughly
 /// 780 px of content in a 390 px viewport, so the header overflows by a mile.
 /// Instead of shrinking the desktop chrome, the touch layout keeps two icons
 /// in the header and moves the rest into this sheet.

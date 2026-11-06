@@ -1,15 +1,25 @@
-# Testing — `test/widget_test.dart`
+# Testing — `test/`
 
-Companion to root `AGENTS.md`. Single test file, **18 `testWidgets` tests**, all widget
-level (no unit tests, no integration tests, no golden tests).
+Companion to root `AGENTS.md`. Seven files, **127 tests**:
 
-> **Status (2026-11-04, after commit `382656d`): 18 pass / 0 fail, `flutter analyze` clean.**
+| File | What it covers |
+|---|---|
+| `test/widget_test.dart` | widget-level tests for the whole app (the bulk) |
+| `test/terminal_test.dart` | widget tests for the Shell prompt (Enter, ↑/↓ history, Tab, multi-line, Ctrl+L, output) |
+| `test/mongosh_interpreter_test.dart` | unit tests for the terminal's command table (`MongoshInterpreter`) |
+| `test/mongosh_completer_test.dart` | unit tests for Tab completion + `hasUnbalancedBrackets` |
+| `test/mongo_json_parser_test.dart` | unit tests for the mongosh-flavoured JSON parser |
+| `test/compass_density_test.dart` | unit tests for the desktop/touch density profiles |
+| `test/json_auto_indent_formatter_test.dart` | unit tests for the JSON auto-indent formatter |
+
+> **Status: 127 pass / 0 fail, `flutter analyze` clean.**
 
 ## Commands
 
 ```bash
-flutter test                              # all — expect 60/60
-flutter test test/widget_test.dart        # the only test file
+flutter test                              # all — expect 127/127
+flutter test test/widget_test.dart        # just the widget tests
+flutter test test/mongosh_interpreter_test.dart
 flutter analyze                           # expect "No issues found!"
 ```
 
@@ -17,7 +27,8 @@ flutter analyze                           # expect "No issues found!"
 
 These were introduced recently; tests written before them silently fail.
 
-1. **The app boots into the connection popup.** `_isConnectModalOpen = true`, so the
+1. **A returning user boots into the connection popup.** `_isConnectModalOpen` is decided by
+   `_loadPreferences` (a first-time user gets the welcome tour instead), so the
    `ConnectionModal` overlay covers the shell and `tester.tap(...)` on shell widgets lands on
    the backdrop. Every full-app test calls the `closeConnectionPopup(tester)` helper (defined
    at the top of the test file, right after the imports) immediately after pumping

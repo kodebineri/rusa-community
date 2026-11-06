@@ -12,6 +12,7 @@ import 'models/mongo_models.dart';
 import 'models/collection_tab.dart';
 import 'services/local_mongo_engine.dart';
 import 'services/mongo_engine.dart';
+import 'services/mongosh_interpreter.dart';
 import 'services/real_mongo_service.dart';
 import 'services/app_preferences.dart';
 import 'widgets/compass_header.dart';
@@ -965,113 +966,47 @@ class _CompassAppState extends State<CompassApp> {
     confirm?.call();
   }
 
-  /// Executes a (already confirmed) mongosh command against the mock engine.
-  void _executeTerminalCommand(String command) {
-    final service = mongoEngine;
-    final cmd = command.trim();
-    if (cmd == 'show dbs') {
-      setState(() {});
-      return;
-    }
-    if (cmd == 'show collections') {
-      setState(() {});
-      return;
-    }
-    if (cmd.startsWith('use ')) {
-      final dbName =
-          cmd.substring(4).trim().replaceAll(RegExp(r';$'), '').trim();
-      if (dbName.isNotEmpty && service.getDatabase(dbName) != null) {
-        setState(() {
-          _selectedDbName = dbName;
-          // Open first collection if exists
-          final db = service.getDatabase(dbName);
-          final coll = db?.collections.keys.firstOrNull;
-          if (coll != null) {
-            _openCollectionTab(dbName, coll);
-          }
-        });
-      }
-      return;
-    }
-
-    if (RegExp(r'db\.dropDatabase\s*\(\s*\)').hasMatch(cmd)) {
-      final droppedDb = _selectedDbName;
-      service.dropDatabase(droppedDb);
-      setState(() {
-        _closeTabsMatching((tab) => tab.dbName == droppedDb);
-        if (_openTabs.isEmpty) {
-          final first = service.getDatabases().firstOrNull;
-          final firstColl = first?.collections.keys.firstOrNull;
-          if (first != null && firstColl != null) {
-            _openCollectionTab(first.name, firstColl);
-          }
-        }
-      });
-      return;
-    }
-
-    final match =
-        RegExp(r'db\.([A-Za-z0-9_]+)\.(\w+)\s*\((.*)\)\s*;?\s*$', dotAll: true)
-            .firstMatch(cmd);
-    if (match == null) return;
-    final collName = match.group(1)!;
-    final method = match.group(2)!;
-    final args = match.group(3) ?? '';
-
-    Map<String, dynamic> parseArgs() {
-      try {
-        final parsed = service.tolerantParse(args);
-        return parsed is Map
-            ? Map<String, dynamic>.from(parsed)
-            : <String, dynamic>{};
-      } catch (_) {
-        return <String, dynamic>{};
+  /// Applies the UI side effects of a mongosh command.
+  ///
+  /// The command itself has already run inside [MongoshInterpreter] (the single
+  /// executor); this only switches the selected database, closes tabs for
+  /// dropped targets, and refreshes the tree.
+  void _handleTerminalResult(MongoshResult result) {
+    final effect = result.sideEffect;
+    if (effect != null) {
+      switch (effect.kind) {
+        case MongoshSideEffectKind.switchDatabase:
+          setState(() {
+            _selectedDbName = effect.database;
+            final db = mongoEngine.getDatabase(effect.database);
+            final coll = db?.collections.keys.firstOrNull;
+            if (coll != null) _openCollectionTab(effect.database, coll);
+          });
+          return;
+        case MongoshSideEffectKind.dropDatabase:
+          final droppedDb = effect.database;
+          setState(() {
+            _closeTabsMatching((tab) => tab.dbName == droppedDb);
+            if (_openTabs.isEmpty) {
+              final first = mongoEngine.getDatabases().firstOrNull;
+              final firstColl = first?.collections.keys.firstOrNull;
+              if (first != null && firstColl != null) {
+                _openCollectionTab(first.name, firstColl);
+              }
+            }
+          });
+          return;
+        case MongoshSideEffectKind.dropCollection:
+          setState(() {
+            _closeTabsMatching((tab) =>
+                tab.isSameTarget(effect.database, effect.collection!));
+          });
+          return;
       }
     }
-
-    if (method == 'drop') {
-      final droppedDb = _selectedDbName;
-      service.dropCollection(droppedDb, collName);
-      _closeTabsMatching((tab) => tab.isSameTarget(droppedDb, collName));
-    } else if (method == 'deleteMany' || method == 'remove') {
-      service.deleteMany(_selectedDbName, collName, parseArgs());
-    } else if (method == 'deleteOne') {
-      service.deleteOne(_selectedDbName, collName, parseArgs());
-    } else if (method == 'updateMany' || method == 'updateOne') {
-      final split = _splitArgs(args);
-      service.updateMany(
-          _selectedDbName, collName, _parseMap(split.$1), _parseMap(split.$2));
-    } else if (method == 'insertOne') {
-      try {
-        service.insertDocument(_selectedDbName, collName, parseArgs());
-      } catch (_) {}
-    }
+    // Reads (show dbs / show collections) and mutations (insert / update /
+    // delete) both need a rebuild so the sidebar and the open tab refresh.
     setState(() {});
-  }
-
-  (String, String) _splitArgs(String args) {
-    // Splits a two-argument call such as `{...}, { $set: {...} }` at the top level.
-    var depth = 0;
-    for (var i = 0; i < args.length; i++) {
-      final ch = args[i];
-      if (ch == '{' || ch == '[' || ch == '(') depth++;
-      if (ch == '}' || ch == ']' || ch == ')') depth--;
-      if (ch == ',' && depth == 0) {
-        return (args.substring(0, i), args.substring(i + 1));
-      }
-    }
-    return (args, '{}');
-  }
-
-  Map<String, dynamic> _parseMap(String text) {
-    try {
-      final parsed = mongoEngine.tolerantParse(text);
-      return parsed is Map
-          ? Map<String, dynamic>.from(parsed)
-          : <String, dynamic>{};
-    } catch (_) {
-      return <String, dynamic>{};
-    }
   }
 
   /// Resolved theme palette for the selected [CompassThemeVariant].
@@ -1324,8 +1259,7 @@ class _CompassAppState extends State<CompassApp> {
                       activeDbName: _selectedDbName.isEmpty
                           ? (mongoEngine.getDatabases().firstOrNull?.name ?? '')
                           : _selectedDbName,
-                      onExecuteCommand: (command) =>
-                          _executeTerminalCommand(command),
+                      onCommandExecuted: _handleTerminalResult,
                       onRequestConfirmation: _requestTerminalConfirmation,
                     ),
                   ],
@@ -1489,7 +1423,7 @@ class _CompassAppState extends State<CompassApp> {
                       onTap: _handleResetData,
                     ),
                   CompassActionSheetItem(
-                    label: _isTerminalOpen ? 'Close _mongosh' : 'Open _mongosh',
+                    label: _isTerminalOpen ? 'Close Shell' : 'Open Shell',
                     svg: CompassSvgIcons.terminal,
                     onTap: () {
                       setState(() => _isTerminalOpen = !_isTerminalOpen);

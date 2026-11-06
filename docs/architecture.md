@@ -52,7 +52,7 @@ void main() => runApp(const DefaultTextEditingShortcuts(child: CompassApp()));
 | `_savedConnections` | `List<ConnectionProfile>` | two seeded profiles (`1` "Local Standalone (27017)", `2` "Atlas Production ReplicaSet") |
 
 **Panel flags (L229–243):** `_isConnectModalOpen` (**defaults to `true`** — the app boots into
-the connection popup), `_isTerminalOpen` (docked mongosh shell), `_isMobileSidebarOpen`
+the connection popup), `_isTerminalOpen` (docked Shell), `_isMobileSidebarOpen`
 (off-canvas sidebar < 768px), `_isHeaderActionsOpen` (touch-only header overflow sheet),
 `_isEulaModalOpen`, `_isAboutModalOpen`, `_isPrivacyPolicyModalOpen`, `_isQueryActionsOpen` (touch-only query-bar overflow
 sheet), `_isQueryOptionsExpanded` (query-bar options panel; owned here so the overflow sheet
@@ -122,7 +122,7 @@ Shell Stack
 │        ├ CompassQueryBar              (if tab open && _activeTab == 'documents')
 │        ├ _buildDocumentsPagination    (Tree/JSON/Table switcher + Prev/Next) — same condition
 │        └ Expanded > SingleChildScrollView(16) > _buildActiveTabView(...)
-│  3. CompassTerminal                   (docked mongosh drawer; the only "footer" region)
+│  3. CompassTerminal                   (docked Shell drawer; the only "footer" region)
 └─ 16 modal overlays + TWO CompassActionSheet overlays (header actions, query actions)
    (always-installed children; each closed one renders SizedBox.shrink)
    + the conditionally-rendered first-run welcome tour (blank cover while the flags load,
@@ -261,7 +261,7 @@ Two modals hand-roll their own `Positioned.fill` overlay instead of `CompassModa
 **Two** `CompassActionSheet` overlays are installed after them:
 
 - header actions (`_isHeaderActionsOpen`) — opened from the header's `⋮` via `onOpenActions`:
-  change connection / reset samples / `_mongosh` / disconnect / **theme picker** / Report Bug /
+  change connection / reset samples / Shell / disconnect / **theme picker** / Report Bug /
   EULA / About.
 - query actions (`_isQueryActionsOpen`) — opened from the query bar's `onOpenOverflow`: toggle
   the options panel (`_isQueryOptionsExpanded`) / reset query / show generated code.
@@ -292,7 +292,7 @@ delete payload clears on confirm; insert payload (`_editingDoc`) clears on open/
   re-seed + `_resetTabsTo('library','books')`.
 - Header `showResetSample: _realService == null` — Reset Samples hidden on live connections.
 
-## Terminal / mongosh (~L817–920, terminal widget at L1110)
+## Terminal / Shell (~L817–920, terminal widget at L1110)
 
 `CompassTerminal` (docked bottom drawer) → `onRequestConfirmation: _requestTerminalConfirmation`
 → sets `_pendingTerminalOperation`/`_pendingTerminalConfirm` → `MongoshConfirmationModal`.

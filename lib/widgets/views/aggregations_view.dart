@@ -1138,7 +1138,7 @@ class _AggregationsViewState extends State<AggregationsView> {
               ),
             ),
             child: Text(
-              'AGGREGATION SCRIPT (JSON OR MONGOSH)',
+              'AGGREGATION SCRIPT (JSON OR SHELL)',
               style: CompassTypography.monoBold(color: _theme.textMuted, size: 11.0),
             ),
           ),

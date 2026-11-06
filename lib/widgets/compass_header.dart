@@ -33,7 +33,7 @@ class CompassHeader extends StatelessWidget {
   final bool isMobile;
 
   /// Opens the overflow sheet that hosts the header actions which do not fit
-  /// on a narrow screen (reset samples, `_mongosh`, disconnect). Only wired up
+  /// on a narrow screen (reset samples, Shell, disconnect). Only wired up
   /// on touch layouts.
   final VoidCallback? onOpenActions;
 
@@ -72,7 +72,7 @@ class CompassHeader extends StatelessWidget {
     final density = CompassDensity.of(context);
 
     // The full header (logo, version, connection pill, reset samples,
-    // `_mongosh`, theme, disconnect) needs roughly 780 px. Below that the
+    // Shell, theme, disconnect) needs roughly 780 px. Below that the
     // secondary controls move into the overflow sheet.
     final windowWidth = MediaQuery.maybeOf(context)?.size.width ?? 1200.0;
     final compact = windowWidth < 1100.0;
@@ -292,13 +292,13 @@ class CompassHeader extends StatelessWidget {
                       const SizedBox(width: 8.0),
                     ],
 
-                    // _mongosh Shell Toggle
+                    // Shell Toggle
                     ConstrainedBox(
                       constraints:
                           BoxConstraints(minHeight: density.minTapTarget),
                       child: CompassHover(
                         onTap: onToggleTerminal,
-                        semanticLabel: 'Toggle mongosh terminal',
+                        semanticLabel: 'Toggle Shell',
                         builder: (hovered) => Container(
                           padding: const EdgeInsets.symmetric(
                               horizontal: 10.0, vertical: 6.0),
@@ -326,7 +326,7 @@ class CompassHeader extends StatelessWidget {
                               ),
                               const SizedBox(width: 6.0),
                               Text(
-                                '_mongosh',
+                                'Shell',
                                 style: CompassTypography.monoMedium(
                                   color: isTerminalOpen
                                       ? const Color(0xFFFFFFFF)

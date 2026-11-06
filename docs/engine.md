@@ -32,6 +32,7 @@ inside `setState`). Every view/modal imports this file. Reads must stay **synchr
 | `getDatabase` | `MongoDatabase? (String name)` | null if missing |
 | `getCollection` | `MongoCollection? (String dbName, String collName)` | null if missing |
 | `findDocuments` | `QueryResult (db, coll, QueryFilterOptions)` | filter→sort→skip/limit→project; never throws |
+| `distinct` | `List<dynamic> (db, coll, field, filter)` | unique values of `field` across matching docs (used by the shell's `distinct`); reads the mirror, so it works for the local engine and a connected server |
 | `analyzeSchema` | `List<SchemaFieldStat> (db, coll)` | `[]` if missing/empty |
 | `resetToDefaults` | `void ()` | just calls `seedSampleData()` (real service overrides to re-load from server) |
 | `generateObjectId` | `String ()` | 24-char lowercase hex: epoch-seconds hex + 16 random hex chars, then `.substring(0, 24)` (timestamp is 8 chars, so the tail is effectively 16 random chars — verified at L379–383) |
@@ -77,12 +78,12 @@ inside `setState`). Every view/modal imports this file. Reads must stay **synchr
   starting with `.`, name already existing, missing source collection.
 - **Rename validation:** DB name cannot match `[/\\. "$*<>:|?]` or be ≥64 chars; collection
   names cannot contain `$` or start with `system.`.
-- **`updateDocument` operator precedence:** if/else-if — only **one** of `$set`/`$inc`/
-  `$unset` applies (first wins). The else branch **replaces the whole document**
-  (`{...updatedFields, '_id': docId}`): any field omitted from `updatedFields` is **removed**,
-  and `_id` is always forced back to `docId`. (Plain maps therefore mean replacement, matching
-  MongoDB.) **`updateMany` follows the same rule:** a plain map replaces each matched document
-  (`_id` preserved), an operator map merges.
+- **Update operators (`_applyUpdate`, shared by `updateDocument` and `updateMany`):** all
+  present operators apply, in order `$set` → `$unset` → `$inc` → `$push` (supports
+  `{ $each: [...] }`) → `$pull`. A map with **no** operator key is a **full replacement**
+  (`{...update, '_id': <existing>}`): any field omitted is **removed**, and `_id` is always
+  preserved. (Plain maps therefore mean replacement, matching MongoDB.) `updateMany` applies
+  the same helper to every matched document.
 
 ### Line map of `local_mongo_engine.dart`
 

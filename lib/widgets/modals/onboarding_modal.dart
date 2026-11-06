@@ -354,7 +354,7 @@ class _OnboardingModalState extends State<OnboardingModal> {
           'Browse and query a MongoDB database without leaving your desktop: '
           'documents in tree, JSON and table views, a real aggregation '
           'pipeline builder, schema analysis, indexes and a built-in '
-          '`mongosh` shell.',
+          'Shell.',
           textAlign: TextAlign.center,
           style: CompassTypography.bodyRegular(color: theme.textSecondary)
               .copyWith(height: 1.6),

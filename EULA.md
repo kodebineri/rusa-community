@@ -3,7 +3,7 @@
 **Last Updated:** November 04, 2026  
 **Version:** 1.2
 
-This End User License Agreement ("Agreement") is a legal agreement between you ("User", "You") and the developers of Rusa ("Licensor", "We", "Us", or "Our") for the use of the Rusa software, a MongoDB database client ("Software").
+This End User License Agreement ("Agreement") is a legal agreement between you ("User", "You") and PT. Kodebineri Algoritma Inovasi ("Licensor", "We", "Us", or "Our") for the use of the Rusa software, a MongoDB database client ("Software").
 
 By downloading, installing, accessing, or using the Software, you agree to be bound by the terms of this Agreement. If you do not agree to these terms, do not use the Software.
 
@@ -81,7 +81,7 @@ This Agreement is effective until terminated. Licensor may terminate this Agreem
 
 ## 9. GOVERNING LAW
 
-This Agreement shall be governed by and construed in accordance with the laws of [Your Jurisdiction], without regard to its conflict of law provisions. Any disputes arising under this Agreement shall be subject to the exclusive jurisdiction of the courts located in [Your Jurisdiction].
+This Agreement shall be governed by and construed in accordance with the laws of the Republic of Indonesia, without regard to its conflict of law principles. Any legal suit, action, or proceeding arising out of or related to this Agreement or the Software shall be instituted exclusively in the courts located in Jakarta, Indonesia, and each party irrevocably submits to the exclusive jurisdiction of such courts.
 
 ## 10. SEVERABILITY
 

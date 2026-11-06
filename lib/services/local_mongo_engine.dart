@@ -328,6 +328,30 @@ class LocalMongoEngine {
     );
   }
 
+  /// Distinct values of [field] across the documents matching [filter].
+  ///
+  /// Used by the shell's `db.<coll>.distinct(...)`. It reads the in-memory
+  /// mirror, so it works for both the local engine and a connected server.
+  List<dynamic> distinct(
+    String dbName,
+    String collName,
+    String field,
+    Map filter,
+  ) {
+    final coll = getCollection(dbName, collName);
+    if (coll == null) return [];
+    final normalizedFilter = _normalizeExtendedJson(filter) as Map;
+    final values = <dynamic>[];
+    final seen = <String>{};
+    for (final doc in coll.documents) {
+      if (!_matchesFilter(doc.data, normalizedFilter)) continue;
+      final value = _resolvePath(doc.data, field);
+      if (value == null) continue;
+      if (seen.add(jsonEncode(value))) values.add(value);
+    }
+    return values;
+  }
+
   /// Computes per-field schema statistics for [collName] by scanning the
   /// in-memory documents (a generic stand-in for Compass's schema analysis,
   /// which works for any of the bundled collections).
@@ -647,38 +671,91 @@ class LocalMongoEngine {
     final index = coll.documents.indexWhere((d) => d.id == docId);
     if (index == -1) return false;
 
-    final normalizedFields = <String, dynamic>{
-      for (final entry in updatedFields.entries)
-        entry.key: _normalizeExtendedJson(entry.value),
-    };
+    coll.documents[index] = MongoDocument.fromMap(
+      _applyUpdate(coll.documents[index].data, updatedFields,
+          fallbackId: docId),
+    );
+    return true;
+  }
 
-    var finalMap = Map<String, dynamic>.from(coll.documents[index].data);
-    if (normalizedFields.containsKey('\$set')) {
-      final setObj = normalizedFields['\$set'] as Map;
-      setObj.forEach((k, v) => _setPath(finalMap, k.toString(), v));
-    } else if (normalizedFields.containsKey('\$inc')) {
-      final incObj = normalizedFields['\$inc'] as Map;
-      incObj.forEach((k, v) {
-        final current = _asNum(_resolvePath(finalMap, k.toString()));
-        _setPath(finalMap, k.toString(), current + _asNum(v));
-      });
-    } else if (normalizedFields.containsKey('\$unset')) {
-      final unsetObj = normalizedFields['\$unset'] as Map;
-      for (final k in unsetObj.keys) {
-        _unsetPath(finalMap, k.toString());
-      }
-    } else {
-      // A plain map is a full replacement (MongoDB semantics): the provided map
-      // becomes the whole document, so fields omitted from it are removed.
-      // `_id` is always preserved (keeping its BSON type, e.g. an ObjectId).
-      finalMap = {
-        ...normalizedFields,
-        '_id': coll.documents[index].data['_id'] ?? docId,
+  /// Applies a MongoDB update document to [data] and returns the new map.
+  ///
+  /// Operator maps (`$set` / `$unset` / `$inc` / `$push` / `$pull`) merge into
+  /// a copy; a plain map is a full replacement (MongoDB semantics) that keeps
+  /// `_id`. Shared by [updateDocument] and [updateMany] so both understand the
+  /// same operators.
+  Map<String, dynamic> _applyUpdate(
+    Map<String, dynamic> data,
+    Map update, {
+    required String fallbackId,
+  }) {
+    final normalized = _normalizeExtendedJson(update) as Map;
+    final hasOperator =
+        normalized.keys.any((key) => key.toString().startsWith(r'$'));
+
+    if (!hasOperator) {
+      return <String, dynamic>{
+        for (final entry in normalized.entries)
+          entry.key.toString(): entry.value,
+        '_id': data['_id'] ?? fallbackId,
       };
     }
 
-    coll.documents[index] = MongoDocument.fromMap(finalMap);
-    return true;
+    final map = Map<String, dynamic>.from(data);
+
+    final set = normalized[r'$set'];
+    if (set is Map) {
+      set.forEach((key, value) => _setPath(map, key.toString(), value));
+    }
+
+    final unset = normalized[r'$unset'];
+    if (unset is Map) {
+      for (final key in unset.keys) {
+        _unsetPath(map, key.toString());
+      }
+    }
+
+    final inc = normalized[r'$inc'];
+    if (inc is Map) {
+      inc.forEach((key, value) {
+        _setPath(
+          map,
+          key.toString(),
+          _asNum(_resolvePath(map, key.toString())) + _asNum(value),
+        );
+      });
+    }
+
+    final push = normalized[r'$push'];
+    if (push is Map) {
+      push.forEach((key, value) {
+        final current = _resolvePath(map, key.toString());
+        final list = current is List ? List<dynamic>.from(current) : <dynamic>[];
+        if (value is Map && value.containsKey(r'$each')) {
+          final each = value[r'$each'];
+          if (each is List) list.addAll(each);
+        } else {
+          list.add(value);
+        }
+        _setPath(map, key.toString(), list);
+      });
+    }
+
+    final pull = normalized[r'$pull'];
+    if (pull is Map) {
+      pull.forEach((key, value) {
+        final current = _resolvePath(map, key.toString());
+        if (current is List) {
+          _setPath(
+            map,
+            key.toString(),
+            current.where((item) => item != value).toList(),
+          );
+        }
+      });
+    }
+
+    return map;
   }
 
   bool deleteDocument(String dbName, String collName, String docId) {
@@ -715,32 +792,13 @@ class LocalMongoEngine {
     final coll = getCollection(dbName, collName);
     if (coll == null || coll.isView) return 0;
     final normalizedFilter = _normalizeExtendedJson(filter) as Map;
-    final normalizedUpdate = _normalizeExtendedJson(update) as Map;
     var count = 0;
     for (var i = 0; i < coll.documents.length; i++) {
       final d = coll.documents[i];
       if (!_matchesFilter(d.data, normalizedFilter)) continue;
-      late Map<String, dynamic> map;
-      if (normalizedUpdate.containsKey('\$set') && normalizedUpdate['\$set'] is Map) {
-        map = Map<String, dynamic>.from(d.data);
-        (normalizedUpdate['\$set'] as Map).forEach((k, v) => _setPath(map, k.toString(), v));
-      } else if (normalizedUpdate.containsKey('\$inc') && normalizedUpdate['\$inc'] is Map) {
-        map = Map<String, dynamic>.from(d.data);
-        (normalizedUpdate['\$inc'] as Map).forEach((k, v) {
-          _setPath(map, k.toString(), _asNum(_resolvePath(map, k.toString())) + _asNum(v));
-        });
-      } else {
-        // A plain map is a full replacement (MongoDB semantics): each matched
-        // document becomes the provided map, so omitted fields are removed.
-        // `_id` is always preserved.
-        map = <String, dynamic>{
-          for (final entry in normalizedUpdate.entries)
-            if (!entry.key.toString().startsWith('\$'))
-              entry.key.toString(): entry.value,
-          '_id': d.data['_id'] ?? d.id,
-        };
-      }
-      coll.documents[i] = MongoDocument.fromMap(map);
+      coll.documents[i] = MongoDocument.fromMap(
+        _applyUpdate(d.data, update, fallbackId: d.id),
+      );
       count++;
     }
     return count;

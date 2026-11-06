@@ -83,7 +83,7 @@ class MongoshConfirmationModal extends StatefulWidget {
 }
 
 class _MongoshConfirmationModalState extends State<MongoshConfirmationModal> {
-  final FocusNode _focusNode = FocusNode(debugLabel: 'mongosh-confirm');
+  final FocusNode _focusNode = FocusNode(debugLabel: 'shell-confirm');
   _RiskyAction _selectedAction = _RiskyAction.cancel;
   bool _canConfirmDestructive = false;
 
@@ -268,7 +268,7 @@ class _MongoshConfirmationModalState extends State<MongoshConfirmationModal> {
                   ),
                   const SizedBox(height: 2.0),
                   Text(
-                    'mongosh requested execution of a data-altering command',
+                    'Shell requested execution of a data-altering command',
                     style: CompassTypography.caption(color: _theme.textMuted),
                   ),
                 ],
