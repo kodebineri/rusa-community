@@ -43,7 +43,7 @@ class CompassColors {
   // Rusa brand mark (`CompassSvgIcons.rusa`) drawn straight on the app
   // background (header, About modal) — resolved by `CompassTheme.brandMark`.
   static const Color darkBrandMark = Color(0xFFFFFFFF);
-  static const Color lightBrandMark = Color(0xFF2B2119);
+  static const Color lightBrandMark = Color(0xFF14453D);
 
   // Light theme palette
   static const Color lightBgApp = Color(0xFFF9FBFA);
