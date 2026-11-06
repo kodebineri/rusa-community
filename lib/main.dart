@@ -28,6 +28,7 @@ import 'widgets/views/document_table_view.dart';
 import 'widgets/views/aggregations_view.dart';
 import 'widgets/views/schema_view.dart';
 import 'widgets/views/indexes_view.dart';
+import 'widgets/views/show_ddl_view.dart';
 import 'widgets/modals/connection_modal.dart';
 import 'widgets/modals/create_db_modal.dart';
 import 'widgets/modals/create_collection_modal.dart';
@@ -362,8 +363,12 @@ class _CompassAppState extends State<CompassApp> {
 
   String _selectedDbName = 'library';
   String _selectedCollName = 'books';
-  String _activeTab = 'documents'; // documents, aggregations, schema, indexes
+  String _activeTab = 'documents'; // documents, aggregations, schema, indexes, ddl
   String _docViewMode = 'tree'; // tree, json, table
+
+  /// Pipeline handed to the Aggregations tab by a view's "Copy to Aggregations"
+  /// action. The aggregations view consumes it when (re)built.
+  List<dynamic>? _pendingAggregationPipeline;
 
   QueryFilterOptions _queryOptions = QueryFilterOptions();
 
@@ -401,7 +406,12 @@ class _CompassAppState extends State<CompassApp> {
     final tab = _openTabs[index];
     _selectedDbName = tab.dbName;
     _selectedCollName = tab.collName;
-    _activeTab = tab.activeSection;
+    // "Show DDL" only exists for views: fall back to Documents when the saved
+    // section no longer applies (e.g. the view was replaced by a collection).
+    final coll = mongoEngine.getCollection(tab.dbName, tab.collName);
+    _activeTab = (tab.activeSection == 'ddl' && coll?.isView != true)
+        ? 'documents'
+        : tab.activeSection;
     _docViewMode = tab.docViewMode;
     _queryOptions = tab.queryOptions;
   }
@@ -821,6 +831,58 @@ class _CompassAppState extends State<CompassApp> {
     });
   }
 
+  /// Re-applies an edited DDL to the active view. Returns `null` on success or
+  /// a message for the view's error banner.
+  String? _handleUpdateView(MongoCollection activeColl, List<dynamic> pipeline) {
+    if (!activeColl.isView) return 'The selected item is not a view.';
+    final source = activeColl.viewOn;
+    if (source == null || source.isEmpty) {
+      return 'Cannot update a view without a known source collection.';
+    }
+    try {
+      mongoEngine.updateView(_selectedDbName, _selectedCollName, source, pipeline);
+    } catch (err) {
+      return err.toString().replaceFirst('Exception: ', '');
+    }
+    setState(() {});
+    return null;
+  }
+
+  /// Loads a view's pipeline into the Aggregations tab.
+  ///
+  /// The DDL describes how to build the view **from its source collection**, so
+  /// the pipeline is run against the source (re-applying it to the view itself
+  /// would produce nothing/garbage). The source tab is opened/loaded and its
+  /// Aggregations section is shown with the view's pipeline pre-filled.
+  void _copyViewToAggregations(List<dynamic> pipeline) {
+    final view = mongoEngine.getCollection(_selectedDbName, _selectedCollName);
+    final source = view?.viewOn;
+    final targetColl =
+        (source != null && source.isNotEmpty) ? source : _selectedCollName;
+    setState(() {
+      _pendingAggregationPipeline = List<dynamic>.from(pipeline);
+      if (targetColl != _selectedCollName) {
+        _openCollectionTab(_selectedDbName, targetColl);
+      }
+      _activeTab = 'aggregations';
+    });
+  }
+
+  /// Ensures the collection the Aggregations tab will run against is mirrored.
+  ///
+  /// For a view the pipeline runs against the view's **source** collection, which
+  /// may not have been opened yet on a live server — without this it would
+  /// aggregate an empty mirror and show 0 documents.
+  void _ensureAggregationTargetLoaded() {
+    final service = mongoEngine;
+    if (service is! RealMongoService) return;
+    if (_selectedDbName.isEmpty) return;
+    final coll = service.getCollection(_selectedDbName, _selectedCollName);
+    if (coll == null) return;
+    final target = coll.isView ? (coll.viewOn ?? coll.name) : coll.name;
+    unawaited(service.loadCollectionData(_selectedDbName, target));
+  }
+
   void _handleResetData() {
     final engine = mongoEngine;
     if (engine is RealMongoService) {
@@ -1018,207 +1080,218 @@ class _CompassAppState extends State<CompassApp> {
             activeColl.documents.isEmpty;
         final queryResult = service.findDocuments(
             _selectedDbName, _selectedCollName, _queryOptions);
-        final pageDocs = queryResult.documents;
+        // When the user has not asked for a sort, order the page by `_id` so
+        // the document list reads alphabetically.
+        final pageDocs = _queryOptions.sort.trim().isEmpty
+            ? (List<MongoDocument>.from(queryResult.documents)
+              ..sort((a, b) => a.id.toLowerCase().compareTo(b.id.toLowerCase())))
+            : queryResult.documents;
 
         final appShell = Container(
           color: _theme.bgApp,
           child: Stack(
             children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  // Header (h-14 / 56px)
-                  CompassHeader(
-                    connection: _connection,
-                    showResetSample: _realService == null,
-                    onOpenConnectModal: () {
-                      setState(() => _isConnectModalOpen = true);
-                    },
-                    onDisconnect: _handleDisconnect,
-                    onResetData: _handleResetData,
-                    isTerminalOpen: _isTerminalOpen,
-                    onToggleTerminal: () {
-                      setState(() => _isTerminalOpen = !_isTerminalOpen);
-                    },
-                    themeVariant: _themeVariant,
-                    onSelectTheme: (variant) {
-                      setState(() => _themeVariant = variant);
-                    },
-                    onToggleMobileSidebar: () {
-                      setState(
-                          () => _isMobileSidebarOpen = !_isMobileSidebarOpen);
-                    },
-                    isMobile: !isDesktop,
-                    onOpenActions: () {
-                      setState(() => _isHeaderActionsOpen = true);
-                    },
-                    onReportBug: () {
-                      unawaited(_handleReportBug());
-                    },
-                    onShowEula: () {
-                      setState(() => _isEulaModalOpen = true);
-                    },
-                    onShowPrivacyPolicy: () {
-                      setState(() => _isPrivacyPolicyModalOpen = true);
-                    },
-                    onShowAbout: () {
-                      setState(() => _isAboutModalOpen = true);
-                    },
-                  ),
-
-                  // Main Body: Side-by-side on desktop, or off-canvas sidebar
-                  Expanded(
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        if (isDesktop || _isMobileSidebarOpen)
-                          CompassSidebar(
-                            databases: dbs,
-                            selectedDb: _selectedDbName,
-                            selectedColl: _selectedCollName,
-                            onSelectDatabase: (dbName) {
-                              setState(() {
-                                final db = service.getDatabase(dbName);
-                                final collName =
-                                    db?.collections.keys.firstOrNull ?? '';
-                                if (collName.isNotEmpty) {
-                                  _openCollectionTab(dbName, collName);
-                                } else {
-                                  _selectedDbName = dbName;
-                                  _selectedCollName = '';
-                                }
-                                _isMobileSidebarOpen = false;
-                              });
-                            },
-                            onSelectCollection: (dbName, collName) {
-                              setState(() {
-                                _openCollectionTab(dbName, collName);
-                                _isMobileSidebarOpen = false;
-                              });
-                            },
-                            onOpenCreateDb: _openCreateDb,
-                            onOpenCreateColl: (dbName) =>
-                                _openCreateCollection(dbName),
-                            onRenameDb: _openRenameDb,
-                            onRenameColl: (dbName, collName, isView) =>
-                                _openRenameColl(dbName, collName, isView),
-                            onDropDb: _openDropDb,
-                            onDropColl: _openDropColl,
-                            onRefresh: () {
-                              setState(() {});
-                            },
-                            onExpandDb: (dbName) {
-                              final service = mongoEngine;
-                              if (service is RealMongoService) {
-                                unawaited(service.loadCollectionCounts(dbName));
-                              }
-                            },
-                          ),
-
-                        // Active Collection Main Pane
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              if (_openTabs.isNotEmpty)
-                                CollectionTabBar(
-                                  tabs: _openTabs,
-                                  activeIndex: _activeTabIndex,
-                                  onSelect: (index) {
-                                    setState(() => _activateTabIndex(index));
-                                  },
-                                  onClose: (index) {
-                                    setState(() => _removeTabAt(index));
-                                  },
-                                ),
-
-                              // Collection Header Bar: Title, Breadcrumbs, Tab Switcher
-                              if (_activeTabIndex >= 0)
-                                _buildCollectionHeader(activeDb, activeColl),
-
-                              // Query Bar (only shown while a collection tab is open)
-                              if (_activeTabIndex >= 0 &&
-                                  _activeTab == 'documents')
-                                CompassQueryBar(
-                                  options: _queryOptions,
-                                  onChangeOptions: (updated) {
-                                    setState(() => _queryOptions = updated);
-                                  },
-                                  onExecuteQuery: () {
-                                    setState(() {});
-                                  },
-                                  onResetQuery: () {
-                                    setState(() =>
-                                        _queryOptions = QueryFilterOptions());
-                                    // The circular-arrow button doubles as a
-                                    // refresh: reload the collection from the
-                                    // server (no-op for the sample engine).
-                                    final service = mongoEngine;
-                                    if (service is RealMongoService &&
-                                        _selectedDbName.isNotEmpty &&
-                                        _selectedCollName.isNotEmpty) {
-                                      final coll = service.getCollection(
-                                          _selectedDbName, _selectedCollName);
-                                      coll?.loadError = null;
-                                      unawaited(service.loadCollectionData(
-                                          _selectedDbName, _selectedCollName,
-                                          force: true));
-                                    }
-                                  },
-                                  optionsExpanded: _isQueryOptionsExpanded,
-                                  onToggleOptions: () {
-                                    setState(() => _isQueryOptionsExpanded =
-                                        !_isQueryOptionsExpanded);
-                                  },
-                                  onOpenOverflow: () {
-                                    setState(() => _isQueryActionsOpen = true);
-                                  },
-                                  executionTimeMs: queryResult.executionTimeMs,
-                                  totalResultsCount: queryResult.totalCount,
-                                  isLoading: isCollLoading,
-                                ),
-
-                              // Documents View Sub-Header: Pagination
-                              if (_activeTabIndex >= 0 &&
-                                  _activeTab == 'documents')
-                                _buildDocumentsPagination(queryResult,
-                                    isLoading: isCollLoading),
-
-                              // Active Tab Content View
-                              Expanded(
-                                child: Container(
-                                  color: _theme.bgApp,
-                                  child: _activeTab == 'documents'
-                                      ? _buildActiveTabView(
-                                          activeColl, pageDocs)
-                                      : SingleChildScrollView(
-                                          padding: const EdgeInsets.all(16.0),
-                                          child: _buildActiveTabView(
-                                              activeColl, pageDocs),
-                                        ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
+              // Keep the shell clear of the bottom system inset (Android
+              // navigation bar / iOS home indicator). The header handles the
+              // top inset itself.
+              SafeArea(
+                top: false,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    // Header (h-14 / 56px)
+                    CompassHeader(
+                      connection: _connection,
+                      showResetSample: _realService == null,
+                      onOpenConnectModal: () {
+                        setState(() => _isConnectModalOpen = true);
+                      },
+                      onDisconnect: _handleDisconnect,
+                      onResetData: _handleResetData,
+                      isTerminalOpen: _isTerminalOpen,
+                      onToggleTerminal: () {
+                        setState(() => _isTerminalOpen = !_isTerminalOpen);
+                      },
+                      themeVariant: _themeVariant,
+                      onSelectTheme: (variant) {
+                        setState(() => _themeVariant = variant);
+                      },
+                      onToggleMobileSidebar: () {
+                        setState(
+                            () => _isMobileSidebarOpen = !_isMobileSidebarOpen);
+                      },
+                      isMobile: !isDesktop,
+                      onOpenActions: () {
+                        setState(() => _isHeaderActionsOpen = true);
+                      },
+                      onReportBug: () {
+                        unawaited(_handleReportBug());
+                      },
+                      onShowEula: () {
+                        setState(() => _isEulaModalOpen = true);
+                      },
+                      onShowPrivacyPolicy: () {
+                        setState(() => _isPrivacyPolicyModalOpen = true);
+                      },
+                      onShowAbout: () {
+                        setState(() => _isAboutModalOpen = true);
+                      },
                     ),
-                  ),
-
-                  // Dockable Mongosh Shell at Bottom
-                  CompassTerminal(
-                    isOpen: _isTerminalOpen,
-                    onClose: () {
-                      setState(() => _isTerminalOpen = false);
-                    },
-                    activeDbName: _selectedDbName.isEmpty
-                        ? (mongoEngine.getDatabases().firstOrNull?.name ?? '')
-                        : _selectedDbName,
-                    onExecuteCommand: (command) =>
-                        _executeTerminalCommand(command),
-                    onRequestConfirmation: _requestTerminalConfirmation,
-                  ),
-                ],
+  
+                    // Main Body: Side-by-side on desktop, or off-canvas sidebar
+                    Expanded(
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          if (isDesktop || _isMobileSidebarOpen)
+                            CompassSidebar(
+                              databases: dbs,
+                              selectedDb: _selectedDbName,
+                              selectedColl: _selectedCollName,
+                              onSelectDatabase: (dbName) {
+                                setState(() {
+                                  final db = service.getDatabase(dbName);
+                                  final collName =
+                                      db?.collections.keys.firstOrNull ?? '';
+                                  if (collName.isNotEmpty) {
+                                    _openCollectionTab(dbName, collName);
+                                  } else {
+                                    _selectedDbName = dbName;
+                                    _selectedCollName = '';
+                                  }
+                                  _isMobileSidebarOpen = false;
+                                });
+                              },
+                              onSelectCollection: (dbName, collName) {
+                                setState(() {
+                                  _openCollectionTab(dbName, collName);
+                                  _isMobileSidebarOpen = false;
+                                });
+                              },
+                              onOpenCreateDb: _openCreateDb,
+                              onOpenCreateColl: (dbName) =>
+                                  _openCreateCollection(dbName),
+                              onRenameDb: _openRenameDb,
+                              onRenameColl: (dbName, collName, isView) =>
+                                  _openRenameColl(dbName, collName, isView),
+                              onDropDb: _openDropDb,
+                              onDropColl: _openDropColl,
+                              onRefresh: () {
+                                setState(() {});
+                              },
+                              onExpandDb: (dbName) {
+                                final service = mongoEngine;
+                                if (service is RealMongoService) {
+                                  unawaited(service.loadCollectionCounts(dbName));
+                                }
+                              },
+                            ),
+  
+                          // Active Collection Main Pane
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                if (_openTabs.isNotEmpty)
+                                  CollectionTabBar(
+                                    tabs: _openTabs,
+                                    activeIndex: _activeTabIndex,
+                                    onSelect: (index) {
+                                      setState(() => _activateTabIndex(index));
+                                    },
+                                    onClose: (index) {
+                                      setState(() => _removeTabAt(index));
+                                    },
+                                  ),
+  
+                                // Collection Header Bar: Title, Breadcrumbs, Tab Switcher
+                                if (_activeTabIndex >= 0)
+                                  _buildCollectionHeader(activeDb, activeColl),
+  
+                                // Query Bar (only shown while a collection tab is open)
+                                if (_activeTabIndex >= 0 &&
+                                    _activeTab == 'documents')
+                                  CompassQueryBar(
+                                    options: _queryOptions,
+                                    onChangeOptions: (updated) {
+                                      setState(() => _queryOptions = updated);
+                                    },
+                                    onExecuteQuery: () {
+                                      setState(() {});
+                                    },
+                                    onResetQuery: () {
+                                      setState(() =>
+                                          _queryOptions = QueryFilterOptions());
+                                      // The circular-arrow button doubles as a
+                                      // refresh: reload the collection from the
+                                      // server (no-op for the sample engine).
+                                      final service = mongoEngine;
+                                      if (service is RealMongoService &&
+                                          _selectedDbName.isNotEmpty &&
+                                          _selectedCollName.isNotEmpty) {
+                                        final coll = service.getCollection(
+                                            _selectedDbName, _selectedCollName);
+                                        coll?.loadError = null;
+                                        unawaited(service.loadCollectionData(
+                                            _selectedDbName, _selectedCollName,
+                                            force: true));
+                                      }
+                                    },
+                                    optionsExpanded: _isQueryOptionsExpanded,
+                                    onToggleOptions: () {
+                                      setState(() => _isQueryOptionsExpanded =
+                                          !_isQueryOptionsExpanded);
+                                    },
+                                    onOpenOverflow: () {
+                                      setState(() => _isQueryActionsOpen = true);
+                                    },
+                                    executionTimeMs: queryResult.executionTimeMs,
+                                    totalResultsCount: queryResult.totalCount,
+                                    isLoading: isCollLoading,
+                                  ),
+  
+                                // Documents View Sub-Header: Pagination
+                                if (_activeTabIndex >= 0 &&
+                                    _activeTab == 'documents')
+                                  _buildDocumentsPagination(queryResult,
+                                      isLoading: isCollLoading),
+  
+                                // Active Tab Content View
+                                Expanded(
+                                  child: Container(
+                                    color: _theme.bgApp,
+                                    child: _activeTab == 'documents'
+                                        ? _buildActiveTabView(
+                                            activeColl, pageDocs)
+                                        : SingleChildScrollView(
+                                            padding: const EdgeInsets.all(16.0),
+                                            child: _buildActiveTabView(
+                                                activeColl, pageDocs),
+                                          ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+  
+                    // Dockable Mongosh Shell at Bottom
+                    CompassTerminal(
+                      isOpen: _isTerminalOpen,
+                      onClose: () {
+                        setState(() => _isTerminalOpen = false);
+                      },
+                      activeDbName: _selectedDbName.isEmpty
+                          ? (mongoEngine.getDatabases().firstOrNull?.name ?? '')
+                          : _selectedDbName,
+                      onExecuteCommand: (command) =>
+                          _executeTerminalCommand(command),
+                      onRequestConfirmation: _requestTerminalConfirmation,
+                    ),
+                  ],
+                ),
               ),
 
               // Connection Modal Overlay
@@ -1539,6 +1612,26 @@ class _CompassAppState extends State<CompassApp> {
       }
     }
 
+    // Clamp the OS text scale (Android/iOS accessibility "font size"). The
+    // shell is dense and pixel-precise, so honouring an unbounded scale would
+    // overflow controls; 0.8–1.3 keeps accessibility useful without breaking
+    // the layout. Desktop reports a 1.0 scale, so this is a no-op there.
+    final unscaledContent = content;
+    content = Builder(
+      builder: (context) {
+        final mq = MediaQuery.of(context);
+        return MediaQuery(
+          data: mq.copyWith(
+            textScaler: mq.textScaler.clamp(
+              minScaleFactor: 0.8,
+              maxScaleFactor: 1.3,
+            ),
+          ),
+          child: unscaledContent,
+        );
+      },
+    );
+
     // Propagate the selected theme to the whole tree so widgets can read it
     // via `CompassTheme.of(context)` instead of taking a variant parameter.
     // (See theme/compass_theme.dart.)
@@ -1696,6 +1789,8 @@ class _CompassAppState extends State<CompassApp> {
                           CompassSvgIcons.layers),
                       _buildTab('schema', 'Schema', CompassSvgIcons.barChart),
                       _buildTab('indexes', 'Indexes', CompassSvgIcons.key),
+                      if (activeColl?.isView == true)
+                        _buildTab('ddl', 'Show DDL', CompassSvgIcons.code),
                     ],
                   ),
                 ),
@@ -1798,6 +1893,7 @@ class _CompassAppState extends State<CompassApp> {
     return GestureDetector(
       onTap: () {
         setState(() => _activeTab = tabKey);
+        if (tabKey == 'aggregations') _ensureAggregationTargetLoaded();
       },
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14.0, vertical: 10.0),
@@ -2226,10 +2322,24 @@ class _CompassAppState extends State<CompassApp> {
           );
         }
       case 'aggregations':
+        // A view's pipeline describes how to build it **from its source
+        // collection**, so aggregate the source and pre-fill the view's DDL.
+        // That makes "Aggregations" on a view show the view's current data
+        // (instead of re-applying the pipeline to the view's own output).
+        final aggColl = activeColl.isView
+            ? (activeColl.viewOn ?? activeColl.name)
+            : activeColl.name;
+        final aggInitial = activeColl.isView
+            ? (_pendingAggregationPipeline ??
+                (activeColl.pipeline?.isNotEmpty == true
+                    ? activeColl.pipeline
+                    : null))
+            : _pendingAggregationPipeline;
         return AggregationsView(
           dbName: _selectedDbName,
-          collName: _selectedCollName,
+          collName: aggColl,
           onSaveAsView: _openSaveView,
+          initialPipeline: aggInitial,
         );
       case 'schema':
         // SchemaView owns its analysis state: it re-runs `analyzeSchema` on
@@ -2248,6 +2358,16 @@ class _CompassAppState extends State<CompassApp> {
             _dropIndexName = idxName;
             _isDropIndexModalOpen = true;
           }),
+        );
+      case 'ddl':
+        if (!activeColl.isView) return const SizedBox.shrink();
+        return ShowDdlView(
+          dbName: _selectedDbName,
+          collName: _selectedCollName,
+          viewOn: activeColl.viewOn ?? '',
+          pipeline: activeColl.pipeline ?? const [],
+          onUpdateView: (pipeline) => _handleUpdateView(activeColl, pipeline),
+          onCopyToAggregations: _copyViewToAggregations,
         );
       default:
         return const SizedBox.shrink();

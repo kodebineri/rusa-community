@@ -1,6 +1,5 @@
 import 'package:flutter/widgets.dart';
 import '../../icons/compass_svg_icons.dart';
-import '../../theme/compass_colors.dart';
 import '../../theme/compass_theme.dart';
 import '../../theme/compass_typography.dart';
 import 'compass_modal.dart';
@@ -34,27 +33,10 @@ class AboutModal extends StatelessWidget {
         // Logo: the same leaf-on-green-gradient badge as the header, scaled up.
         Center(
           child: Container(
-            width: 72.0,
-            height: 72.0,
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [CompassColors.greenAccent, CompassColors.greenForest],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-              borderRadius: BorderRadius.circular(16.0),
-              boxShadow: const [
-                BoxShadow(
-                  color: Color(0x33000000),
-                  blurRadius: 8.0,
-                  offset: Offset(0, 2),
-                ),
-              ],
-            ),
             alignment: Alignment.center,
             child: const CompassSvg(
               svgString: CompassSvgIcons.rusa,
-              size: 40.0,
+              size: 72.0,
               color: Color(0xFFFFFFFF),
             ),
           ),
@@ -67,7 +49,7 @@ class AboutModal extends StatelessWidget {
           child: FittedBox(
             fit: BoxFit.scaleDown,
             child: Text(
-              'Rusa',
+              'r u s a',
               style: CompassTypography.title(color: theme.textPrimary)
                   .copyWith(fontSize: 22.0),
             ),

@@ -490,6 +490,41 @@ class LocalMongoEngine {
     return true;
   }
 
+  /// Replaces the definition (source collection + pipeline) of an existing view.
+  ///
+  /// Kept separate from [createView] so [RealMongoService] can sequence the
+  /// server-side drop + recreate in one operation instead of firing a second
+  /// create through the [createView] override.
+  bool updateView(
+    String dbName,
+    String viewName,
+    String sourceCollName,
+    List<dynamic> pipeline,
+  ) {
+    final db = getDatabase(dbName);
+    if (db == null) throw Exception('Database "$dbName" not found');
+    final existing = db.collections[viewName];
+    if (existing == null || !existing.isView) {
+      throw Exception('"$viewName" is not a view in database "$dbName"');
+    }
+    final source = db.collections[sourceCollName];
+    if (source == null) {
+      throw Exception('Source collection "$sourceCollName" does not exist in database "$dbName"');
+    }
+
+    final normalizedPipeline = _normalizeExtendedJson(pipeline) as List;
+    final docs = _runPipeline(source.documents, normalizedPipeline, dbName);
+    db.collections[viewName] = MongoCollection(
+      name: viewName,
+      documents: docs,
+      indexes: [MongoIndex(name: '_id_', keys: {'_id': 1}, sizeKb: 0)],
+      isView: true,
+      viewOn: sourceCollName,
+      pipeline: normalizedPipeline,
+    );
+    return true;
+  }
+
   bool dropCollection(String dbName, String collName) {
     final db = getDatabase(dbName);
     if (db == null || !db.collections.containsKey(collName)) return false;

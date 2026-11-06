@@ -6,9 +6,11 @@ import '../../icons/compass_svg_icons.dart';
 import '../../models/mongo_models.dart';
 import '../../services/mongo_engine.dart';
 import '../../theme/compass_colors.dart';
+import '../../theme/compass_density.dart';
 import '../../theme/compass_theme.dart';
 import '../../theme/compass_typography.dart';
 import '../../utils/json_syntax_text_controller.dart';
+import '../compass_hover.dart';
 import '../compass_icon_button.dart';
 import '../modals/compass_modal.dart';
 
@@ -27,7 +29,7 @@ class AggregationPreset {
 }
 
 const Map<String, String> _defaultTemplates = {
-  r'$match': '{\n  "published_year": { "\$gte": 2015 }\n}',
+  r'$match': '{}',
   r'$group': '{\n  "_id": "\$publisher_id",\n  "count": { "\$sum": 1 },\n  "avgRating": { "\$avg": "\$rating" }\n}',
   r'$sort': '{\n  "_id": -1\n}',
   r'$project': '{\n  "title": 1,\n  "published_year": 1,\n  "rating": 1\n}',
@@ -60,11 +62,16 @@ class AggregationsView extends StatefulWidget {
   final String collName;
   final Function(List<dynamic> pipeline, String pipelineJson)? onSaveAsView;
 
+  /// Optional pipeline to seed the builder with (e.g. copied from a view's
+  /// "Show DDL" tab). When null/empty the default sample stages are used.
+  final List<dynamic>? initialPipeline;
+
   const AggregationsView({
     super.key,
     required this.dbName,
     required this.collName,
     this.onSaveAsView,
+    this.initialPipeline,
   });
 
   @override
@@ -76,26 +83,13 @@ class _AggregationsViewState extends State<AggregationsView> {
 
   String _activeMode = 'visual'; // 'visual' or 'raw'
 
-  final List<PipelineStage> _stages = [
-    PipelineStage(
-      id: '1',
-      operator: r'$match',
-      content: '{\n  "published_year": { "\$gte": 2015 }\n}',
-      enabled: true,
-    ),
-    PipelineStage(
-      id: '2',
-      operator: r'$group',
-      content: '{\n  "_id": "\$publisher_id",\n  "count": { "\$sum": 1 },\n  "avgRating": { "\$avg": "\$rating" }\n}',
-      enabled: true,
-    ),
-    PipelineStage(
-      id: '3',
-      operator: r'$sort',
-      content: '{\n  "_id": -1\n}',
-      enabled: true,
-    ),
-  ];
+  /// The pipeline starts empty (like MongoDB Compass): an empty pipeline
+  /// returns the collection's own documents, so **Run Pipeline** shows data
+  /// immediately. Presets and the quick-add chips fill it in. The previous
+  /// hard-coded demo stages filtered on `published_year`, which only exists in
+  /// the bundled sample data, so running them against a real collection always
+  /// produced "0 docs".
+  final List<PipelineStage> _stages = [];
 
   final Map<String, JsonSyntaxTextController> _stageControllers = {};
   late final JsonSyntaxTextController _rawController;
@@ -108,7 +102,19 @@ class _AggregationsViewState extends State<AggregationsView> {
   String? _errorMessage;
   bool _isRunning = false;
   bool _isCopied = false;
+
+  /// Results are a paged preview: only [_resultPageSize] documents are rendered
+  /// at a time (the full pipeline output is kept in memory).
+  static const int _resultPageSize = 20;
+  int _resultPage = 0;
+
+  /// Tracks the active collection's on-demand load so a run that happened while
+  /// the mirror was still empty is repeated once the documents arrive.
+  bool _wasCollLoading = false;
   String _resultViewMode = 'json'; // 'json' or 'table'
+
+  /// Anchors the results panel so an explicit run can scroll it into view.
+  final GlobalKey _resultsKey = GlobalKey();
 
   final List<AggregationPreset> _presets = [
     AggregationPreset(
@@ -167,9 +173,41 @@ class _AggregationsViewState extends State<AggregationsView> {
   @override
   void initState() {
     super.initState();
+    final initial = widget.initialPipeline;
+    if (initial != null && initial.isNotEmpty) {
+      _loadPipelineIntoStages(initial);
+    }
+    _wasCollLoading =
+        mongoEngine.getCollection(widget.dbName, widget.collName)?.isLoading ?? false;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _runAggregation();
     });
+  }
+
+  /// Replaces the visual builder's stages with [pipeline] (a list of
+  /// `{ $stage: <value> }` maps), used by "Copy to Aggregations".
+  void _loadPipelineIntoStages(List<dynamic> pipeline) {
+    for (final c in _stageControllers.values) {
+      c.dispose();
+    }
+    _stageControllers.clear();
+    _stages.clear();
+    for (var i = 0; i < pipeline.length; i++) {
+      final stageMap = pipeline[i];
+      if (stageMap is Map && stageMap.isNotEmpty) {
+        final op = stageMap.keys.first.toString();
+        final val = stageMap[op];
+        final content = val is Map || val is List
+            ? const JsonEncoder.withIndent('  ').convert(val)
+            : (val is String ? '"$val"' : val.toString());
+        _stages.add(PipelineStage(
+          id: '${DateTime.now().millisecondsSinceEpoch}_$i',
+          operator: op,
+          content: content,
+          enabled: true,
+        ));
+      }
+    }
   }
 
   @override
@@ -196,7 +234,18 @@ class _AggregationsViewState extends State<AggregationsView> {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.dbName != widget.dbName || oldWidget.collName != widget.collName) {
       _runAggregation();
+      _wasCollLoading =
+          mongoEngine.getCollection(widget.dbName, widget.collName)?.isLoading ?? false;
+      return;
     }
+    // The first run may have happened while the collection was still streaming
+    // into the mirror; re-run once it finishes loading.
+    final loading =
+        mongoEngine.getCollection(widget.dbName, widget.collName)?.isLoading ?? false;
+    if (_wasCollLoading && !loading) {
+      _runAggregation();
+    }
+    _wasCollLoading = loading;
   }
 
   @override
@@ -243,10 +292,14 @@ class _AggregationsViewState extends State<AggregationsView> {
     }
   }
 
-  void _runAggregation() {
+  /// Runs the pipeline. [revealResults] scrolls the Pipeline Results panel into
+  /// view (used by the explicit **Run Pipeline** button so the user actually
+  /// sees the output; live edits re-run without moving the viewport).
+  void _runAggregation({bool revealResults = false}) {
     setState(() {
       _isRunning = true;
       _errorMessage = null;
+      _resultPage = 0;
     });
 
     try {
@@ -271,6 +324,19 @@ class _AggregationsViewState extends State<AggregationsView> {
         _results = [];
         _totalResultCount = 0;
         _isRunning = false;
+      });
+    }
+
+    if (revealResults) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        final ctx = _resultsKey.currentContext;
+        if (ctx != null && mounted) {
+          Scrollable.ensureVisible(
+            ctx,
+            duration: const Duration(milliseconds: 250),
+            alignment: 0.0,
+          );
+        }
       });
     }
   }
@@ -430,96 +496,7 @@ class _AggregationsViewState extends State<AggregationsView> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         // Mode Switcher & Top Action Bar
-        Container(
-          padding: const EdgeInsets.all(12.0),
-          decoration: BoxDecoration(
-            color: _theme.bgPanel,
-            borderRadius: BorderRadius.circular(8.0),
-            border: Border.all(color: _theme.border, width: 1.0),
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              // Segmented Tab Switcher (Visual vs Raw)
-              Container(
-                padding: const EdgeInsets.all(3.0),
-                decoration: BoxDecoration(
-                  color: _theme.bgSubtle,
-                  borderRadius: BorderRadius.circular(6.0),
-                  border: Border.all(color: _theme.border, width: 1.0),
-                ),
-                child: Row(
-                  children: [
-                    _buildModeTab('visual', 'Visual Pipeline', '${_stages.length} stages'),
-                    const SizedBox(width: 4.0),
-                    _buildModeTab('raw', 'Raw Aggregations', 'JSON Script'),
-                  ],
-                ),
-              ),
-
-              // Action Buttons
-              Row(
-                children: [
-                  // Run Aggregation Button
-                  GestureDetector(
-                    onTap: _runAggregation,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 6.0),
-                      decoration: BoxDecoration(
-                        color: _theme.accent,
-                        borderRadius: BorderRadius.circular(6.0),
-                      ),
-                      child: Row(
-                        children: [
-                          CompassSvg(
-                            svgString: CompassSvgIcons.play,
-                            size: 13.0,
-                            color: _theme.onAccent,
-                          ),
-                          const SizedBox(width: 6.0),
-                          Text(
-                            _isRunning ? 'Running...' : 'Run Pipeline',
-                            style: CompassTypography.header(color: _theme.onAccent),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 8.0),
-
-                  // Save as View
-                  GestureDetector(
-                    onTap: widget.onSaveAsView == null
-                        ? null
-                        : () => widget.onSaveAsView!(_pipelineArray(), _pipelineJsonString()),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10.0, vertical: 6.0),
-                      decoration: BoxDecoration(
-                        color: CompassColors.warningAmberBg,
-                        borderRadius: BorderRadius.circular(6.0),
-                        border: Border.all(color: CompassColors.warningAmberBorder, width: 1.0),
-                      ),
-                      child: Row(
-                        children: [
-                          const CompassSvg(
-                            svgString: CompassSvgIcons.eye,
-                            size: 13.0,
-                            color: CompassColors.warningAmber,
-                          ),
-                          const SizedBox(width: 6.0),
-                          Text(
-                            'Save as View',
-                            style: CompassTypography.bodyMedium(color: CompassColors.warningAmber),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
+        _buildActionBar(),
 
         const SizedBox(height: 10.0),
 
@@ -537,8 +514,132 @@ class _AggregationsViewState extends State<AggregationsView> {
         const SizedBox(height: 16.0),
 
         // Live Pipeline Results Panel
-        _buildResultsPanel(),
+        KeyedSubtree(key: _resultsKey, child: _buildResultsPanel()),
       ],
+    );
+  }
+
+  /// Mode switcher + primary actions. Stacks when the pane is narrow so the
+  /// **Run Pipeline** button is never clipped off-screen (tablets/phones), and
+  /// uses finger-sized targets on touch layouts.
+  Widget _buildActionBar() {
+    final switcher = Container(
+      padding: const EdgeInsets.all(3.0),
+      decoration: BoxDecoration(
+        color: _theme.bgSubtle,
+        borderRadius: BorderRadius.circular(6.0),
+        border: Border.all(color: _theme.border, width: 1.0),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _buildModeTab('visual', 'Visual Pipeline', '${_stages.length} stages'),
+          const SizedBox(width: 4.0),
+          _buildModeTab('raw', 'Raw Aggregations', 'JSON Script'),
+        ],
+      ),
+    );
+
+    final actions = Wrap(
+      spacing: 8.0,
+      runSpacing: 8.0,
+      children: [_buildRunButton(), _buildSaveAsViewButton()],
+    );
+
+    return Container(
+      padding: const EdgeInsets.all(12.0),
+      decoration: BoxDecoration(
+        color: _theme.bgPanel,
+        borderRadius: BorderRadius.circular(8.0),
+        border: Border.all(color: _theme.border, width: 1.0),
+      ),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          if (constraints.maxWidth < 620.0) {
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                switcher,
+                const SizedBox(height: 8.0),
+                actions,
+              ],
+            );
+          }
+          return Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [switcher, actions],
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildRunButton() {
+    final density = CompassDensity.of(context);
+    return ConstrainedBox(
+      constraints: BoxConstraints(minHeight: density.minTapTarget),
+      child: CompassHover(
+        onTap: () => _runAggregation(revealResults: true),
+        semanticLabel: 'Run pipeline',
+        builder: (hovered) => Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 6.0),
+          decoration: BoxDecoration(
+            color: hovered ? _theme.accentHover : _theme.accent,
+            borderRadius: BorderRadius.circular(6.0),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              CompassSvg(
+                svgString: CompassSvgIcons.play,
+                size: 13.0,
+                color: _theme.onAccent,
+              ),
+              const SizedBox(width: 6.0),
+              Text(
+                _isRunning ? 'Running...' : 'Run Pipeline',
+                style: CompassTypography.header(color: _theme.onAccent),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSaveAsViewButton() {
+    final density = CompassDensity.of(context);
+    return ConstrainedBox(
+      constraints: BoxConstraints(minHeight: density.minTapTarget),
+      child: CompassHover(
+        onTap: widget.onSaveAsView == null
+            ? null
+            : () => widget.onSaveAsView!(_pipelineArray(), _pipelineJsonString()),
+        semanticLabel: 'Save pipeline as view',
+        builder: (hovered) => Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10.0, vertical: 6.0),
+          decoration: BoxDecoration(
+            color: CompassColors.warningAmberBg,
+            borderRadius: BorderRadius.circular(6.0),
+            border: Border.all(color: CompassColors.warningAmberBorder, width: 1.0),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const CompassSvg(
+                svgString: CompassSvgIcons.eye,
+                size: 13.0,
+                color: CompassColors.warningAmber,
+              ),
+              const SizedBox(width: 6.0),
+              Text(
+                'Save as View',
+                style: CompassTypography.bodyMedium(color: CompassColors.warningAmber),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 
@@ -1036,38 +1137,9 @@ class _AggregationsViewState extends State<AggregationsView> {
                 bottom: BorderSide(color: _theme.border, width: 1.0),
               ),
             ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  'AGGREGATION SCRIPT (JSON OR MONGOSH)',
-                  style: CompassTypography.monoBold(color: _theme.textMuted, size: 11.0),
-                ),
-                GestureDetector(
-                  onTap: _runAggregation,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10.0, vertical: 4.0),
-                    decoration: BoxDecoration(
-                      color: _theme.accent,
-                      borderRadius: BorderRadius.circular(4.0),
-                    ),
-                    child: Row(
-                      children: [
-                        CompassSvg(
-                          svgString: CompassSvgIcons.play,
-                          size: 11.0,
-                          color: _theme.onAccent,
-                        ),
-                        const SizedBox(width: 4.0),
-                        Text(
-                          'Run Aggregation',
-                          style: CompassTypography.header(color: _theme.onAccent),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
+            child: Text(
+              'AGGREGATION SCRIPT (JSON OR MONGOSH)',
+              style: CompassTypography.monoBold(color: _theme.textMuted, size: 11.0),
             ),
           ),
           Container(
@@ -1091,9 +1163,49 @@ class _AggregationsViewState extends State<AggregationsView> {
     );
   }
 
+  /// Prev/next pager for the results preview ([start]..[end) of [total]).
+  Widget _buildResultPager(int start, int end, int total) {
+    final canPrev = start > 0;
+    final canNext = end < total;
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        CompassIconButton(
+          svgString: CompassSvgIcons.chevronLeft,
+          onTap: canPrev ? () => setState(() => _resultPage--) : null,
+          size: 12.0,
+          padding: 2.0,
+          color: canPrev ? _theme.textSecondary : _theme.border,
+          semanticLabel: 'Previous results page',
+        ),
+        Text(
+          '${start + 1}–$end of $total',
+          style: CompassTypography.monoSmall(color: _theme.textMuted),
+        ),
+        CompassIconButton(
+          svgString: CompassSvgIcons.chevronRight,
+          onTap: canNext ? () => setState(() => _resultPage++) : null,
+          size: 12.0,
+          padding: 2.0,
+          color: canNext ? _theme.textSecondary : _theme.border,
+          semanticLabel: 'Next results page',
+        ),
+      ],
+    );
+  }
+
   Widget _buildResultsPanel() {
+    // Only a page-sized preview of the results is rendered at a time.
+    final total = _results.length;
+    final pageCount = total == 0 ? 1 : (total / _resultPageSize).ceil();
+    final page = _resultPage.clamp(0, pageCount - 1);
+    final start = page * _resultPageSize;
+    final end = (start + _resultPageSize) < total ? (start + _resultPageSize) : total;
+    final pageResults =
+        total == 0 ? const <MongoDocument>[] : _results.sublist(start, end);
+
     final formattedResultsJson = const JsonEncoder.withIndent('  ').convert(
-      _results.map((d) => d.data).toList(),
+      pageResults.map((d) => d.data).toList(),
     );
 
     return Container(
@@ -1142,6 +1254,10 @@ class _AggregationsViewState extends State<AggregationsView> {
                         style: CompassTypography.monoSmall(color: _theme.textMuted),
                       ),
                     ),
+                    if (total > 0) ...[
+                      const SizedBox(width: 8.0),
+                      _buildResultPager(start, end, total),
+                    ],
                   ],
                 ),
 
@@ -1282,7 +1398,7 @@ class _AggregationsViewState extends State<AggregationsView> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    for (int i = 0; i < _results.length; i++)
+                    for (int i = 0; i < pageResults.length; i++)
                       Container(
                         margin: const EdgeInsets.only(bottom: 6.0),
                         padding: const EdgeInsets.all(8.0),
@@ -1293,7 +1409,7 @@ class _AggregationsViewState extends State<AggregationsView> {
                         ),
                         child: Text.rich(
                           buildJsonSyntaxSpan(
-                            jsonEncode(_results[i].data),
+                            jsonEncode(pageResults[i].data),
                             style: CompassTypography.monoRegular(
                               color: _theme.textPrimary,
                               size: 11.0,

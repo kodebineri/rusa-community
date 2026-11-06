@@ -30,3 +30,35 @@ flutter:
     # Privacy text rendered by PrivacyPolicyModal
     # (lib/widgets/modals/privacy_policy_modal.dart).
     - PRIVACY.md
+
+  # Bundled so the UI renders with the same faces on Windows, Android and iOS
+  # instead of falling back to each platform's system font. The families match
+  # `CompassTypography.fontSans` / `fontMono` / `fontTitle`
+  # (lib/theme/compass_typography.dart).
+  fonts:
+    - family: Inter
+      fonts:
+        - asset: assets/fonts/Inter/Inter_18pt-Regular.ttf
+          weight: 400
+        - asset: assets/fonts/Inter/Inter_18pt-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/Inter/Inter_18pt-SemiBold.ttf
+          weight: 600
+        - asset: assets/fonts/Inter/Inter_18pt-Bold.ttf
+          weight: 700
+    - family: JetBrains Mono
+      fonts:
+        - asset: assets/fonts/JetBrains_Mono/JetBrainsMono-Regular.ttf
+          weight: 400
+        - asset: assets/fonts/JetBrains_Mono/JetBrainsMono-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/JetBrains_Mono/JetBrainsMono-Bold.ttf
+          weight: 700
+    - family: Outfit
+      fonts:
+        - asset: assets/fonts/Outfit/Outfit-Regular.ttf
+          weight: 400
+        - asset: assets/fonts/Outfit/Outfit-SemiBold.ttf
+          weight: 600
+        - asset: assets/fonts/Outfit/Outfit-Bold.ttf
+          weight: 700

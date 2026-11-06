@@ -781,6 +781,33 @@ class RealMongoService extends LocalMongoEngine {
   }
 
   @override
+  bool updateView(
+    String dbName,
+    String viewName,
+    String sourceCollName,
+    List<dynamic> pipeline,
+  ) {
+    final ok = super.updateView(dbName, viewName, sourceCollName, pipeline);
+    if (ok) {
+      // MongoDB can't change a view's pipeline in place: drop then recreate in
+      // a single queued operation so the two server calls can't race.
+      _fireDb(dbName, (db) async {
+        try {
+          await db.dropCollection(viewName);
+        } catch (_) {
+          // Missing view is fine — createView below recreates it.
+        }
+        await db.createView(
+          viewName,
+          sourceCollName,
+          _denormalizeValue(pipeline) as List,
+        );
+      });
+    }
+    return ok;
+  }
+
+  @override
   bool saveValidator(
     String dbName,
     String collName,

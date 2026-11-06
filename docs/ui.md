@@ -109,6 +109,22 @@ A `MouseRegion` + optional `GestureDetector` + optional `Semantics(button: true)
   verified overflow-free at 320/360/390/414/600/767/768/1024/1920 px with a temporary
   probe that was deleted afterwards.
 
+### System insets and OS text scaling (`lib/main.dart` → `_CompassAppState.build`)
+
+The shell is dense and pixel-precise, so two OS-level inputs are normalised in `build()`:
+
+- **Text scaling is clamped to 0.8–1.3.** The app builds its own `MediaQuery` (there is no
+  Material app), so `build()` wraps the tree in a `Builder` that re-provides
+  `mq.copyWith(textScaler: mq.textScaler.clamp(minScaleFactor: 0.8, maxScaleFactor: 1.3))`.
+  Android/iOS "font size" then moves the UI within a range the layout can absorb instead of
+  blowing it up; desktop reports 1.0, so it is a no-op there.
+- **The shell honours the bottom system inset.** The `Column` (header + body + terminal) that
+  the `appShell` `Stack` hosts is wrapped in `SafeArea(top: false)`, so the sidebar footer,
+  pagination bar and docked terminal stay clear of the Android navigation bar / iOS home
+  indicator. Top is left to `CompassHeader`, which has its own `SafeArea`. The modals and
+  action sheets are siblings of that widget in the `Stack` and keep their own `SafeArea`, so
+  they still reach the screen edge (invariant 5).
+
 ## Text selection context menu & syntax colouring
 
 Two small cross-cutting helpers make bare `EditableText`s usable (no Material
@@ -206,7 +222,8 @@ copy as Dart literals.
 | `DocumentTableView` | `documents`, `onEditDocument`, `onDeleteDocument` | Horizontal-scroll table: `#` col (48px), dynamic columns from key union, `_id` first (220px, others 160px, header click client-side sorts), ACTIONS col (100px, **132px on touch**) pencil/trash. Rows 36px (**48px on touch**), BSON-styled cells. **No clone callback — no copy icon in table mode** |
 | `SchemaView` | `dbName, collName` | **StatefulWidget** owning `fields` + `isAnalyzing`: auto-runs analysis on open / db-coll change and on **Analyze Schema** (250 ms `Timer` mirrors the React `setTimeout(…, 250)`; while running the button is disabled `Opacity 0.5` with label **Analyzing...**); reads `analyzeSchema` from the global `mongoEngine`. Header "Schema Analysis" + `Analyzed N unique fields in <coll>`; per-field cards: type badges with %, 8px multi-color distribution bar (incl. red missing segment), first-3 samples, min/max |
 | `IndexesView` | `dbName, collName, indexes, onCreateIndex, onDropIndex(name)` | Header + **Create Index**; table `INDEX NAME / FIELDS & ORDER / PROPERTIES / SIZE / ACTIONS`; `_id_` row = shieldCheck "Protected" (no trash); `unique` → blue badge. Stateless — `onCreateIndex`/`onDropIndex` only open the root-Stack modals (`CreateIndexModal` / `DropIndexModal`), which mutate the engine; the table refreshes on the next `setState` because `indexes` is the live `activeColl.indexes` list |
-| `AggregationsView` | `dbName, collName, onSaveAsView?: fn(pipeline, json)` | ~1300 lines / 47 KB. Classes: `AggregationPreset {id, name, description, stages}`; `_availableOperators = [$match,$group,$sort,$project,$limit,$skip,$unwind,$count,$lookup]`. State: `_activeMode ('visual'\|'raw')`, 3 seeded stages, per-stage controllers, `_rawController`, 5 presets (Match & Group, Unwind & Count, Top 10 Rated, Lookup Publishers, Count Documents), results (`_results`, `_executionTimeMs`, `_errorMessage`, `_isRunning`, `_resultViewMode 'json'\|'table'`). Auto-runs once post-frame in `initState` and on db/coll change. Sections: mode switcher + action bar (Run Pipeline / Save as View), presets strip, visual builder (quick-add chips, Add Stage, stage cards with operator picker/enable/move/duplicate/delete; **content edits re-run the pipeline live**), raw editor (`CompassInput maxLines 14`), results panel (`n docs (x.x ms)` pill, JSON/Table switch, copy) |
+| `AggregationsView` | `dbName, collName, onSaveAsView?: fn(pipeline, json), initialPipeline?` | ~1300 lines / 47 KB. Classes: `AggregationPreset {id, name, description, stages}`; `_availableOperators = [$match,$group,$sort,$project,$limit,$skip,$unwind,$count,$lookup]`. State: `_activeMode ('visual'\|'raw')`, **starts with an empty pipeline** (like Compass — an empty pipeline returns the collection's documents; a view's "Copy to Aggregations" can seed it via `initialPipeline`), per-stage controllers, `_rawController`, 5 presets (Match & Group, Unwind & Count, Top 10 Rated, Lookup Publishers, Count Documents), results (`_results`, `_executionTimeMs`, `_errorMessage`, `_isRunning`, `_resultPage`, `_resultViewMode 'json'\|'table'`). Auto-runs once post-frame in `initState` and on db/coll change. Sections: mode switcher + action bar (**Run Pipeline** / Save as View; stacks below 620 dp so the buttons are never clipped, touch-sized targets), presets strip, visual builder (quick-add chips, Add Stage, stage cards with operator picker/enable/move/duplicate/delete; **content edits re-run the pipeline live**), raw editor (`CompassInput maxLines 14`; the action bar's **Run Pipeline** is the only run control), results panel (paged **preview** — only 20 documents per page with a prev/next pager, `n docs (x.x ms)` pill, JSON/Table switch, copy); pressing **Run Pipeline** scrolls the results panel into view |
+| `ShowDdlView` | `dbName, collName, viewOn, pipeline, onUpdateView(pipeline)->String?, onCopyToAggregations(pipeline)` | **Only for views**; hosts the `ddl` ("Show DDL") section tab that appears after **Indexes** when `activeColl.isView`. Renders the view's pipeline as an editable, JSON-syntax-coloured `CompassInput` (`JsonSyntaxTextController` + auto-indent). **Update View** re-applies the edited DDL via `mongoEngine.updateView` (drop + recreate; the real service sequences both server calls in one queued op); **Copy to Aggregations** loads the pipeline into the Aggregations tab (`_pendingAggregationPipeline`). Error/success banners below the editor |
 
 ## Chrome widgets — `lib/widgets/`
 
@@ -295,13 +312,17 @@ Static `const Color` tokens only, no logic: dark palette (`darkBgApp 0xFF0C1014`
 ### `compass_typography.dart` — `CompassTypography`
 
 Static factories returning plain `TextStyle` (no `ThemeData`):
-`fontSans = 'Plus Jakarta Sans'`, `fontMono = 'JetBrains Mono'`. Sans: `title` (14/w700),
-`header` (13/w600), `bodyMedium` (12/w500), `bodyRegular` (12/w400), `caption` (11),
-`badge` (10/w600). Mono: `monoBold/monoMedium/monoRegular({Color color, double size = 12})`,
-`monoSmall` (11), `queryInput` (12), `terminal` (12, height 1.5).
+`fontSans = 'Inter'`, `fontMono = 'JetBrains Mono'`, `fontTitle = 'Outfit'`. Sans: `title`
+(14/Outfit w700), `header` (13/w600), `bodyMedium` (12/w500), `bodyRegular` (12/w400),
+`caption` (11), `badge` (10/w600). Mono: `monoBold/monoMedium/monoRegular({Color color,
+double size = 12})`, `monoSmall` (11), `queryInput` (12), `terminal` (12, height 1.5).
 
-⚠ `google_fonts` is in pubspec but **never imported**; no font files ship — families fall
-back at runtime if the OS lacks them.
+✅ The three families **ship with the app** — declared under `flutter: fonts:` in `pubspec.yaml`
+and committed in `assets/fonts/` (`Inter` 18pt static 400/500/600/700, `JetBrains Mono`
+400/500/700, `Outfit` 400/600/700, with their OFL licenses). So the UI renders with the same
+typefaces on Windows, Android and iOS instead of falling back to the system font. `google_fonts`
+is still in pubspec but never imported. If you change a family/weight in `CompassTypography`, add
+the matching file+weight to `pubspec.yaml` (or Flutter synthesises the missing weight).
 
 ## Recipe: adding a new view/section
 

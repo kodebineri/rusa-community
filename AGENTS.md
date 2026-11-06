@@ -117,7 +117,8 @@ the legacy `src/` React app; `npm` is not needed for Flutter work).
     back to Dracula. Users pick a theme from the header options menu (above Report Bug) or
     the touch action sheet; both call `onSelectTheme` → `setState(_themeVariant)`.
 12. **State field names (easy to get wrong):** section = `_activeTab`
-    (`documents|aggregations|schema|indexes`), view mode = `_docViewMode`
+    (`documents|aggregations|schema|indexes|ddl`; `ddl` — the "Show DDL" tab — exists only for
+    views), view mode = `_docViewMode`
     (`tree|json|table`), tab index = `_activeTabIndex` (`-1` = none sentinel). There is no
     `_activeSection` or `_activeTabId`.
 13. **Touch layer (mobile/tablet):** metrics come from `CompassDensity.of(context)`
@@ -130,7 +131,10 @@ the legacy `src/` React app; `npm` is not needed for Flutter work).
     area without changing the glyph size); hover/tap feedback uses `CompassHover` (builder
     API — the control paints its own hover fill); actions that do not fit go into
     `CompassActionSheet`, which is a root-`Stack` child like the modals. Never hard-code
-    tap-target sizes.
+    tap-target sizes. The OS text scale is clamped to **0.8–1.3** and the shell `Column` is
+    wrapped in `SafeArea(top: false)` (both in `_CompassAppState.build`), so the dense layout
+    survives an Android/iOS font-size setting and the bottom inset (nav bar / home indicator)
+    — see `docs/ui.md` → "System insets and OS text scaling".
 
 14. **Text selection is hand-rolled** (`lib/widgets/compass_text_menu.dart`). Material's
     `AdaptiveTextSelectionToolbar` needs `MaterialLocalizations`, so bare `EditableText`s get
@@ -143,8 +147,11 @@ the legacy `src/` React app; `npm` is not needed for Flutter work).
 
 ## Known dead-ends / no-op code (don't "fix" silently, don't rely on)
 
-- `google_fonts` is in pubspec but never imported; fonts ("Plus Jakarta Sans", "JetBrains
-  Mono") are referenced by name and fall back at runtime — no font files ship.
+- `google_fonts` is in pubspec but never imported. The UI fonts **do** ship now: `Inter`,
+  `JetBrains Mono` and `Outfit` are declared under `flutter: fonts:` in `pubspec.yaml` and
+  committed in `assets/fonts/` (see `docs/ui.md` → `CompassTypography`), so the same typefaces
+  render on Windows, Android and iOS. Keep `CompassTypography` families/weights in sync with
+  `pubspec.yaml`.
 - `QueryFilterOptions.collation` / `maxTimeMS` are stored but never consumed by the engine.
 - `CompassQueryBar._handleSkipChange` / `_handleLimitChange` are **intentional no-ops**
   ("do not execute on type"); the numeric fields commit only on blur/Find.

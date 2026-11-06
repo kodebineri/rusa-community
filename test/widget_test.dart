@@ -17,6 +17,7 @@ import 'package:rusa/theme/compass_theme.dart';
 import 'package:rusa/theme/compass_theme_presets.dart';
 import 'package:rusa/widgets/collection_tab_bar.dart';
 import 'package:rusa/widgets/compass_header.dart';
+import 'package:rusa/widgets/compass_icon_button.dart';
 import 'package:rusa/widgets/compass_query_bar.dart';
 import 'package:rusa/widgets/compass_sidebar.dart';
 import 'package:rusa/widgets/modals/compass_modal.dart';
@@ -30,6 +31,7 @@ import 'package:rusa/widgets/views/document_json_view.dart';
 import 'package:rusa/widgets/views/document_tree_view.dart';
 import 'package:rusa/widgets/views/indexes_view.dart';
 import 'package:rusa/widgets/views/schema_view.dart';
+import 'package:rusa/widgets/views/show_ddl_view.dart';
 
 /// Parses the mongosh-flavoured text an editor shows and unwraps the Extended
 /// JSON constructors (`ObjectId("...")` / `ISODate("...")`) back to the plain
@@ -296,11 +298,57 @@ void main() {
     final headerTopLeft = tester.getTopLeft(headerFinder);
     expect(headerTopLeft.dy, 0.0);
 
-    final titleFinder = find.text('Rusa');
+    final titleFinder = find.text('r u s a');
     expect(titleFinder, findsOneWidget);
     final titleTopLeft = tester.getTopLeft(titleFinder);
     expect(titleTopLeft.dy, greaterThanOrEqualTo(48.0),
         reason: 'Header content should be pushed down below the notification bar');
+  });
+
+  testWidgets('the shell clears the bottom system inset (navigation bar / home indicator)',
+      (WidgetTester tester) async {
+    tester.view.physicalSize = const Size(1920.0, 1080.0);
+    tester.view.devicePixelRatio = 1.0;
+    tester.view.padding = const FakeViewPadding(bottom: 34.0);
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    addTearDown(tester.view.resetPadding);
+
+    await tester.pumpWidget(const CompassApp());
+    await tester.pump();
+    for (var i = 0; i < 50 && tester.takeException() != null; i++) {}
+    await closeConnectionPopup(tester);
+
+    // The sidebar (and terminal below it) lives inside the shell SafeArea, so
+    // nothing the app paints reaches the bottom system inset.
+    final sidebar = find.byType(CompassSidebar);
+    expect(sidebar, findsOneWidget);
+    expect(tester.getRect(sidebar).bottom, lessThanOrEqualTo(1080.0 - 34.0 + 0.001),
+        reason: 'shell content should stop above the navigation bar');
+  });
+
+  testWidgets('system text scaling is clamped so the dense layout stays usable',
+      (WidgetTester tester) async {
+    tester.view.physicalSize = const Size(1920.0, 1080.0);
+    tester.view.devicePixelRatio = 1.0;
+    tester.platformDispatcher.textScaleFactorTestValue = 2.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+
+    await tester.pumpWidget(const CompassApp());
+    await tester.pump();
+    // The harness's placeholder font is far wider than Inter, so the connection
+    // modal's footer overflows in *any* test that boots the shell (also at 1.0);
+    // drain it rather than failing on a test-only artefact.
+    for (var i = 0; i < 50 && tester.takeException() != null; i++) {}
+    await closeConnectionPopup(tester);
+
+    final scaler = MediaQuery.textScalerOf(
+      tester.element(find.byType(CompassHeader)),
+    );
+    expect(scaler.scale(10.0), closeTo(13.0, 0.001),
+        reason: 'an OS scale of 2.0 should be clamped to 1.3');
   });
 
   testWidgets('CompassHeader hides Reset Samples button when showResetSample is false',
@@ -380,9 +428,9 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    // Verify initial stages and EditableText fields exist
+    // The pipeline starts empty (like Compass).
     expect(find.text('Visual Pipeline Stages'), findsOneWidget);
-    expect(find.byType(EditableText), findsWidgets);
+    expect(find.text('No pipeline stages added yet.'), findsOneWidget);
 
     // Click 'Add Stage' button
     final addStageBtn = find.text('Add Stage');
@@ -390,8 +438,9 @@ void main() {
     await tester.tap(addStageBtn);
     await tester.pumpAndSettle();
 
-    // Verify stage was added (from 3 to 4 stages)
-    expect(find.text('Stage 4:'), findsOneWidget);
+    // Verify a stage (and its editor) was added.
+    expect(find.text('Stage 1:'), findsOneWidget);
+    expect(find.byType(EditableText), findsWidgets);
 
     // Verify 'Run Pipeline' button is clickable
     final runBtn = find.text('Run Pipeline');
@@ -401,6 +450,100 @@ void main() {
 
     // Verify Results panel is rendered
     expect(find.text('Pipeline Results'), findsOneWidget);
+  });
+
+  testWidgets('Run Pipeline executes the raw aggregation script',
+      (WidgetTester tester) async {
+    tester.view.physicalSize = const Size(1920.0, 1080.0);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(const CompassApp());
+    await tester.pump();
+    for (var i = 0; i < 50 && tester.takeException() != null; i++) {}
+    await closeConnectionPopup(tester);
+
+    await tester.tap(find.text('Aggregations'));
+    await tester.pump();
+    for (var i = 0; i < 50 && tester.takeException() != null; i++) {}
+
+    // Switch to Raw mode; its editor does not auto-run on type.
+    await tester.tap(find.text('Raw Aggregations'));
+    await tester.pump();
+    for (var i = 0; i < 50 && tester.takeException() != null; i++) {}
+
+    final rawEditor = find.descendant(
+      of: find.byType(AggregationsView),
+      matching: find.byType(EditableText),
+    );
+    expect(rawEditor, findsOneWidget);
+    await tester.enterText(
+      rawEditor,
+      '[{ "\$match": { "published_year": 2019 } }]',
+    );
+    await tester.pump();
+
+    // The top action-bar button must run the edited script.
+    await tester.tap(find.text('Run Pipeline'));
+    await tester.pump();
+    for (var i = 0; i < 50 && tester.takeException() != null; i++) {}
+
+    expect(find.textContaining('1 docs ('), findsWidgets);
+  });
+
+  testWidgets('aggregation results preview is paged 20 at a time',
+      (WidgetTester tester) async {
+    tester.view.physicalSize = const Size(1920.0, 1080.0);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    addTearDown(mongoEngine.resetToDefaults);
+
+    // 2 seeded books + 25 bulk = 27 documents.
+    for (var i = 0; i < 25; i++) {
+      mongoEngine.insertDocument('library', 'books', {
+        '_id': 'bulk-$i',
+        'title': 'Bulk $i',
+        'isbn': 'bulk-isbn-$i',
+        'published_year': 2020,
+      });
+    }
+
+    await tester.pumpWidget(const CompassApp());
+    await tester.pump();
+    for (var i = 0; i < 50 && tester.takeException() != null; i++) {}
+    await closeConnectionPopup(tester);
+
+    await tester.tap(find.text('Aggregations'));
+    await tester.pump();
+    for (var i = 0; i < 50 && tester.takeException() != null; i++) {}
+
+    await tester.tap(find.text('Raw Aggregations'));
+    await tester.pump();
+    for (var i = 0; i < 50 && tester.takeException() != null; i++) {}
+
+    final rawEditor = find.descendant(
+      of: find.byType(AggregationsView),
+      matching: find.byType(EditableText),
+    );
+    await tester.enterText(rawEditor, '[{ "\$match": {} }]');
+    await tester.pump();
+    await tester.tap(find.text('Run Pipeline'));
+    await tester.pump(const Duration(milliseconds: 400));
+    for (var i = 0; i < 50 && tester.takeException() != null; i++) {}
+
+    // First page of 20, with the pager showing the 27-document total.
+    expect(find.text('1–20 of 27'), findsOneWidget);
+
+    final nextBtn = find.byWidgetPredicate(
+      (w) => w is CompassIconButton && w.semanticLabel == 'Next results page',
+    );
+    expect(nextBtn, findsOneWidget);
+    await tester.tap(nextBtn);
+    await tester.pump();
+
+    expect(find.text('21–27 of 27'), findsOneWidget);
   });
 
   testWidgets('selecting collections opens them in tabs', (WidgetTester tester) async {
@@ -1380,5 +1523,105 @@ void main() {
 
     // Let the 2-second reset timer fire so no timer is left pending.
     await tester.pump(const Duration(seconds: 2));
+  });
+
+  testWidgets('sidebar lists databases and collections alphabetically',
+      (WidgetTester tester) async {
+    tester.view.physicalSize = const Size(1920.0, 1080.0);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(const CompassApp());
+    await tester.pump();
+    for (var i = 0; i < 50 && tester.takeException() != null; i++) {}
+    await closeConnectionPopup(tester);
+
+    final sidebar = find.byType(CompassSidebar);
+    double topOf(String name) {
+      final finder =
+          find.descendant(of: sidebar, matching: find.text(name));
+      expect(finder, findsWidgets, reason: '"$name" must be in the sidebar');
+      return tester.getTopLeft(finder.first).dy;
+    }
+
+    // Databases: library before social_networks.
+    expect(topOf('library'), lessThan(topOf('social_networks')));
+
+    // Collections inside "library": books, genres, publishers.
+    final books = topOf('books');
+    final genres = topOf('genres');
+    final publishers = topOf('publishers');
+    expect(books, lessThan(genres));
+    expect(genres, lessThan(publishers));
+  });
+
+  testWidgets('a view has a Show DDL tab that updates the view and copies to aggregations',
+      (WidgetTester tester) async {
+    tester.view.physicalSize = const Size(1920.0, 1080.0);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    // The engine is a shared singleton; restore the seed data afterwards.
+    addTearDown(mongoEngine.resetToDefaults);
+
+    // A view over library.books.
+    mongoEngine.createView('library', 'recent_books', 'books', [
+      {
+        r'$match': {
+          'published_year': {r'$gte': 2015},
+        },
+      },
+    ]);
+
+    await tester.pumpWidget(const CompassApp());
+    await tester.pump();
+    for (var i = 0; i < 50 && tester.takeException() != null; i++) {}
+    await closeConnectionPopup(tester);
+
+    // Select the view from the sidebar.
+    await tester.tap(find.text('recent_books'));
+    await tester.pump();
+    for (var i = 0; i < 50 && tester.takeException() != null; i++) {}
+
+    // The Show DDL tab appears alongside the others.
+    expect(find.text('Show DDL'), findsOneWidget);
+    await tester.tap(find.text('Show DDL'));
+    await tester.pump();
+    for (var i = 0; i < 50 && tester.takeException() != null; i++) {}
+
+    final ddl = find.byType(ShowDdlView);
+    expect(ddl, findsOneWidget);
+
+    final editor = find.descendant(of: ddl, matching: find.byType(EditableText));
+    expect(editor, findsOneWidget);
+    expect(
+      tester.widget<EditableText>(editor).controller.text,
+      contains(r'$match'),
+    );
+
+    // Editing the DDL and pressing Update View re-applies it.
+    await tester.enterText(
+      editor,
+      '[{ "\$match": { "published_year": { "\$gte": 2020 } } }]',
+    );
+    await tester.pump();
+    await tester.tap(find.text('Update View'));
+    await tester.pump();
+    for (var i = 0; i < 50 && tester.takeException() != null; i++) {}
+
+    final updated = mongoEngine.getCollection('library', 'recent_books')!;
+    expect(updated.pipeline!.first.toString(), contains('2020'));
+
+    // Copy to Aggregations runs the view's DDL against its SOURCE collection
+    // (library.books) and shows the resulting documents.
+    await tester.tap(find.text('Copy to Aggregations'));
+    await tester.pump();
+    await tester.pump();
+    for (var i = 0; i < 50 && tester.takeException() != null; i++) {}
+
+    expect(find.byType(AggregationsView), findsOneWidget);
+    expect(find.text(r'$match'), findsWidgets);
+    expect(find.textContaining('1 docs ('), findsWidgets);
   });
 }

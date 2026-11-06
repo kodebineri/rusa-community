@@ -151,7 +151,11 @@ section no longer derives data in `build()` — `SchemaView` owns its analysis a
     `onDeleteDocument: _requestDeleteDocument`
   - json: `onUpdateDocument: _handleUpdateDocument`, clone, delete
   - table: edit + delete only (**no clone callback** — table view has no copy icon)
-- `aggregations` → `AggregationsView(db, coll, onSaveAsView: _openSaveView)`
+- `aggregations` → `AggregationsView(db, coll, onSaveAsView: _openSaveView, initialPipeline: _pendingAggregationPipeline)`.
+  For a **view**, `coll` is the view's source (`viewOn`) and `initialPipeline` is the view's own
+  DDL, so the Aggregations tab shows the view's current data instead of re-applying the pipeline
+  to the view's output; `_ensureAggregationTargetLoaded` (on tab select) and `_copyViewToAggregations`
+  (Copy to Aggregations) both load the source's documents on a live server.
 - `schema` → `SchemaView(db, coll)` — stateful; no callbacks (it runs `analyzeSchema` via the
   global `mongoEngine` itself, see `docs/ui.md`)
 - `indexes` → `IndexesView(db, coll, indexes: activeColl.indexes, onCreateIndex: () => setState(…), onDropIndex: (name) => setState(…))`
@@ -160,6 +164,10 @@ section no longer derives data in `build()` — `SchemaView` owns its analysis a
   from the root `Stack`. The engine mutations happen in the modal (`createIndex`) and in
   `_confirmDropIndex` (`dropIndex`); the table re-reads the live `activeColl.indexes` list on
   the next `setState`. See `docs/ui.md`.
+- `ddl` → `ShowDdlView(db, coll, viewOn, pipeline, onUpdateView, onCopyToAggregations)` — **only
+  for views**; the "Show DDL" tab is rendered after `indexes` only when `activeColl.isView`.
+  `onUpdateView` calls `mongoEngine.updateView` (drop + recreate), `onCopyToAggregations` sets
+  `_pendingAggregationPipeline` and switches to the `aggregations` tab.
 
 ### Collection header (`_buildCollectionHeader`, ~L1436–1594)
 

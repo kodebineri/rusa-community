@@ -122,7 +122,8 @@ class _CompassSidebarState extends State<CompassSidebar> {
       final q = _searchQuery.toLowerCase();
       if (db.name.toLowerCase().contains(q)) return true;
       return db.collections.keys.any((c) => c.toLowerCase().contains(q));
-    }).toList();
+    }).toList()
+      ..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
 
     // On a phone the drawer takes most of the screen: the tree of databases
     // and collections needs room for finger-sized action buttons.
@@ -297,7 +298,8 @@ class _CompassSidebarState extends State<CompassSidebar> {
     final isExpanded = _expandedDbs[db.name] ?? false;
     final isSelected =
         widget.selectedDb == db.name && widget.selectedColl == null;
-    final collections = db.collections.values.toList();
+    final collections = db.collections.values.toList()
+      ..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 2.0),

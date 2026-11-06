@@ -12,26 +12,30 @@ class CompassColors {
   static const Color darkBgInput = Color(0xFF0C1014);
   static const Color darkBorder = Color(0xFF21313C);
   static const Color darkBorderHover = Color(0xFF2B4050);
-  
+
   static const Color darkTextPrimary = Color(0xFFF9FBFA);
   static const Color darkTextSecondary = Color(0xFFC1C7C6);
   static const Color darkTextMuted = Color(0xFF889397);
 
   // MongoDB Signature Forest & Spring Green Accents
-  static const Color greenAccent = Color(0xFF00ED64);
+  static const Color greenAccent = Color(0xFF12715B);
   static const Color greenHover = Color(0xFF00C954);
-  static const Color greenForest = Color(0xFF00684A);
+  static const Color greenForest = Color(0xFF14453D);
   static const Color greenDeep = Color(0xFF023430);
   static const Color greenNavy = Color(0xFF001E2B);
 
   // Accent Badge Tokens (dark mode)
-  static const Color greenBadgeBg = Color(0x1A00ED64); // rgba(0, 237, 100, 0.10)
-  static const Color greenBadgeBorder = Color(0x4000ED64); // rgba(0, 237, 100, 0.25)
+  static const Color greenBadgeBg =
+      Color(0x1A00ED64); // rgba(0, 237, 100, 0.10)
+  static const Color greenBadgeBorder =
+      Color(0x4000ED64); // rgba(0, 237, 100, 0.25)
   static const Color greenBadgeText = Color(0xFF00ED64);
 
   // Accent Badge Tokens (light mode) - forest green tints read better on white
-  static const Color lightGreenBadgeBg = Color(0x1400684A); // rgba(0, 104, 74, 0.08)
-  static const Color lightGreenBadgeBorder = Color(0x3300684A); // rgba(0, 104, 74, 0.20)
+  static const Color lightGreenBadgeBg =
+      Color(0x1400684A); // rgba(0, 104, 74, 0.08)
+  static const Color lightGreenBadgeBorder =
+      Color(0x3300684A); // rgba(0, 104, 74, 0.20)
 
   // Content colour drawn on top of an accent-coloured fill
   static const Color lightOnAccent = Color(0xFFFFFFFF);
