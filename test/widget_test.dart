@@ -1472,7 +1472,7 @@ void main() {
     // Slide 1 — welcome. The connect popup must NOT be auto-opened: the tour
     // tells the user to explore the sample data first.
     expect(find.byType(OnboardingModal), findsOneWidget);
-    expect(inTour(find.text('Step 1 of 4')), findsOneWidget);
+    expect(inTour(find.text('1 / 4')), findsOneWidget);
     expect(inTour(find.text('a MongoDB database client')), findsOneWidget);
     expect(find.text('Connect to MongoDB'), findsNothing);
 
@@ -1492,21 +1492,25 @@ void main() {
     expect(tester.widget<CompassTheme>(find.byType(CompassTheme)).variant,
         CompassThemeVariant.materialLight);
 
-    // Slide 4 — the licence, ending in acceptance.
+    // Slide 4 — the full licence, inline, with a required acceptance box.
     await tester.tap(find.text('Next'));
     await tester.pump();
     await tester.pump();
     for (var i = 0; i < 50 && tester.takeException() != null; i++) {}
+    expect(inTour(find.text('Accept License Agreement')), findsOneWidget);
+    expect(inTour(find.text('Done')), findsOneWidget);
+
+    // The whole licence is rendered inline (no "read full text" toggle).
     final licenceBody =
         inTour(find.textContaining('LICENSE GRANT', findRichText: true));
     await pumpUntilFound(tester, licenceBody);
-    expect(inTour(find.text('Terms of use')), findsOneWidget);
-    expect(inTour(find.text('I Accept')), findsOneWidget);
     expect(
       licenceBody,
       findsWidgets,
-      reason: 'the licence body comes from the bundled EULA.md',
+      reason: 'the full EULA.md is shown inline',
     );
+    expect(tester.takeException(), isNull,
+        reason: 'the full licence must not overflow the slide');
 
     // Nothing is persisted until the user accepts.
     expect(
@@ -1514,13 +1518,43 @@ void main() {
       isNull,
     );
 
-    await tester.tap(find.text('I Accept'));
+    // The Done button is disabled until the acceptance box is ticked.
+    CompassPrimaryButton doneButton() => tester.widget<CompassPrimaryButton>(
+          find.ancestor(
+            of: find.text('Done'),
+            matching: find.byType(CompassPrimaryButton),
+          ),
+        );
+    expect(doneButton().onTap, isNull,
+        reason: 'Done must be disabled before the EULA is accepted');
+
+    // Tapping it before accepting does nothing.
+    await tester.tap(find.text('Done'));
+    await tester.pump();
+    expect(find.text('Accept License Agreement'), findsOneWidget,
+        reason: 'the tour must not close before the licence is accepted');
+    expect(
+      (await SharedPreferences.getInstance()).getBool('eula_accepted'),
+      isNull,
+    );
+
+    // Accept, then finish. The full licence is long, so the acceptance box
+    // sits below the fold — scroll to it first.
+    final acceptBox =
+        find.text('I accept the End User License Agreement (EULA).');
+    await tester.ensureVisible(acceptBox);
+    await tester.pump();
+    await tester.tap(acceptBox);
+    await tester.pump();
+    expect(doneButton().onTap, isNotNull,
+        reason: 'ticking the box must enable Done');
+    await tester.tap(find.text('Done'));
     await tester.pump();
     for (var i = 0; i < 50 && tester.takeException() != null; i++) {}
 
     // The tour is gone, consent is stored, and the user lands in the shell on
     // sample data (still no connect popup).
-    expect(find.text('Terms of use'), findsNothing);
+    expect(find.text('Accept License Agreement'), findsNothing);
     expect(find.text('Connect to MongoDB'), findsNothing);
     final prefs = await SharedPreferences.getInstance();
     expect(prefs.getBool('eula_accepted'), isTrue);
@@ -1528,6 +1562,76 @@ void main() {
         reason: 'the "don\'t show this again" box is ticked by default');
     expect(prefs.getString('theme_variant'), 'materialLight',
         reason: 'the theme picked in the tour is persisted for next launch');
+  });
+
+  testWidgets('the welcome tour content is vertically centered',
+      (WidgetTester tester) async {
+    SharedPreferences.setMockInitialValues(const {});
+    tester.view.physicalSize = const Size(1200.0, 900.0);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(const CompassApp());
+    await tester.pump();
+    for (var i = 0; i < 50 && tester.takeException() != null; i++) {}
+
+    final body = tester.getRect(find.descendant(
+      of: find.byType(OnboardingModal),
+      matching: find.byType(SingleChildScrollView),
+    ));
+    final content = tester.getRect(find.descendant(
+      of: find.byType(OnboardingModal),
+      matching: find.byType(AnimatedSwitcher),
+    ));
+
+    // The slide must size to its content (a `mainAxisSize: max` Column would
+    // fill the body and pin its children to the top).
+    expect(
+      content.height,
+      lessThan(body.height * 0.8),
+      reason: 'the slide should size to its content, not fill the body',
+    );
+    // …and sit in the middle of the body.
+    expect(
+      (content.center.dy - body.center.dy).abs(),
+      lessThan(40.0),
+      reason: 'the slide should be centered in the body, not pinned to the top',
+    );
+  });
+
+  testWidgets('the terms slide fits a small window without overflowing',
+      (WidgetTester tester) async {
+    SharedPreferences.setMockInitialValues(const {});
+    tester.view.physicalSize = const Size(400.0, 800.0);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(const CompassApp());
+    await tester.pump();
+    for (var i = 0; i < 50 && tester.takeException() != null; i++) {}
+
+    await tester.tap(find.text('Skip'));
+    await tester.pump();
+    await tester.pump();
+    for (var i = 0; i < 50 && tester.takeException() != null; i++) {}
+
+    // The footer (Back + dots + primary) must fit a 400 px window.
+    expect(find.text('Accept License Agreement'), findsOneWidget);
+    expect(tester.takeException(), isNull,
+        reason: 'the terms slide must not overflow a narrow window');
+
+    // The acceptance box toggles and enables the primary action.
+    final acceptBox =
+        find.text('I accept the End User License Agreement (EULA).');
+    await tester.ensureVisible(acceptBox);
+    await tester.pump();
+    await tester.tap(acceptBox);
+    await tester.pump();
+    expect(tester.takeException(), isNull);
+    expect(find.text('Tick the box above to continue.'), findsNothing,
+        reason: 'ticking the box should enable the primary action');
   });
 
   testWidgets("the welcome tour's Skip jumps to the licence slide",
@@ -1542,15 +1646,15 @@ void main() {
     await tester.pump();
     for (var i = 0; i < 50 && tester.takeException() != null; i++) {}
 
-    expect(inTour(find.text('Step 1 of 4')), findsOneWidget);
+    expect(inTour(find.text('1 / 4')), findsOneWidget);
     await tester.tap(find.text('Skip'));
     await tester.pump();
     await tester.pump();
     for (var i = 0; i < 50 && tester.takeException() != null; i++) {}
 
     // Skip never bypasses consent: it lands *on* the licence slide.
-    expect(find.text('Terms of use'), findsOneWidget);
-    expect(find.text('I Accept'), findsOneWidget);
+    expect(find.text('Accept License Agreement'), findsOneWidget);
+    expect(find.text('Done'), findsOneWidget);
     expect(find.text('Skip'), findsNothing);
     // Still a first-time user, so nothing is stored yet.
     expect(
@@ -1573,22 +1677,26 @@ void main() {
     await tester.pump();
     for (var i = 0; i < 50 && tester.takeException() != null; i++) {}
 
-    expect(inTour(find.text('Step 1 of 4')), findsOneWidget);
+    expect(inTour(find.text('1 / 4')), findsOneWidget);
 
     await tester.tap(find.text('Skip'));
     await tester.pump();
     await tester.pump();
     for (var i = 0; i < 50 && tester.takeException() != null; i++) {}
 
-    // Already accepted: the action is Done, not a fresh acceptance.
-    expect(find.text('I Accept'), findsNothing);
+    // Already accepted: no acceptance box, and Done is enabled.
+    expect(
+      find.text('I accept the End User License Agreement (EULA).'),
+      findsNothing,
+      reason: 'consent is already given, so there is no acceptance box',
+    );
     expect(find.text('Done'), findsOneWidget);
 
     await tester.tap(find.text('Done'));
     await tester.pump();
     for (var i = 0; i < 50 && tester.takeException() != null; i++) {}
 
-    expect(find.text('Terms of use'), findsNothing);
+    expect(find.text('Accept License Agreement'), findsNothing);
     expect((await SharedPreferences.getInstance()).getBool('onboarding_done'),
         isFalse,
         reason: 'the box stays unticked, so the tour replays next time');
@@ -1607,7 +1715,7 @@ void main() {
     await tester.pump();
     for (var i = 0; i < 50 && tester.takeException() != null; i++) {}
 
-    expect(find.textContaining('Step 1 of 4'), findsNothing);
+    expect(find.textContaining('1 / 4'), findsNothing);
     expect(find.text('Connect to MongoDB'), findsOneWidget,
         reason: 'without the tour the connect popup still opens at boot');
 
@@ -1661,7 +1769,7 @@ void main() {
     await tester.pump();
     for (var i = 0; i < 50 && tester.takeException() != null; i++) {}
 
-    expect(find.text('Step 1 of 4'), findsOneWidget);
+    expect(find.text('1 / 4'), findsOneWidget);
   });
 
   testWidgets('saved connections can be edited from the connect popup',

@@ -1,6 +1,6 @@
 # Testing — `test/`
 
-Companion to root `AGENTS.md`. Seven files, **127 tests**:
+Companion to root `AGENTS.md`. Seven files, **129 tests**:
 
 | File | What it covers |
 |---|---|
@@ -12,12 +12,12 @@ Companion to root `AGENTS.md`. Seven files, **127 tests**:
 | `test/compass_density_test.dart` | unit tests for the desktop/touch density profiles |
 | `test/json_auto_indent_formatter_test.dart` | unit tests for the JSON auto-indent formatter |
 
-> **Status: 127 pass / 0 fail, `flutter analyze` clean.**
+> **Status: 129 pass / 0 fail, `flutter analyze` clean.**
 
 ## Commands
 
 ```bash
-flutter test                              # all — expect 127/127
+flutter test                              # all — expect 129/129
 flutter test test/widget_test.dart        # just the widget tests
 flutter test test/mongosh_interpreter_test.dart
 flutter analyze                           # expect "No issues found!"

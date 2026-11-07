@@ -20,7 +20,7 @@ connect to a **real MongoDB server** (via `mongo_dart`) which swaps the engine i
 - Tests: `test/widget_test.dart` (widget tests) plus `test/compass_density_test.dart`,
   `test/json_auto_indent_formatter_test.dart`, `test/mongo_json_parser_test.dart`,
   `test/mongosh_interpreter_test.dart`, `test/mongosh_completer_test.dart` and
-  `test/terminal_test.dart` — 127 tests in total.
+  `test/terminal_test.dart` — 129 tests in total.
 - Sample data sources of truth: `sample_library.json`, `sample_social_network.json` (repo root).
 - Legal text: `EULA.md` and `PRIVACY.md` (repo root) — bundled as Flutter assets
   (`pubspec.yaml`) and rendered by `EulaModal` / `OnboardingModal` (its last slide) /
@@ -38,7 +38,7 @@ connect to a **real MongoDB server** (via `mongo_dart`) which swaps the engine i
 
 _(Last verified 2026-11-03, after commit `382656d` "enable preset themes".)_
 
-- **`flutter analyze` is clean** and **`flutter test` is 127/127.** Keep both that way; the
+- **`flutter analyze` is clean** and **`flutter test` is 129/129.** Keep both that way; the
   recurring test patterns live in `docs/testing.md`.
 - **A returning user boots into the connection popup** (`_isConnectModalOpen = true`, decided
   by `_loadPreferences`). Full-app widget tests must dismiss it first — use the
@@ -51,6 +51,9 @@ _(Last verified 2026-11-03, after commit `382656d` "enable preset themes".)_
   (`lib/widgets/modals/onboarding_modal.dart`) covers the whole window with four slides —
   welcome → sample data → theme → terms — and its last slide is the only way past it (no
   close button, no backdrop dismiss; **Skip** jumps *to* the terms slide, never past it).
+  The terms slide renders the **full `EULA.md` inline** and the primary action stays
+  **disabled until the "I accept the End User License Agreement (EULA)." box is ticked**
+  (first run only; a replay shows **Done** with no acceptance box).
   Accepting persists `eula_accepted`; the "don't show this again" box persists
   `onboarding_done`; the theme slide persists `theme_variant`. All three go through
   `AppPreferences` (`lib/services/app_preferences.dart`). The tour is shown when
@@ -58,13 +61,19 @@ _(Last verified 2026-11-03, after commit `382656d` "enable preset themes".)_
   upgrades never see it), and while it is shown the **connect popup does not auto-open** —
   the user lands on the sample data and opens Connect from the header. Re-open the tour from
   the header `⋮` menu / touch action sheet → **Show Welcome Screen** (above About).
+  **Design language:** mirrors the reference `mongodb-compass-web-client`
+  `OnboardingPage.tsx` — minimal header (gradient brand chip, `n / N` counter, Skip), one
+  centered 448 px column per slide behind a 48 px rounded icon tile, 12 px-radius cards whose
+  selected state is a `CompassTheme.accent` border + tint + ring, and a bottom bar with a
+  borderless Back, the dots, and one `CompassPrimaryButton`. Keep new slides in that
+  vocabulary (see `docs/ui.md` → `OnboardingModal`).
 
 ## Commands
 
 | Task | Command |
 |---|---|
 | Static analysis (must be clean) | `flutter analyze` |
-| Tests (must be 127/127) | `flutter test` |
+| Tests (must be 129/129) | `flutter test` |
 | Run desktop app | `flutter run -d windows` |
 | Run on Android | `flutter run -d <device>` (needs `INTERNET` — already in the main manifest) |
 | Run a single test file | `flutter test test/widget_test.dart` |
