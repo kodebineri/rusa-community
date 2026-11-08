@@ -21,6 +21,20 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^4.0.0
+  # Generates the Android / iOS / Windows launcher icons from
+  # `assets/icon/icon.png` (run: `dart run flutter_launcher_icons`).
+  flutter_launcher_icons: ^0.14.1
+
+# Launcher icon source of truth. Re-run `dart run flutter_launcher_icons`
+# after replacing `assets/icon/icon.png` (1024x1024, no alpha).
+flutter_launcher_icons:
+  image_path: "assets/icon/icon.png"
+  android: true
+  ios: true
+  windows:
+    generate: true
+    image_path: "assets/icon/icon.png"
+    icon_size: 256
 
 flutter:
   uses-material-design: false

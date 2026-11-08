@@ -30,6 +30,14 @@ connect to a **real MongoDB server** (via `mongo_dart`) which swaps the engine i
   strings must not say "Compass" and must not use the MongoDB leaf logo — the brand mark is
   `CompassSvgIcons.rusa` (placeholder deer mark). "MongoDB" appears only descriptively, and
   About / EULA / Privacy carry a non-affiliation disclaimer.
+- **Launcher icon:** `assets/icon/icon.png` (1024×1024, no alpha) is the source of truth.
+  `flutter_launcher_icons` (dev dependency, configured under `flutter_launcher_icons:` in
+  `pubspec.yaml`) generates the Android mipmaps, the iOS `AppIcon` set and
+  `windows/runner/resources/app_icon.ico`. After replacing the PNG, run
+  `dart run flutter_launcher_icons` — and check `ios/Runner.xcodeproj/project.pbxproj`
+  afterwards: v0.14.4 wrongly rewrites
+  `ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS` to `AppIcon` (it must stay
+  `YES`).
 - **Identifiers:** OS app id is **`com.kodebineri.rusa`** (Android `applicationId`/`namespace`
   + `MainActivity` package, iOS `PRODUCT_BUNDLE_IDENTIFIER`, Windows `CompanyName`). The **Dart
   package name is `rusa`** (`name:` in `pubspec.yaml`, so imports use `package:rusa/…`).
@@ -77,6 +85,7 @@ _(Last verified 2026-11-03, after commit `382656d` "enable preset themes".)_
 | Run desktop app | `flutter run -d windows` |
 | Run on Android | `flutter run -d <device>` (needs `INTERNET` — already in the main manifest) |
 | Run a single test file | `flutter test test/widget_test.dart` |
+| Regenerate launcher icons | `dart run flutter_launcher_icons` (after replacing `assets/icon/icon.png`) |
 
 There is no JS build step for the Flutter app (root `package.json`/`vite.config.ts` belong to
 the legacy `src/` React app; `npm` is not needed for Flutter work).
