@@ -174,16 +174,20 @@ jobs:
               rpmsign --addsign "$rpm_file"
             fi
           done
-      - name: Verify Signed RPM Packages
+     - name: Verify Signed RPM Packages
         run: |
-          # 1. Export GPG public key and import it into the RPM keyring
-          gpg --armor --export > /tmp/RPM-GPG-KEY-tmp
-          sudo rpm --import /tmp/RPM-GPG-KEY-tmp
+          # 1. Export GPG public key to a standard ASCII-armored key file
+          gpg --armor --export > /tmp/public.key
 
-          # 2. Verify all RPM packages
+          # 2. Build a local temporary RPM keyring DB
+          mkdir -p /tmp/rpm-keyring
+          rpmdb --initdb --dbpath /tmp/rpm-keyring
+          rpm --dbpath /tmp/rpm-keyring --import /tmp/public.key
+
+          # 3. Verify RPM packages against the isolated local RPM keyring
           for rpm_file in dist/*.rpm; do
             echo "Verifying $rpm_file..."
-            rpm -K "$rpm_file"
+            rpm --dbpath /tmp/rpm-keyring -v -K "$rpm_file"
           done
 
       - name: Upload Signed RPM Artifact
