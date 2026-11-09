@@ -187,6 +187,10 @@ jobs:
       - name: Upload Assets to GitHub Release
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ github.ref_type == 'tag' && github.ref_name || 'v0.0.0-dev' }}
+          name: ${{ github.ref_type == 'tag' && github.ref_name || 'Development Build (v0.0.0-dev)' }}
+          draft: false
+          prerelease: ${{ github.ref_type != 'tag' }}
           files: deb-artifacts/*.deb
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
