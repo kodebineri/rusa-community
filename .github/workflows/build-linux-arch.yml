@@ -1,0 +1,215 @@
+name: Build, Publish Multi-Arch Pacman Repo and GitHub Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # 1. Build Linux Binaries & Package Arch .pkg.tar.zst (x86_64 + aarch64)
+  # ---------------------------------------------------------------------------
+  build-arch:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target_arch: x86_64
+          - os: ubuntu-24.04-arm
+            target_arch: aarch64
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+
+      - name: Install Linux Build Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev liblzma-dev libstdc++-12-dev git curl unzip zstd
+
+      # --- Setup Flutter for x86_64 ---
+      - name: Setup Flutter Engine (x86_64)
+        if: matrix.target_arch == 'x86_64'
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+
+      # --- Setup Flutter for aarch64 (Git Clone Fallback) ---
+      - name: Setup Flutter Engine (aarch64 Git Fallback)
+        if: matrix.target_arch == 'aarch64'
+        run: |
+          git clone https://github.com/flutter/flutter.git -b stable --depth 1 /opt/flutter
+          echo "/opt/flutter/bin" >> $GITHUB_PATH
+          echo "/opt/flutter/bin/cache/dart-sdk/bin" >> $GITHUB_PATH
+
+      - name: Enable Linux Desktop Build & Setup Platform
+        run: |
+          flutter config --enable-linux-desktop
+          if [ ! -d "linux" ]; then
+            flutter create --platforms=linux .
+          fi
+
+      - name: Install Pub Dependencies
+        run: flutter pub get
+
+      - name: Build Flutter Linux Release
+        run: flutter build linux --release
+
+      - name: Create Arch Linux Package (.pkg.tar.zst)
+        run: |
+          RAW_TAG="${{ github.ref_name }}"
+          VERSION="${RAW_TAG#v}"
+          if [ -z "$VERSION" ] || [ "$RAW_TAG" = "main" ]; then
+            VERSION="0.0.0"
+          fi
+
+          ARCH="${{ matrix.target_arch }}"
+          PKG_NAME="rusa-community"
+          PKG_DIR="build/pacman/pkg_root"
+
+          mkdir -p "${PKG_DIR}/usr/lib/rusa-community"
+          mkdir -p "${PKG_DIR}/usr/bin"
+          mkdir -p "${PKG_DIR}/usr/share/applications"
+          mkdir -p "${PKG_DIR}/usr/share/icons/hicolor/256x256/apps"
+
+          # Copy Flutter Linux bundle outputs dynamically
+          BUILD_BUNDLE=$(find build/linux -type d -name "bundle" | head -n 1)
+          cp -r ${BUILD_BUNDLE}/* "${PKG_DIR}/usr/lib/rusa-community/"
+
+          # Symlink binary to /usr/bin
+          ln -s /usr/lib/rusa-community/rusa-community "${PKG_DIR}/usr/bin/rusa-community"
+
+          # Copy icon if available
+          if [ -f "assets/icon/icon.png" ]; then
+            cp assets/icon/icon.png "${PKG_DIR}/usr/share/icons/hicolor/256x256/apps/rusa-community.png"
+          fi
+
+          # Desktop entry metadata
+          cat <<EOF > "${PKG_DIR}/usr/share/applications/rusa-community.desktop"
+          [Desktop Entry]
+          Name=Rusa Community
+          Comment=MongoDB GUI Client Community Edition
+          Exec=/usr/bin/rusa-community %U
+          Icon=rusa-community
+          Terminal=false
+          Type=Application
+          Categories=Development;Database;
+          EOF
+
+          # Generate Arch Linux .PKGINFO metadata file
+          cat <<EOF > "${PKG_DIR}/.PKGINFO"
+          pkgname = ${PKG_NAME}
+          pkgver = ${VERSION}-1
+          pkgdesc = Rusa Community MongoDB GUI Client (${ARCH})
+          url = https://rusa.deveditortools.com
+          builddate = $(date +%s)
+          packager = Kodebineri <kodebineri@gmail.com>
+          size = $(du -sk "${PKG_DIR}" | cut -f1)
+          arch = ${ARCH}
+          license = GPL3
+          depend = gtk3
+          depend = glibc
+          EOF
+
+          # Build .pkg.tar.zst package
+          OUT_FILE="${PKG_NAME}-${VERSION}-1-${ARCH}.pkg.tar.zst"
+          mkdir -p dist
+          tar -I 'zstd -19 -T0' -cvf "dist/${OUT_FILE}" -C "${PKG_DIR}" .
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: pacman-package-${{ matrix.target_arch }}
+          path: dist/*.pkg.tar.zst
+
+  # ---------------------------------------------------------------------------
+  # 2. Collect Artifacts, Publish Pacman Repo & GitHub Releases
+  # ---------------------------------------------------------------------------
+  publish-repo:
+    needs: build-arch
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+
+      - name: Install Pacman Repo Tools & GPG
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y pacman-package-manager gpg
+
+      - name: Import GPG Private Key
+        run: |
+          if [ -n "${{ secrets.GPG_PRIVATE_KEY }}" ]; then
+            echo "${{ secrets.GPG_PRIVATE_KEY }}" | gpg --batch --import
+          fi
+
+      - name: Download Built .pkg.tar.zst Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: pacman-artifacts
+          pattern: pacman-package-*
+          merge-multiple: true
+
+      - name: Generate Arch Repository Database
+        run: |
+          mkdir -p public/x86_64 public/aarch64
+
+          # Separate packages by architecture
+          mv pacman-artifacts/*-x86_64.pkg.tar.zst public/x86_64/ 2>/dev/null || true
+          mv pacman-artifacts/*-aarch64.pkg.tar.zst public/aarch64/ 2>/dev/null || true
+
+          # Create x86_64 repository database
+          if [ -f public/x86_64/*.pkg.tar.zst ]; then
+            cd public/x86_64
+            repo-add rusa.db.tar.gz *.pkg.tar.zst
+            cd ../..
+          fi
+
+          # Create aarch64 repository database
+          if [ -f public/aarch64/*.pkg.tar.zst ]; then
+            cd public/aarch64
+            repo-add rusa.db.tar.gz *.pkg.tar.zst
+            cd ../..
+          fi
+
+          # Export public key if available
+          if [ -n "${{ secrets.GPG_PRIVATE_KEY }}" ]; then
+            gpg --armor --export > public/KEY.gpg
+          fi
+
+      - name: Upload GitHub Pages Artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: public/
+
+      - name: Upload Assets to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_type == 'tag' && github.ref_name || 'v0.0.0-dev' }}
+          name: ${{ github.ref_type == 'tag' && github.ref_name || 'Development Build (v0.0.0-dev)' }}
+          draft: false
+          prerelease: ${{ github.ref_type != 'tag' }}
+          files: public/*/*.pkg.tar.zst
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # ---------------------------------------------------------------------------
+  # 3. Deploy Pacman Repository to GitHub Pages
+  # ---------------------------------------------------------------------------
+  deploy-pages:
+    needs: publish-repo
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy to GitHub Pages
+        uses: actions/deploy-pages@v4
