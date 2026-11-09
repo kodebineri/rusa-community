@@ -1,0 +1,79 @@
+name: Build Windows Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter Engine
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+
+      - name: Enable Windows Desktop Build & Setup Platform
+        run: |
+          flutter config --enable-windows-desktop
+          if (!(Test-Path "windows")) {
+            flutter create --platforms=windows .
+          }
+
+      - name: Install Pub Dependencies
+        run: flutter pub get
+
+      - name: Build Flutter Windows Release
+        run: flutter build windows --release
+
+      - name: Extract Version & Package Windows Release
+        shell: powershell
+        run: |
+          $rawTag = "${{ github.ref_name }}"
+          $version = $rawTag -replace '^v', ''
+          if ([string]::IsNullOrEmpty($version) -or $rawTag -eq "main") {
+            $version = "0.0.0-dev"
+          }
+
+          New-Item -ItemType Directory -Force -Path "dist"
+
+          # 1. Zip Portable Release Bundle
+          $bundlePath = "build\windows\x64\runner\Release\*"
+          $zipName = "dist\rusa-community_${version}_windows_x64.zip"
+          Compress-Archive -Path $bundlePath -DestinationPath $zipName -Force
+
+          # Write environment variable for release asset pattern
+          echo "APP_VERSION=$version" >> $env:GITHUB_ENV
+
+      # Optional: Create NSIS Installer EXE if nsis is available/configured
+      - name: Build NSIS Installer (Optional)
+        shell: powershell
+        run: |
+          if (Get-Command makensis -ErrorAction SilentlyContinue) {
+            # Execute makensis if you have an installer.nsi script in your repo
+            if (Test-Path "windows\installer.nsi") {
+              makensis /DVERSION=$env:APP_VERSION windows\installer.nsi
+              Move-Item -Path "windows\rusa-community-setup.exe" -Destination "dist\rusa-community_${env:APP_VERSION}_windows_x64_setup.exe"
+            }
+          }
+
+      - name: Upload Windows Artifacts to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_type == 'tag' && github.ref_name || 'v0.0.0-dev' }}
+          name: ${{ github.ref_type == 'tag' && github.ref_name || 'Development Build (v0.0.0-dev)' }}
+          draft: false
+          prerelease: ${{ github.ref_type != 'tag' }}
+          files: dist/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
