@@ -1,0 +1,118 @@
+name: Build, Publish Multi-Arch APT Repo and GitHub Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # 1. Build Linux Binaries (amd64 + arm64)
+  # ---------------------------------------------------------------------------
+  build-linux:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        target_arch: [amd64, arm64]
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+
+      - name: Install Linux Build Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev liblzma-dev libstdc++-12-dev
+
+      - name: Setup Flutter Engine
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+          # Omit `architecture` here so it defaults to host architecture (x86_64)
+
+      - name: Enable Linux Desktop Build
+        run: flutter config --enable-linux-desktop
+
+      - name: Install Pub Dependencies
+        run: flutter pub get
+
+      - name: Build Flutter Linux Release
+        run: flutter build linux --release
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: deb-package-${{ matrix.arch }}
+          path: dist/*.deb
+
+  # ---------------------------------------------------------------------------
+  # 2. Collect Artifacts, Publish APT Repo & GitHub Releases
+  # ---------------------------------------------------------------------------
+  publish-repo:
+    needs: build-linux
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+
+      - name: Install Aptly & GPG
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y aptly gpg
+
+      - name: Import GPG Private Key
+        run: |
+          echo "${{ secrets.GPG_PRIVATE_KEY }}" | gpg --batch --import
+
+      - name: Download Built .deb Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: deb-artifacts
+          pattern: deb-package-*
+          merge-multiple: true
+
+      - name: Generate Multi-Arch APT Repository
+        run: |
+          aptly repo create -distribution=stable -component=main rusa-repo
+          
+          # Add all retrieved .deb files
+          aptly repo add rusa-repo deb-artifacts/*.deb
+          
+          # Publish repository with GPG signature
+          aptly publish repo -batch rusa-repo
+          
+          mkdir -p public
+          cp -r ~/.aptly/public/* public/
+          cp public.key public/KEY.gpg
+
+      - name: Upload GitHub Pages Artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: public/
+
+      - name: Upload Assets to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: deb-artifacts/*.deb
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # ---------------------------------------------------------------------------
+  # 3. Deploy APT Repository to GitHub Pages
+  # ---------------------------------------------------------------------------
+  deploy-pages:
+    needs: publish-repo
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy to GitHub Pages
+        uses: actions/deploy-pages@v4
