@@ -20,14 +20,10 @@ jobs:
   # 1. Build Linux Binaries (amd64 + arm64)
   # ---------------------------------------------------------------------------
   build-linux:
-    runs-on: ${{ matrix.os }}
+    runs-on: ubuntu-latest
     strategy:
       matrix:
-        include:
-          - os: ubuntu-latest
-            arch: amd64
-          - os: ubuntu-24.04-arm # Native ARM64 runner or docker build
-            arch: arm64
+        target_arch: [amd64, arm64]
     steps:
       - name: Checkout Source Code
         uses: actions/checkout@v4
@@ -42,6 +38,7 @@ jobs:
         with:
           channel: 'stable'
           cache: true
+          # Omit `architecture` here so it defaults to host architecture (x86_64)
 
       - name: Enable Linux Desktop Build
         run: flutter config --enable-linux-desktop
@@ -51,63 +48,6 @@ jobs:
 
       - name: Build Flutter Linux Release
         run: flutter build linux --release
-
-      - name: Create `.deb` Package Structure
-        run: |
-          RAW_TAG="${{ github.ref_name }}"
-          VERSION="${RAW_TAG#v}"
-          if [ -z "$VERSION" ] || [ "$RAW_TAG" = "main" ]; then
-            VERSION="0.0.0-dev"
-          fi
-
-          ARCH="${{ matrix.arch }}"
-          PKG_DIR="build/debian/rusa-community_${VERSION}_${ARCH}"
-
-          # Create directory layout
-          mkdir -p "${PKG_DIR}/DEBIAN"
-          mkdir -p "${PKG_DIR}/usr/lib/rusa-community"
-          mkdir -p "${PKG_DIR}/usr/bin"
-          mkdir -p "${PKG_DIR}/usr/share/applications"
-          mkdir -p "${PKG_DIR}/usr/share/icons/hicolor/256x256/apps"
-
-          # Copy Flutter Linux bundle
-          cp -r build/linux/${ARCH}/release/bundle/* "${PKG_DIR}/usr/lib/rusa-community/"
-
-          # Symlink binary to /usr/bin
-          ln -s /usr/lib/rusa-community/rusa-community "${PKG_DIR}/usr/bin/rusa-community"
-
-          # App Icon (if present)
-          if [ -f "assets/icon/icon.png" ]; then
-            cp assets/icon/icon.png "${PKG_DIR}/usr/share/icons/hicolor/256x256/apps/rusa-community.png"
-          fi
-
-          # Desktop Launcher Entry
-          cat <<EOF > "${PKG_DIR}/usr/share/applications/rusa-community.desktop"
-          [Desktop Entry]
-          Name=Rusa Community
-          Comment=MongoDB GUI Client Community Edition
-          Exec=/usr/bin/rusa-community %U
-          Icon=rusa-community
-          Terminal=false
-          Type=Application
-          Categories=Development;Database;
-          EOF
-
-          # DEBIAN/control file
-          cat <<EOF > "${PKG_DIR}/DEBIAN/control"
-          Package: rusa-community
-          Version: ${VERSION}
-          Architecture: ${ARCH}
-          Maintainer: Kodebineri <kodebineri@gmail.com>
-          Description: Rusa Community MongoDB GUI Client
-          Section: utils
-          Priority: optional
-          EOF
-
-          # Build package
-          dpkg-deb --build "${PKG_DIR}"
-          mkdir -p dist
-          mv build/debian/*.deb dist/
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
