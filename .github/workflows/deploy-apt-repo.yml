@@ -17,13 +17,17 @@ concurrency:
 
 jobs:
   # ---------------------------------------------------------------------------
-  # 1. Build Linux Binaries (amd64 + arm64)
+  # 1. Build Linux Binaries & Package .deb (amd64 + arm64)
   # ---------------------------------------------------------------------------
   build-linux:
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        target_arch: [amd64, arm64]
+        include:
+          - os: ubuntu-latest
+            target_arch: amd64
+          - os: ubuntu-24.04-arm
+            target_arch: arm64
     steps:
       - name: Checkout Source Code
         uses: actions/checkout@v4
@@ -38,10 +42,13 @@ jobs:
         with:
           channel: 'stable'
           cache: true
-          # Omit `architecture` here so it defaults to host architecture (x86_64)
 
-      - name: Enable Linux Desktop Build
-        run: flutter config --enable-linux-desktop
+      - name: Enable Linux Desktop Build & Setup Platform
+        run: |
+          flutter config --enable-linux-desktop
+          if [ ! -d "linux" ]; then
+            flutter create --platforms=linux .
+          fi
 
       - name: Install Pub Dependencies
         run: flutter pub get
@@ -49,10 +56,66 @@ jobs:
       - name: Build Flutter Linux Release
         run: flutter build linux --release
 
+      - name: Create .deb Package
+        run: |
+          RAW_TAG="${{ github.ref_name }}"
+          VERSION="${RAW_TAG#v}"
+          if [ -z "$VERSION" ] || [ "$RAW_TAG" = "main" ]; then
+            VERSION="0.0.0-dev"
+          fi
+
+          ARCH="${{ matrix.target_arch }}"
+          PKG_DIR="build/debian/rusa-community_${VERSION}_${ARCH}"
+
+          mkdir -p "${PKG_DIR}/DEBIAN"
+          mkdir -p "${PKG_DIR}/usr/lib/rusa-community"
+          mkdir -p "${PKG_DIR}/usr/bin"
+          mkdir -p "${PKG_DIR}/usr/share/applications"
+          mkdir -p "${PKG_DIR}/usr/share/icons/hicolor/256x256/apps"
+
+          # Copy Flutter Linux bundle outputs
+          BUILD_BUNDLE=$(find build/linux -type d -name "bundle" | head -n 1)
+          cp -r ${BUILD_BUNDLE}/* "${PKG_DIR}/usr/lib/rusa-community/"
+
+          # Symlink binary to /usr/bin
+          ln -s /usr/lib/rusa-community/rusa-community "${PKG_DIR}/usr/bin/rusa-community"
+
+          # Copy icon if available
+          if [ -f "assets/icon/icon.png" ]; then
+            cp assets/icon/icon.png "${PKG_DIR}/usr/share/icons/hicolor/256x256/apps/rusa-community.png"
+          fi
+
+          # Desktop entry metadata
+          cat <<EOF > "${PKG_DIR}/usr/share/applications/rusa-community.desktop"
+          [Desktop Entry]
+          Name=Rusa Community
+          Comment=MongoDB GUI Client Community Edition
+          Exec=/usr/bin/rusa-community %U
+          Icon=rusa-community
+          Terminal=false
+          Type=Application
+          Categories=Development;Database;
+          EOF
+
+          # DEBIAN control file
+          cat <<EOF > "${PKG_DIR}/DEBIAN/control"
+          Package: rusa-community
+          Version: ${VERSION}
+          Architecture: ${ARCH}
+          Maintainer: Kodebineri <kodebineri@gmail.com>
+          Description: Rusa Community MongoDB GUI Client (${ARCH})
+          Section: utils
+          Priority: optional
+          EOF
+
+          dpkg-deb --build "${PKG_DIR}"
+          mkdir -p dist
+          mv build/debian/*.deb dist/
+
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: deb-package-${{ matrix.arch }}
+          name: deb-package-${{ matrix.target_arch }}
           path: dist/*.deb
 
   # ---------------------------------------------------------------------------
@@ -72,6 +135,10 @@ jobs:
 
       - name: Import GPG Private Key
         run: |
+          if [ -z "${{ secrets.GPG_PRIVATE_KEY }}" ]; then
+            echo "Error: GPG_PRIVATE_KEY secret is missing or empty."
+            exit 1
+          fi
           echo "${{ secrets.GPG_PRIVATE_KEY }}" | gpg --batch --import
 
       - name: Download Built .deb Artifacts
@@ -83,17 +150,24 @@ jobs:
 
       - name: Generate Multi-Arch APT Repository
         run: |
-          aptly repo create -distribution=stable -component=main rusa-repo
-          
-          # Find all .deb files across subdirectories and add them to Aptly
+          mkdir -p deb-artifacts
+
+          DEB_COUNT=$(find deb-artifacts -name "*.deb" | wc -l)
+          if [ "$DEB_COUNT" -eq 0 ]; then
+            echo "Error: No .deb packages found in deb-artifacts directory!"
+            ls -la deb-artifacts || true
+            exit 1
+          fi
+
+          aptly repo create -distribution=stable -component=main -architectures="amd64,arm64" rusa-repo
           find deb-artifacts -name "*.deb" | xargs -r aptly repo add rusa-repo
-          
-          # Publish repository with GPG signing
-          aptly publish repo -batch rusa-repo
-          
+          aptly publish repo -batch -architectures="amd64,arm64" rusa-repo
+
           mkdir -p public
           cp -r ~/.aptly/public/* public/
-          cp public.key public/KEY.gpg
+          if [ -f "public.key" ]; then
+            cp public.key public/KEY.gpg
+          fi
 
       - name: Upload GitHub Pages Artifact
         uses: actions/upload-pages-artifact@v3
@@ -103,8 +177,7 @@ jobs:
       - name: Upload Assets to GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          files: |
-            deb-artifacts/**/*.deb
+          files: deb-artifacts/*.deb
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
