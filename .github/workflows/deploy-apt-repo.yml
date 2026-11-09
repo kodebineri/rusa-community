@@ -83,12 +83,14 @@ jobs:
 
       - name: Generate Multi-Arch APT Repository
         run: |
+          # Enable globstar so ** matches subdirectories recursively
+          shopt -s globstar
+
           aptly repo create -distribution=stable -component=main rusa-repo
           
-          # Add all retrieved .deb files
-          aptly repo add rusa-repo deb-artifacts/*.deb
+          # Match all .deb files recursively inside deb-artifacts
+          aptly repo add rusa-repo deb-artifacts/**/*.deb
           
-          # Publish repository with GPG signature
           aptly publish repo -batch rusa-repo
           
           mkdir -p public
@@ -103,7 +105,7 @@ jobs:
       - name: Upload Assets to GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          files: deb-artifacts/*.deb
+          files: deb-artifacts/**/*.deb
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
