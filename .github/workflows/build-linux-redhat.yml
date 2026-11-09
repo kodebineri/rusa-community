@@ -72,7 +72,7 @@ jobs:
         run: |
           RAW_TAG="${{ github.ref_name }}"
           VERSION="${RAW_TAG#v}"
-          if [ -z "$VERSION" ] || [ "$RAW_TAG" = "main" ]; then
+          if [ -z "$VERSION" ] \vert{}\vert{} [ "$RAW_TAG" = "main" ]; then
             VERSION="0.0.0"
           fi
 
@@ -145,20 +145,19 @@ jobs:
             exit 1
           fi
 
-          # Import GPG Private Key
+          # Import GPG Private Key & set owner trust
           echo "$GPG_PRIVATE_KEY" | gpg --batch --import
-
-          # Extract GPG Key ID dynamically
           GPG_KEY_ID=$(gpg --list-secret-keys --keyid-format LONG | grep -E '^sec' | awk '{print $2}' | cut -d'/' -f2 | head -n 1)
+          echo "${GPG_KEY_ID}:6:" | gpg --import-ownertrust
           echo "Signing RPMs with GPG Key ID: $GPG_KEY_ID"
 
-          # Configure ~/.rpmmacros for non-interactive GPG signing
+          # Configure ~/.rpmmacros without legacy flags
           cat <<EOF > ~/.rpmmacros
           %_signature gpg
           %_gpg_path ~/.gnupg
           %_gpg_name $GPG_KEY_ID
           %_gpgbin /usr/bin/gpg
-          %__gpg_sign_cmd %{__gpg} gpg --batch --no-verbose --no-armor --passphrase-fd 0 --pinentry-mode loopback --detach-sign --sign --detach-sign %{?_gpg_digest_algo:--digest-algo %{_gpg_digest_algo}} --no-secmem-md-user-cb -u "%{_gpg_name}" -s -o %{__signature_filename} %{__plaintext_filename}
+          %__gpg_sign_cmd %{__gpg} gpg --batch --no-verbose --no-armor --passphrase-fd 0 --pinentry-mode loopback --detach-sign --sign --detach-sign %{?_gpg_digest_algo:--digest-algo %{_gpg_digest_algo}} -u "%{_gpg_name}" -s -o %{__signature_filename} %{__plaintext_filename}
           EOF
 
           # Sign all built RPM files
@@ -249,36 +248,4 @@ jobs:
           # Generate DNF .repo configuration file for end users
           cat <<EOF > public/rusa-community.repo
           [rusa-community]
-          name=Rusa Community Official Repository
-          baseurl=https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/
-          enabled=1
-          gpgcheck=1
-          repo_gpgcheck=1
-          gpgkey=https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/RPM-GPG-KEY-rusa-community
-          EOF
-
-      - name: Upload GitHub Pages Artifact
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: public/
-
-      - name: Upload Assets to GitHub Release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ github.ref_type == 'tag' && github.ref_name || 'v0.0.0-dev' }}
-          name: ${{ github.ref_type == 'tag' && github.ref_name || 'Development Build (v0.0.0-dev)' }}
-          draft: false
-          prerelease: ${{ github.ref_type != 'tag' }}
-          files: rpm-artifacts/*.rpm
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-  # ---------------------------------------------------------------------------
-  # 3. Deploy DNF Repository to GitHub Pages
-  # ---------------------------------------------------------------------------
-  deploy-pages:
-    needs: publish-repo
-    runs-on: ubuntu-latest
-    steps:
-      - name: Deploy to GitHub Pages
-        uses: actions/deploy-pages@v4
+          name=Rusa Community
