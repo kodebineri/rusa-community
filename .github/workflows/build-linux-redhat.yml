@@ -174,7 +174,7 @@ jobs:
               rpmsign --addsign "$rpm_file"
             fi
           done
-     - name: Verify Signed RPM Packages
+      - name: Verify Signed RPM Packages
         run: |
           # 1. Export GPG public key to a standard ASCII-armored key file
           gpg --armor --export > /tmp/public.key
@@ -189,7 +189,6 @@ jobs:
             echo "Verifying $rpm_file..."
             rpm --dbpath /tmp/rpm-keyring -v -K "$rpm_file"
           done
-
       - name: Upload Signed RPM Artifact
         uses: actions/upload-artifact@v4
         with:
