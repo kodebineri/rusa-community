@@ -176,7 +176,13 @@ jobs:
           done
       - name: Verify Signed RPM Packages
         run: |
+          # 1. Export GPG public key and import it into the RPM keyring
+          gpg --armor --export > /tmp/RPM-GPG-KEY-tmp
+          sudo rpm --import /tmp/RPM-GPG-KEY-tmp
+
+          # 2. Verify all RPM packages
           for rpm_file in dist/*.rpm; do
+            echo "Verifying $rpm_file..."
             rpm -K "$rpm_file"
           done
 
