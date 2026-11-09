@@ -35,13 +35,23 @@ jobs:
       - name: Install Linux Build Dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev liblzma-dev libstdc++-12-dev
+          sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev liblzma-dev libstdc++-12-dev git curl unzip
 
-      - name: Setup Flutter Engine
+      # --- Setup Flutter for amd64 ---
+      - name: Setup Flutter Engine (amd64)
+        if: matrix.target_arch == 'amd64'
         uses: subosito/flutter-action@v2
         with:
           channel: 'stable'
           cache: true
+
+      # --- Setup Flutter for arm64 (Git Clone Fallback) ---
+      - name: Setup Flutter Engine (arm64 Git Fallback)
+        if: matrix.target_arch == 'arm64'
+        run: |
+          git clone https://github.com/flutter/flutter.git -b stable --depth 1 /opt/flutter
+          echo "/opt/flutter/bin" >> $GITHUB_PATH
+          echo "/opt/flutter/bin/cache/dart-sdk/bin" >> $GITHUB_PATH
 
       - name: Enable Linux Desktop Build & Setup Platform
         run: |
@@ -73,7 +83,7 @@ jobs:
           mkdir -p "${PKG_DIR}/usr/share/applications"
           mkdir -p "${PKG_DIR}/usr/share/icons/hicolor/256x256/apps"
 
-          # Copy Flutter Linux bundle outputs
+          # Copy Flutter Linux bundle outputs dynamically
           BUILD_BUNDLE=$(find build/linux -type d -name "bundle" | head -n 1)
           cp -r ${BUILD_BUNDLE}/* "${PKG_DIR}/usr/lib/rusa-community/"
 
