@@ -259,7 +259,7 @@ class _CompassAppState extends State<CompassApp> {
 
   /// Bug reports open the upstream GitHub issue tracker in the system browser.
   static final Uri _bugReportUri =
-      Uri.parse('https://github.com/kodebineri/rusa/issues');
+      Uri.parse('https://github.com/kodebineri/rusa-community/issues');
 
   /// Opens [_bugReportUri] in the system browser.
   ///
@@ -403,7 +403,8 @@ class _CompassAppState extends State<CompassApp> {
 
   String _selectedDbName = 'library';
   String _selectedCollName = 'books';
-  String _activeTab = 'documents'; // documents, aggregations, schema, indexes, ddl
+  String _activeTab =
+      'documents'; // documents, aggregations, schema, indexes, ddl
   String _docViewMode = 'tree'; // tree, json, table
 
   /// Pipeline handed to the Aggregations tab by a view's "Copy to Aggregations"
@@ -873,14 +874,16 @@ class _CompassAppState extends State<CompassApp> {
 
   /// Re-applies an edited DDL to the active view. Returns `null` on success or
   /// a message for the view's error banner.
-  String? _handleUpdateView(MongoCollection activeColl, List<dynamic> pipeline) {
+  String? _handleUpdateView(
+      MongoCollection activeColl, List<dynamic> pipeline) {
     if (!activeColl.isView) return 'The selected item is not a view.';
     final source = activeColl.viewOn;
     if (source == null || source.isEmpty) {
       return 'Cannot update a view without a known source collection.';
     }
     try {
-      mongoEngine.updateView(_selectedDbName, _selectedCollName, source, pipeline);
+      mongoEngine.updateView(
+          _selectedDbName, _selectedCollName, source, pipeline);
     } catch (err) {
       return err.toString().replaceFirst('Exception: ', '');
     }
@@ -998,8 +1001,8 @@ class _CompassAppState extends State<CompassApp> {
           return;
         case MongoshSideEffectKind.dropCollection:
           setState(() {
-            _closeTabsMatching((tab) =>
-                tab.isSameTarget(effect.database, effect.collection!));
+            _closeTabsMatching(
+                (tab) => tab.isSameTarget(effect.database, effect.collection!));
           });
           return;
       }
@@ -1058,7 +1061,8 @@ class _CompassAppState extends State<CompassApp> {
         // the document list reads alphabetically.
         final pageDocs = _queryOptions.sort.trim().isEmpty
             ? (List<MongoDocument>.from(queryResult.documents)
-              ..sort((a, b) => a.id.toLowerCase().compareTo(b.id.toLowerCase())))
+              ..sort(
+                  (a, b) => a.id.toLowerCase().compareTo(b.id.toLowerCase())))
             : queryResult.documents;
 
         final appShell = Container(
@@ -1110,7 +1114,7 @@ class _CompassAppState extends State<CompassApp> {
                       },
                       onShowWelcome: _showOnboarding,
                     ),
-  
+
                     // Main Body: Side-by-side on desktop, or off-canvas sidebar
                     Expanded(
                       child: Row(
@@ -1155,11 +1159,12 @@ class _CompassAppState extends State<CompassApp> {
                               onExpandDb: (dbName) {
                                 final service = mongoEngine;
                                 if (service is RealMongoService) {
-                                  unawaited(service.loadCollectionCounts(dbName));
+                                  unawaited(
+                                      service.loadCollectionCounts(dbName));
                                 }
                               },
                             ),
-  
+
                           // Active Collection Main Pane
                           Expanded(
                             child: Column(
@@ -1176,11 +1181,11 @@ class _CompassAppState extends State<CompassApp> {
                                       setState(() => _removeTabAt(index));
                                     },
                                   ),
-  
+
                                 // Collection Header Bar: Title, Breadcrumbs, Tab Switcher
                                 if (_activeTabIndex >= 0)
                                   _buildCollectionHeader(activeDb, activeColl),
-  
+
                                 // Query Bar (only shown while a collection tab is open)
                                 if (_activeTabIndex >= 0 &&
                                     _activeTab == 'documents')
@@ -1216,19 +1221,21 @@ class _CompassAppState extends State<CompassApp> {
                                           !_isQueryOptionsExpanded);
                                     },
                                     onOpenOverflow: () {
-                                      setState(() => _isQueryActionsOpen = true);
+                                      setState(
+                                          () => _isQueryActionsOpen = true);
                                     },
-                                    executionTimeMs: queryResult.executionTimeMs,
+                                    executionTimeMs:
+                                        queryResult.executionTimeMs,
                                     totalResultsCount: queryResult.totalCount,
                                     isLoading: isCollLoading,
                                   ),
-  
+
                                 // Documents View Sub-Header: Pagination
                                 if (_activeTabIndex >= 0 &&
                                     _activeTab == 'documents')
                                   _buildDocumentsPagination(queryResult,
                                       isLoading: isCollLoading),
-  
+
                                 // Active Tab Content View
                                 Expanded(
                                   child: Container(
@@ -1249,7 +1256,7 @@ class _CompassAppState extends State<CompassApp> {
                         ],
                       ),
                     ),
-  
+
                     // Dockable Mongosh Shell at Bottom
                     CompassTerminal(
                       isOpen: _isTerminalOpen,
@@ -1987,7 +1994,8 @@ class _CompassAppState extends State<CompassApp> {
   /// the left, and the result range with the Prev/Next page navigator sits on
   /// the right. The page controls adjust the `skip` value on the shared
   /// [QueryFilterOptions]; `limit` acts as the page size.
-  Widget _buildDocumentsPagination(QueryResult result, {bool isLoading = false}) {
+  Widget _buildDocumentsPagination(QueryResult result,
+      {bool isLoading = false}) {
     final total = result.totalCount;
     final pageSize = _queryOptions.limit < 1 ? 1 : _queryOptions.limit;
     final skip = _queryOptions.skip < 0 ? 0 : _queryOptions.skip;
@@ -2217,7 +2225,8 @@ class _CompassAppState extends State<CompassApp> {
           ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 420.0),
             child: Text(
-              activeColl.loadError ?? 'The server did not return the documents.',
+              activeColl.loadError ??
+                  'The server did not return the documents.',
               textAlign: TextAlign.center,
               style: CompassTypography.bodyMedium(color: _theme.textMuted),
             ),

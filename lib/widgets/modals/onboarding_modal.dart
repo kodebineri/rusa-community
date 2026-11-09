@@ -62,8 +62,8 @@ class OnboardingModal extends StatefulWidget {
   /// The two variants previewed on the theme slide (one dark, one light). All
   /// six remain available from the header menu.
   static const List<CompassThemeVariant> previewVariants = [
-    CompassThemeVariant.dracula,
-    CompassThemeVariant.materialLight,
+    CompassThemeVariant.rainForestNight,
+    CompassThemeVariant.sunnyRainForest,
   ];
 
   @override
@@ -211,8 +211,7 @@ class _OnboardingModalState extends State<OnboardingModal> {
                                   padding: EdgeInsets.fromLTRB(
                                       horizontal, 8.0, horizontal, 24.0),
                                   child: AnimatedSwitcher(
-                                    duration:
-                                        const Duration(milliseconds: 150),
+                                    duration: const Duration(milliseconds: 150),
                                     child: KeyedSubtree(
                                       key: ValueKey<int>(_index),
                                       child: _buildSlide(
@@ -300,8 +299,8 @@ class _OnboardingModalState extends State<OnboardingModal> {
                           label: 'Done',
                           iconSvg: CompassSvgIcons.check,
                           onTap: _canFinish
-                              ? () => widget.onFinish(
-                                  dontShowAgain: _dontShowAgain)
+                              ? () =>
+                                  widget.onFinish(dontShowAgain: _dontShowAgain)
                               : null,
                         )
                       : CompassPrimaryButton(label: 'Next', onTap: _next),
@@ -664,7 +663,8 @@ class _OnboardingModalState extends State<OnboardingModal> {
               Expanded(
                 child: Text(
                   label,
-                  style: CompassTypography.bodyRegular(color: theme.textPrimary),
+                  style:
+                      CompassTypography.bodyRegular(color: theme.textPrimary),
                 ),
               ),
             ],

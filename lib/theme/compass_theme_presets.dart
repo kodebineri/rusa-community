@@ -61,6 +61,36 @@ class CompassPalette {
 /// Three dark and three light variants. [dracula] is the default (see
 /// [defaultVariant]); the rest are grouped by [isDark] in the options menu.
 enum CompassThemeVariant {
+  rainForestNight(
+    label: 'Rain Forest Night',
+    isDark: true,
+    palette: CompassPalette(
+      bgApp: Color(0xFF121417), // Neutral Dark Charcoal Base
+      bgSidebar: Color(0xFF16191D), // Neutral Sidebar Surface
+      bgPanel: Color(0xFF1E2228), // Clean Neutral Card Surface
+      bgSubtle: Color(0xFF262B33), // Neutral Inner Container / Input Surface
+      bgHover: Color(0xFF2F353E), // Crisp Neutral Hover State
+      bgInput: Color(0xFF16191D), // Slate Input Surface
+      border: Color(0xFF2A2E37), // Subtle Neutral Border
+      borderHover: Color(0xFF10B981), // Subtle Emerald Focus Outline
+      textPrimary: Color(0xFFE2E8F0), // Soft High-Contrast Slate White
+      textSecondary: Color(0xFF94A3B8), // Clean Neutral Slate Secondary Text
+      textMuted: Color(0xFF64748B), // Soft Muted Grey Text
+      accent: Color(0xFF10B981), // Emerald Accent (Used selectively)
+      accentHover: Color(0xFF059669), // Deep Emerald Hover
+      onAccent: Color(0xFF0F172A), // Dark Text on Accent
+      greenBadgeBg: Color(0x1F10B981), // Soft Emerald Badge Tint
+      greenBadgeBorder: Color(0x4010B981), // Soft Emerald Badge Border
+      // BSON Syntax Highlighting (Eye-Friendly Multi-Color Spectrum)
+      bsonObjectId: Color(0xFF2DD4BF), // Soft Cyan / Mint Teal
+      bsonString:
+          Color(0xFFE2E8F0), // Crisp Off-White (High legibility for text data)
+      bsonNumber: Color(0xFF38BDF8), // Soft Sky Blue
+      bsonBoolean: Color(0xFFFBBF24), // Warm Amber Gold
+      bsonDate: Color(0xFFF472B6), // Muted Rose Pink
+      bsonNull: Color(0xFFF87171),
+    ),
+  ),
   dracula(
     label: 'Dracula',
     isDark: true,
@@ -121,83 +151,119 @@ enum CompassThemeVariant {
     label: 'Night Owl',
     isDark: true,
     palette: CompassPalette(
-      bgApp: Color(0xFF011627),
-      bgSidebar: Color(0xFF0B2942),
-      bgPanel: Color(0xFF0B2942),
-      bgSubtle: Color(0xFF1D3B53),
-      bgHover: Color(0xFF234E6B),
-      bgInput: Color(0xFF011627),
-      border: Color(0xFF1D3B53),
-      borderHover: Color(0xFF2E5A7A),
-      textPrimary: Color(0xFFD6DEEB),
-      textSecondary: Color(0xFFA7B6C2),
-      textMuted: Color(0xFF637777),
-      accent: Color(0xFF82AAFF),
-      accentHover: Color(0xFF6A97F5),
-      onAccent: Color(0xFF011627),
-      greenBadgeBg: Color(0x2682AAFF),
-      greenBadgeBorder: Color(0x4D82AAFF),
-      bsonObjectId: Color(0xFF7FDBCA),
-      bsonString: Color(0xFFC5E478),
-      bsonNumber: Color(0xFFF78C6C),
-      bsonBoolean: Color(0xFF82AAFF),
-      bsonDate: Color(0xFFC792EA),
-      bsonNull: Color(0xFFEF5350),
+      bgApp:
+          Color(0xFF0B0E14), // Deep Obsidian Slate Base (Eliminates blue glare)
+      bgSidebar: Color(0xFF11151C), // Recessed Dark Slate Sidebar
+      bgPanel: Color(0xFF161B22), // Dark Slate Surface Panel
+      bgSubtle: Color(0xFF1F2631), // Soft Slate Surface (Containers / Inputs)
+      bgHover: Color(0xFF283241), // Low-Fatigue Hover Highlight
+      bgInput: Color(0xFF11151C), // Deep Input Surface
+      border: Color(0xFF273140), // Muted Border Outline
+      borderHover: Color(0xFF82AAFF), // Periwinkle Focus Outline
+      textPrimary: Color(0xFFD6DEEB), // Crisp Night Owl Alabaster
+      textSecondary: Color(0xFF94A3B8), // Neutral Slate Secondary Text
+      textMuted: Color(0xFF637777), // Original Night Owl Muted Teal-Grey
+      accent: Color(0xFF82AAFF), // Signature Periwinkle Accent
+      accentHover: Color(0xFF6A97F5), // Deep Periwinkle Hover
+      onAccent: Color(0xFF0B0E14), // Dark Text on Periwinkle Buttons
+      greenBadgeBg: Color(0x2682AAFF), // Periwinkle Badge Tint
+      greenBadgeBorder: Color(0x4D82AAFF), // Periwinkle Badge Outline
+      // Authentic Night Owl BSON Syntax Highlighting
+      bsonObjectId: Color(0xFF7FDBCA), // Soft Mint Teal
+      bsonString: Color(0xFFC5E478), // Warm Lime Green
+      bsonNumber: Color(0xFFF78C6C), // Soft Coral Peach
+      bsonBoolean: Color(0xFF82AAFF), // Periwinkle Blue
+      bsonDate: Color(0xFFC792EA), // Soft Lavender
+      bsonNull: Color(0xFFEF5350), // Soft Red
+    ),
+  ),
+  sunnyRainForest(
+    label: 'Sunny Rain Forest',
+    isDark: false,
+    palette: CompassPalette(
+      bgApp: Color(0xFFF4F7F5), // Crisp Stone White
+      bgSidebar: Color(0xFFEAFFF4), // Cool Soft Tinted Sidebar
+      bgPanel: Color(0xFFFFFFFF), // Clean White Panel
+      bgSubtle: Color(0xFFE2EBE5), // Soft Sage Divider Surface
+      bgHover: Color(0xFFD4E3DA), // Hover Tint
+      bgInput: Color(0xFFFFFFFF), // White Input Canvas
+      border: Color(0xFFCBDCD1), // Light Sage Border
+      borderHover: Color(0xFF059669), // Focused Forest Border
+      textPrimary: Color(0xFF112219), // High-Contrast Deep Charcoal/Green
+      textSecondary: Color(0xFF3D5B4C), // Deep Sage Secondary Text
+      textMuted: Color(0xFF6B8A7A), // Neutral Muted Green
+      accent: Color(0xFF047857), // Deep Alpine Green
+      accentHover: Color(0xFF065F46), // Forest Canopy Green
+      onAccent: Color(0xFFFFFFFF), // White Text on Green Button
+      greenBadgeBg: Color(0x20047857), // Tinted Alpine Badge
+      greenBadgeBorder: Color(0x40047857), // Soft Alpine Outline
+      // BSON Data Types syntax highlighting (Optimized for light background)
+      bsonObjectId: Color(0xFF047857), // Rich Alpine Green
+      bsonString: Color(0xFF15803D), // Lush Leaf Green
+      bsonNumber: Color(0xFF0284C7), // Deep Ocean Blue
+      bsonBoolean: Color(0xFFD97706), // Burnt Amber
+      bsonDate: Color(0xFFC026D3), // Vivid Plum
+      bsonNull: Color(0xFFDC2626),
     ),
   ),
   monokaiLight(
     label: 'Monokai Light',
     isDark: false,
     palette: CompassPalette(
-      bgApp: Color(0xFFFAF4E5),
-      bgSidebar: Color(0xFFF3EBD8),
-      bgPanel: Color(0xFFFFFBF0),
-      bgSubtle: Color(0xFFF2EBDD),
-      bgHover: Color(0xFFEAE2D0),
-      bgInput: Color(0xFFFFFBF0),
-      border: Color(0xFFE3D9C6),
-      borderHover: Color(0xFFCFC3A9),
-      textPrimary: Color(0xFF2C292D),
-      textSecondary: Color(0xFF5C565C),
-      textMuted: Color(0xFF8A8088),
-      accent: Color(0xFFC94F6D),
-      accentHover: Color(0xFFB4415E),
-      onAccent: Color(0xFFFFFBF0),
-      greenBadgeBg: Color(0x26C94F6D),
-      greenBadgeBorder: Color(0x4DC94F6D),
-      bsonObjectId: Color(0xFFC94F6D),
-      bsonString: Color(0xFF4C8A3F),
-      bsonNumber: Color(0xFFB15C00),
-      bsonBoolean: Color(0xFF7A4FBF),
-      bsonDate: Color(0xFFA34BA3),
-      bsonNull: Color(0xFFC62828),
+      bgApp:
+          Color(0xFFFAFAFA), // Crisp Neutral Surface (Eliminates yellow glare)
+      bgSidebar: Color(0xFFF1F3F5), // Cool Soft Grey Sidebar
+      bgPanel: Color(0xFFFFFFFF), // Clean White Container Cards
+      bgSubtle: Color(0xFFE9ECEF), // Soft Grey Divider Surface / Containers
+      bgHover: Color(0xFFDEE2E6), // Crisp Soft Hover Highlight
+      bgInput: Color(0xFFFFFFFF), // Pure White Input Canvas
+      border: Color(0xFFCED4DA), // Clean Slate Border Line
+      borderHover: Color(0xFFD33682), // Monokai Berry Focus Line
+      textPrimary: Color(0xFF212529), // Deep Charcoal for Crisp Legibility
+      textSecondary: Color(0xFF495057), // Neutral Slate Secondary Text
+      textMuted: Color(0xFF6C757D), // Muted Grey Label Text
+      accent: Color(0xFFD33682), // Elegant Monokai Rose Accent
+      accentHover: Color(0xFFB52A6F), // Richer Rose Hover
+      onAccent: Color(0xFFFFFFFF), // Clean White Text on Accent Buttons
+      greenBadgeBg: Color(0x1AD33682), // Subtle Rose Badge Tint
+      greenBadgeBorder: Color(0x38D33682), // Soft Rose Badge Outline
+      // Authentic Monokai BSON Syntax Highlighting (High contrast on light BG)
+      bsonObjectId: Color(0xFFD33682), // Monokai Rose Pink
+      bsonString: Color(0xFF2E7D32), // Deep Leaf Green
+      bsonNumber: Color(0xFFE65100), // Warm Burnt Orange
+      bsonBoolean: Color(0xFF6A1B9A), // Deep Purple
+      bsonDate: Color(0xFFC2185B), // Rich Berry Red
+      bsonNull: Color(0xFFC62828), // Vivid Red
     ),
   ),
   tokyoNightLight(
     label: 'Tokyo Night Light',
     isDark: false,
     palette: CompassPalette(
-      bgApp: Color(0xFFE6E7ED),
-      bgSidebar: Color(0xFFDFE2EA),
-      bgPanel: Color(0xFFF7F7FA),
-      bgSubtle: Color(0xFFD3D7E3),
-      bgHover: Color(0xFFC4C8DA),
-      bgInput: Color(0xFFFFFFFF),
-      border: Color(0xFFC4C8DA),
-      borderHover: Color(0xFFA8AECB),
-      textPrimary: Color(0xFF343B58),
-      textSecondary: Color(0xFF4E5579),
-      textMuted: Color(0xFF7A82A6),
-      accent: Color(0xFF2E7DE9),
-      accentHover: Color(0xFF1F6AD0),
-      onAccent: Color(0xFFFFFFFF),
-      greenBadgeBg: Color(0x262E7DE9),
-      greenBadgeBorder: Color(0x4D2E7DE9),
-      bsonObjectId: Color(0xFF2E7DE9),
-      bsonString: Color(0xFF587539),
-      bsonNumber: Color(0xFFB15C00),
-      bsonBoolean: Color(0xFF9854F1),
-      bsonDate: Color(0xFF8C4EC4),
+      bgApp:
+          Color(0xFFF2F4F8), // Light Cool Canvas (Eliminates muddy grey tint)
+      bgSidebar: Color(0xFFE6E9F0), // Soft Subdued Cool Sidebar
+      bgPanel: Color(0xFFFFFFFF), // Crisp Pure White Cards
+      bgSubtle: Color(0xFFE2E6F0), // Clean Divider Surface / Code Field
+      bgHover: Color(0xFFD7DCE8), // Soft Cool Blue-Grey Hover State
+      bgInput: Color(0xFFFFFFFF), // White Input Surface
+      border: Color(0xFFD5DAE7), // Subtle Slate-Indigo Outline
+      borderHover: Color(0xFF3478E3), // Indigo Focus Border Outline
+      textPrimary: Color(0xFF1F2335), // Deep Ink Navy (Maximum readability)
+      textSecondary: Color(0xFF4C5270), // Crisp Indigo-Slate Secondary Text
+      textMuted: Color(0xFF787F9E), // Subdued Label Text
+      accent: Color(0xFF3478E3), // Tokyo Night Electric Indigo/Blue Accent
+      accentHover: Color(0xFF2761BE), // Rich Indigo Hover
+      onAccent: Color(0xFFFFFFFF), // White Text on Accent Buttons
+      greenBadgeBg: Color(0x1F3478E3), // Soft Indigo Badge Tint
+      greenBadgeBorder: Color(0x383478E3), // Soft Indigo Badge Border
+      // BSON Syntax Highlighting (Sharper Contrast on Light Canvas)
+      bsonObjectId: Color(0xFF3478E3), // Tokyo Electric Blue
+      bsonString: Color(
+          0xFF38663D), // Deep Forest Green (High contrast value readability)
+      bsonNumber: Color(0xFF965B00), // Rich Amber Orange
+      bsonBoolean: Color(0xFF7038D0), // Vivid Royal Violet
+      bsonDate: Color(0xFF8C4EC4), // Soft Amethyst
       bsonNull: Color(0xFFF52A65),
     ),
   ),
@@ -246,7 +312,8 @@ enum CompassThemeVariant {
   final CompassPalette palette;
 
   /// Theme used on first launch.
-  static const CompassThemeVariant defaultVariant = CompassThemeVariant.dracula;
+  static const CompassThemeVariant defaultVariant =
+      CompassThemeVariant.rainForestNight;
 
   /// Dark variants, in menu order.
   static List<CompassThemeVariant> get darkThemes =>
