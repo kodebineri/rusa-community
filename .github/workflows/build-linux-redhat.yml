@@ -69,7 +69,6 @@ jobs:
         run: flutter build linux --release
 
       # --- Package, Sign & Verify RPM inside Native Fedora Container ---
-      # --- Package, Sign & Verify RPM inside Native Fedora Container ---
       - name: Package and Sign RPM inside Fedora Container
         uses: addnab/docker-run-action@v3
         with:
@@ -88,41 +87,14 @@ jobs:
 
             RPM_ARCH="${{ matrix.rpm_arch }}"
             RPM_TOPDIR="/workspace/build/rpm"
-            BUILD_ROOT="${RPM_TOPDIR}/BUILDROOT/rusa-community-${VERSION}-1.${RPM_ARCH}"
 
             # 1. Setup explicit RPM build tree structure
             mkdir -p "${RPM_TOPDIR}/"{BUILD,BUILDROOT,RPMS,SOURCES,SPECS,SRPMS}
 
-            mkdir -p "${BUILD_ROOT}/usr/lib/rusa-community"
-            mkdir -p "${BUILD_ROOT}/usr/bin"
-            mkdir -p "${BUILD_ROOT}/usr/share/applications"
-            mkdir -p "${BUILD_ROOT}/usr/share/icons/hicolor/256x256/apps"
-
-            # Copy Flutter bundle output
+            # Locate Flutter Linux bundle output
             BUILD_BUNDLE=$(find build/linux -type d -name "bundle" | head -n 1)
-            cp -r ${BUILD_BUNDLE}/* "${BUILD_ROOT}/usr/lib/rusa-community/"
 
-            # Symlink binary to /usr/bin
-            ln -s /usr/lib/rusa-community/rusa-community "${BUILD_ROOT}/usr/bin/rusa-community"
-
-            # Copy icon if present
-            if [ -f "assets/icon/icon.png" ]; then
-              cp assets/icon/icon.png "${BUILD_ROOT}/usr/share/icons/hicolor/256x256/apps/rusa-community.png"
-            fi
-
-            # Desktop entry metadata
-            cat <<EOF > "${BUILD_ROOT}/usr/share/applications/rusa-community.desktop"
-            [Desktop Entry]
-            Name=Rusa Community
-            Comment=MongoDB GUI Client Community Edition
-            Exec=/usr/bin/rusa-community %U
-            Icon=rusa-community
-            Terminal=false
-            Type=Application
-            Categories=Development;Database;
-            EOF
-
-            # Spec file creation
+            # 2. Spec file creation with proper %install stage
             cat <<EOF > ${RPM_TOPDIR}/SPECS/rusa-community.spec
             Name:           rusa-community
             Version:        ${VERSION}
@@ -135,17 +107,56 @@ jobs:
             %description
             Rusa Community Edition GUI client built for Linux (${RPM_ARCH}).
 
+            %prep
+            # Skip prep stage
+
+            %build
+            # Binaries are pre-built by Flutter
+
+            %install
+            mkdir -p %{buildroot}/usr/lib/rusa-community
+            mkdir -p %{buildroot}/usr/bin
+            mkdir -p %{buildroot}/usr/share/applications
+            mkdir -p %{buildroot}/usr/share/icons/hicolor/256x256/apps
+
+            # Copy Flutter bundle contents into buildroot
+            cp -r /workspace/${BUILD_BUNDLE}/* %{buildroot}/usr/lib/rusa-community/
+
+            # Create symlink in /usr/bin
+            ln -s /usr/lib/rusa-community/rusa-community %{buildroot}/usr/bin/rusa-community
+
+            # Copy desktop icon if present
+            if [ -f "/workspace/assets/icon/icon.png" ]; then
+              cp /workspace/assets/icon/icon.png %{buildroot}/usr/share/icons/hicolor/256x256/apps/rusa-community.png
+            fi
+
+            # Desktop entry
+            cat <<DESK > %{buildroot}/usr/share/applications/rusa-community.desktop
+            [Desktop Entry]
+            Name=Rusa Community
+            Comment=MongoDB GUI Client Community Edition
+            Exec=/usr/bin/rusa-community %U
+            Icon=rusa-community
+            Terminal=false
+            Type=Application
+            Categories=Development;Database;
+            DESK
+
             %files
             /usr/lib/rusa-community
             /usr/bin/rusa-community
             /usr/share/applications/rusa-community.desktop
             /usr/share/icons/hicolor/256x256/apps/rusa-community.png
+
+            %changelog
+            * Tue Nov 10 2026 Maintainer <kodebineri@gmail.com> - ${VERSION}-1
+            - Release ${VERSION}
             EOF
 
-            # 2. Build RPM package using explicit topdir
+            # 3. Build RPM package
             rpmbuild --define "_topdir ${RPM_TOPDIR}" --target ${RPM_ARCH} -bb ${RPM_TOPDIR}/SPECS/rusa-community.spec
 
-            # 3. Robust package collection into dist/
+            # 4. Collect built package into dist/
             mkdir -p dist
             BUILT_RPM=$(find ${RPM_TOPDIR}/RPMS -type f -name "*.rpm" | head -n 1)
             if [ -z "$BUILT_RPM" ]; then
@@ -178,7 +189,7 @@ jobs:
             %_gpgbin /usr/bin/gpg
             EOF
 
-            # 4. Sign RPM packages & verify natively
+            # 5. Sign RPM packages & verify natively
             for rpm_file in dist/*.rpm; do
               echo "Signing $rpm_file..."
               if [ -n "$GPG_PASS" ]; then
