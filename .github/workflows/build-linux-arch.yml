@@ -122,10 +122,10 @@ jobs:
           depend = glibc
           EOF
 
-          # Build proper binary Arch package tarball including .PKGINFO metadata
+          # Build proper binary Arch package tarball with .PKGINFO at root
           OUT_FILE="${PKG_NAME}-${VERSION}-1-${ARCH}.pkg.tar.zst"
           mkdir -p dist
-          (cd "${PKG_DIR}" && tar --owner=0 --group=0 --numeric-owner -c * .PKGINFO) | zstd -19 -T0 > "dist/${OUT_FILE}"
+          tar -C "${PKG_DIR}" --owner=0 --group=0 --numeric-owner -cf - .PKGINFO . | zstd -19 -T0 > "dist/${OUT_FILE}"
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
@@ -157,7 +157,7 @@ jobs:
             exit 1
           fi
 
-          # Import raw ASCII GPG key safely via environment variable
+          # Import raw ASCII GPG key directly via env variable
           echo "$GPG_KEY" | gpg --batch --import
 
           # Configure gpg-agent for non-interactive signing
@@ -186,7 +186,6 @@ jobs:
           # Extract Key ID automatically from imported secret key
           KEY_ID=$(gpg --list-secret-keys --with-colons | grep '^sec' | cut -d: -f5 | head -n 1)
 
-          # Function to sign packages and build repository database
           build_signed_repo() {
             local target_dir="$1"
             if ls ${target_dir}/*.pkg.tar.zst 1> /dev/null 2>&1; then
@@ -201,12 +200,8 @@ jobs:
                 fi
               done
 
-              # Build and sign the Pacman repository database (rusa.db.tar.gz & rusa.files.tar.gz)
-              if [ -n "$GPG_PASSPHRASE" ]; then
-                repo-add --sign --key "$KEY_ID" --verify rusa.db.tar.gz *.pkg.tar.zst
-              else
-                repo-add --sign --key "$KEY_ID" --verify rusa.db.tar.gz *.pkg.tar.zst
-              fi
+              # Build and sign Pacman repository database
+              repo-add --sign --key "$KEY_ID" --verify rusa.db.tar.gz *.pkg.tar.zst
 
               cd - > /dev/null
             fi
