@@ -1,7 +1,8 @@
 # PRIVACY POLICY
 
-**Last Updated:** November 04, 2026  
-**Version:** 1.1
+**Last Updated:** November 10, 2026
+
+**Version:** 1.2
 
 This Privacy Policy explains how the developers of Rusa ("Licensor", "We", "Us", or "Our") handle information in connection with the Rusa software, a MongoDB database client ("Software"). It should be read together with the End User License Agreement (EULA).
 
@@ -27,8 +28,10 @@ The Software has no account system and does not "phone home" to Licensor.
 
 ## 3. DATA YOU ENTER (CONNECTIONS AND CREDENTIALS)
 
-- Connection details such as URIs, host names, ports, usernames, and passwords that you enter are held **in memory only for the current session**. The Software does not write them to disk.
-- Those details are used solely to establish a connection to the MongoDB server **you** specify, and to send queries and write operations to that server.
+- Connection details such as URIs, host names, ports, usernames, and passwords that you enter are used solely to establish a connection to the MongoDB server **you** specify, and to send queries and write operations to that server.
+- When you choose **Save & Connect**, the connection profile you saved (including its URI and any credentials embedded in it) is stored **locally on your device in the platform's protected credential storage** — Android Keystore-backed storage, the iOS Keychain, Windows Credential Manager, or the platform equivalent on Linux. The platform encrypts the value at rest. It is not uploaded to Licensor or any other party.
+- Connections you use without saving, and connection details that are not part of a saved profile, are held **in memory only for the current session**.
+- You can remove a saved profile from the connection popup at any time, which deletes it from protected storage.
 - Your credentials are transmitted **directly to the server you connect to**. They are not sent to Licensor or any other party.
 - You are responsible for the security of the servers you connect to and for whom you authorize to access them.
 

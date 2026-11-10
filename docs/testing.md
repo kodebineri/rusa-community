@@ -1,6 +1,6 @@
 # Testing — `test/`
 
-Companion to root `AGENTS.md`. Seven files, **134 tests**:
+Companion to root `AGENTS.md`. Seven files, **137 tests**:
 
 | File | What it covers |
 |---|---|
@@ -12,12 +12,12 @@ Companion to root `AGENTS.md`. Seven files, **134 tests**:
 | `test/compass_density_test.dart` | unit tests for the desktop/touch density profiles |
 | `test/json_auto_indent_formatter_test.dart` | unit tests for the JSON auto-indent formatter |
 
-> **Status: 134 pass / 0 fail, `flutter analyze` clean.**
+> **Status: 137 pass / 0 fail, `flutter analyze` clean.**
 
 ## Commands
 
 ```bash
-flutter test                              # all — expect 134/134
+flutter test                              # all — expect 137/137
 flutter test test/widget_test.dart        # just the widget tests
 flutter test test/mongosh_interpreter_test.dart
 flutter analyze                           # expect "No issues found!"
@@ -78,6 +78,9 @@ misuse that would fail the test anyway.
 | 22 | `the theme stored on the device is restored on the next launch` | `{eula_accepted: true, theme_variant: 'monokaiLight'}` → root `CompassTheme.variant == monokaiLight` |
 | 23 | `"Show Welcome Screen" in the header menu replays the tour` | returning user → `⋮` menu → **Show Welcome Screen** → `Step 1 of 4` |
 | 24-28 | `mobile: …` layout regressions | Aggregations / Schema / Indexes at **320 px** wide, the header action sheet on a short phone (first row stays below the status bar, last row scrolls into view), and the connection-modal footer (no overflow) |
+| 29 | `saved connections round-trip through AppPreferences` | Profile JSON preserves id, name, URI (including credentials), colour, favourite, lastConnected and readOnly; writing `[]` stays empty instead of restoring the sample profiles |
+| 30 | `saved connections are restored from device storage` | `saved_connections` seeded in secure storage → booting `CompassApp` shows the persisted profile in `ConnectionModal` |
+| 31 | `legacy plaintext connections migrate to secure storage` | A `saved_connections` value left in `SharedPreferences` is read, written to secure storage, removed from preferences, and survives a second load |
 
 ## Recurring techniques (copy these patterns)
 

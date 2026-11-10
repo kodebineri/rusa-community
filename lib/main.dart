@@ -117,6 +117,11 @@ class _CompassAppState extends State<CompassApp> {
       _eulaAccepted = stored.eulaAccepted;
       _onboardingDone = stored.onboardingDone;
       _themeVariant = CompassThemeVariant.fromName(stored.themeVariantName);
+      // Null means the device has no stored list yet: keep the built-in
+      // sample profiles. An empty list is a real user choice (all deleted).
+      if (stored.savedConnections != null) {
+        _savedConnections = stored.savedConnections!;
+      }
       _isOnboardingOpen = showTour;
       _isConnectModalOpen = !showTour;
     });
@@ -624,12 +629,15 @@ class _CompassAppState extends State<CompassApp> {
         _savedConnections = [..._savedConnections, profile];
       }
     });
+    // Snapshot the list: the async write must not observe a later edit/delete.
+    unawaited(appPreferences.setSavedConnections(List.of(_savedConnections)));
   }
 
   void _handleDeleteConnection(String id) {
     setState(() {
       _savedConnections = _savedConnections.where((c) => c.id != id).toList();
     });
+    unawaited(appPreferences.setSavedConnections(List.of(_savedConnections)));
   }
 
   /// Connects to the bundled sample datasets: (re)loads the built-in seed data

@@ -5,6 +5,7 @@ import 'dart:io';
 
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -13,6 +14,7 @@ import 'package:rusa/main.dart';
 import 'package:rusa/icons/compass_svg_icons.dart';
 import 'package:rusa/models/collection_tab.dart';
 import 'package:rusa/models/mongo_models.dart';
+import 'package:rusa/services/app_preferences.dart';
 import 'package:rusa/services/mongo_engine.dart';
 import 'package:rusa/theme/compass_density.dart';
 import 'package:rusa/theme/compass_theme.dart';
@@ -136,6 +138,7 @@ void main() {
   // gate does not block the app shell. Test 18 overrides this.
   setUp(() {
     SharedPreferences.setMockInitialValues({'eula_accepted': true});
+    FlutterSecureStorage.setMockInitialValues({});
   });
 
   test('AboutModal.appVersion mirrors pubspec.yaml', () {
@@ -1846,6 +1849,96 @@ void main() {
     expect(
       find.textContaining('Editing “Atlas Production ReplicaSet”'),
       findsOneWidget,
+    );
+  });
+
+  test('saved connections round-trip through AppPreferences', () async {
+    SharedPreferences.setMockInitialValues({});
+    FlutterSecureStorage.setMockInitialValues({});
+    final appPrefs = AppPreferences();
+    final profile = ConnectionProfile(
+      id: 'persisted-1',
+      name: 'Persisted Cluster',
+      uri: 'mongodb://user:secret@db.example.com:27017/app',
+      color: '#112233',
+      favorite: true,
+      lastConnected: 'Just now',
+      readOnly: true,
+    );
+
+    await appPrefs.setSavedConnections([profile]);
+    final loaded = await AppPreferences().load();
+
+    expect(loaded.savedConnections, isNotNull);
+    final restored = loaded.savedConnections!.single;
+    expect(restored.id, 'persisted-1');
+    expect(restored.name, 'Persisted Cluster');
+    expect(restored.uri, 'mongodb://user:secret@db.example.com:27017/app');
+    expect(restored.color, '#112233');
+    expect(restored.favorite, isTrue);
+    expect(restored.lastConnected, 'Just now');
+    expect(restored.readOnly, isTrue);
+
+    // The profile JSON must not also be left in plaintext preferences.
+    final rawPrefs = await SharedPreferences.getInstance();
+    expect(rawPrefs.getString(AppPreferences.savedConnectionsKey), isNull);
+
+    // Deleting every profile must persist an empty list, not remove the key:
+    // otherwise the built-in sample profiles would reappear on next launch.
+    await appPrefs.setSavedConnections([]);
+    final cleared = await AppPreferences().load();
+    expect(cleared.savedConnections, isEmpty);
+  });
+
+  test('legacy plaintext connections migrate to secure storage', () async {
+    final profile = ConnectionProfile(
+      id: 'legacy-1',
+      name: 'Legacy Profile',
+      uri: 'mongodb://legacy.example.com:27017/db',
+    );
+    SharedPreferences.setMockInitialValues({
+      AppPreferences.savedConnectionsKey: jsonEncode([profile.toJson()]),
+    });
+    FlutterSecureStorage.setMockInitialValues({});
+
+    final loaded = await AppPreferences().load();
+    expect(loaded.savedConnections!.single.name, 'Legacy Profile');
+
+    // The plaintext copy must be gone, and a second load must read the
+    // keystore-backed copy.
+    final rawPrefs = await SharedPreferences.getInstance();
+    expect(rawPrefs.getString(AppPreferences.savedConnectionsKey), isNull);
+    final reloaded = await AppPreferences().load();
+    expect(reloaded.savedConnections!.single.name, 'Legacy Profile');
+  });
+
+  testWidgets('saved connections are restored from device storage',
+      (WidgetTester tester) async {
+    tester.view.physicalSize = const Size(1920.0, 1080.0);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final profile = ConnectionProfile(
+      id: 'persisted-1',
+      name: 'Persisted Cluster',
+      uri: 'mongodb://user:secret@db.example.com:27017/app',
+    );
+    SharedPreferences.setMockInitialValues({'eula_accepted': true});
+    FlutterSecureStorage.setMockInitialValues({
+      AppPreferences.savedConnectionsKey: jsonEncode([profile.toJson()]),
+    });
+
+    await tester.pumpWidget(const CompassApp());
+    await tester.pump();
+    for (var i = 0; i < 50 && tester.takeException() != null; i++) {}
+
+    final modal = find.byType(ConnectionModal);
+    expect(modal, findsOneWidget);
+    expect(
+      find.descendant(of: modal, matching: find.text('Persisted Cluster')),
+      findsOneWidget,
+      reason: 'a profile saved on a previous launch must reappear',
     );
   });
 

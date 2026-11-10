@@ -46,10 +46,10 @@ void main() => runApp(const DefaultTextEditingShortcuts(child: CompassApp()));
 
 | Field | Type | Purpose |
 |---|---|---|
-| `_themeVariant` | `CompassThemeVariant = .defaultVariant` (Dracula) | selected theme; drives `_theme` + root `CompassTheme`; changed via header menu / action sheet |
+| `_themeVariant` | `CompassThemeVariant = .defaultVariant` (Rain Forest Night) | selected theme; drives `_theme` + root `CompassTheme`; changed via header menu / action sheet |
 | `_connection` | `ConnectionProfile?` | current profile; **null at boot** (the connect popup is open), set on connect / sample-data, cleared on disconnect |
 | `_realService` | `RealMongoService?` | non-null only while on a live server; also gates header `showResetSample` |
-| `_savedConnections` | `List<ConnectionProfile>` | two seeded profiles (`1` "Local Standalone (27017)", `2` "Atlas Production ReplicaSet") |
+| `_savedConnections` | `List<ConnectionProfile>` | two seeded profiles (`1` "Local Standalone (27017)", `2` "Atlas Production ReplicaSet") on first run; replaced from the encrypted `AppPreferences.savedConnections` entry on later launches, where an empty stored list stays empty |
 
 **Panel flags (L229–243):** `_isConnectModalOpen` (**defaults to `true`** — the app boots into
 the connection popup), `_isTerminalOpen` (docked Shell), `_isMobileSidebarOpen`

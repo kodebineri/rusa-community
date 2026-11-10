@@ -150,6 +150,34 @@ class ConnectionProfile {
     this.lastConnected,
     this.readOnly = false,
   });
+
+  /// Serialises a profile for local storage.
+  ///
+  /// The URI can contain credentials; [AppPreferences] keeps the JSON in the
+  /// app-private preferences store on the device. It is never uploaded.
+  Map<String, dynamic> toJson() => <String, dynamic>{
+        'id': id,
+        'name': name,
+        'uri': uri,
+        'color': color,
+        'favorite': favorite,
+        'lastConnected': lastConnected,
+        'readOnly': readOnly,
+      };
+
+  /// Restores a profile written by [toJson]. Tolerates missing fields so an
+  /// older or partially-written preferences entry cannot break startup.
+  factory ConnectionProfile.fromJson(Map<String, dynamic> json) {
+    return ConnectionProfile(
+      id: json['id'] as String? ?? '',
+      name: json['name'] as String? ?? 'MongoDB Cluster',
+      uri: json['uri'] as String? ?? '',
+      color: json['color'] as String?,
+      favorite: json['favorite'] as bool? ?? false,
+      lastConnected: json['lastConnected'] as String?,
+      readOnly: json['readOnly'] as bool? ?? false,
+    );
+  }
 }
 
 class QueryFilterOptions {

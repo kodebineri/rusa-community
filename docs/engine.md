@@ -212,7 +212,7 @@ order; nested objects count as a single `Object` type (no flattening). Per field
 | `MongoIndex` | `final String name`, `final Map<String,dynamic> keys`, `final bool unique` (false), `final bool sparse` (false), `final int sizeKb` (16), `fromMap` |
 | `MongoCollection` | `final String name`; **mutable** `List<MongoDocument> documents`; `List<MongoIndex> indexes`; `Map? validator`; `validationLevel='moderate'`; `validationAction='error'`; `bool isView=false`; `String? viewOn`; `List? pipeline` |
 | `MongoDatabase` | `final String name`; mutable `Map<String, MongoCollection> collections` |
-| `ConnectionProfile` | `id, name, uri, color?, favorite, lastConnected?, readOnly` |
+| `ConnectionProfile` | `id, name, uri, color?, favorite, lastConnected?, readOnly`; `toJson`/`fromJson` for the encrypted `AppPreferences.savedConnections` entry |
 | `QueryFilterOptions` | see above |
 | `QueryResult` | `final List<MongoDocument> documents`, `final int totalCount`, `final double executionTimeMs` |
 | `PipelineStage` | `final String id`, `String operator`, `String content`, `bool enabled=true`, `copyWith` |
