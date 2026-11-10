@@ -155,8 +155,8 @@ jobs:
             exit 1
           fi
 
-          # Import base64-decoded GPG private key
-          echo "${{ secrets.GPG_PRIVATE_KEY }}" | base64 --decode | gpg --batch --import
+          # Strip unexpected newlines/spaces before base64 decoding
+          echo "${{ secrets.GPG_PRIVATE_KEY }}" | tr -d ' \r\n' | base64 --decode | gpg --batch --import
 
           # Configure gpg-agent for non-interactive signing
           mkdir -p ~/.gnupg
