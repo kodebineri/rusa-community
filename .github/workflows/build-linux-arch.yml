@@ -107,7 +107,7 @@ jobs:
           Categories=Development;Database;
           EOF
 
-          # Generate Arch Linux .PKGINFO metadata file
+          # 1. Generate .PKGINFO metadata file
           cat <<EOF > "${PKG_DIR}/.PKGINFO"
           pkgname = ${PKG_NAME}
           pkgver = ${VERSION}-1
@@ -122,10 +122,22 @@ jobs:
           depend = glibc
           EOF
 
-          # Build proper binary Arch package tarball with .PKGINFO at root
+          # 2. Generate mandatory .BUILDINFO metadata file
+          cat <<EOF > "${PKG_DIR}/.BUILDINFO"
+          format = 2
+          pkgname = ${PKG_NAME}
+          pkgver = ${VERSION}-1
+          pkgarch = ${ARCH}
+          pkgbase = ${PKG_NAME}
+          builddate = $(date +%s)
+          packager = Kodebineri <kodebineri@gmail.com>
+          buildenv = !distcc !color !ccache check !sign
+          EOF
+
+          # 3. Compress into standard Arch binary package
           OUT_FILE="${PKG_NAME}-${VERSION}-1-${ARCH}.pkg.tar.zst"
           mkdir -p dist
-          (cd "${PKG_DIR}" && tar --owner=0 --group=0 --numeric-owner -cf - .PKGINFO usr) | zstd -19 -T0 > "dist/${OUT_FILE}"
+          (cd "${PKG_DIR}" && tar --owner=0 --group=0 --numeric-owner -cf - .PKGINFO .BUILDINFO usr) | zstd -19 -T0 > "dist/${OUT_FILE}"
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
