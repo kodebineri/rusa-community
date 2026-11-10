@@ -125,7 +125,7 @@ jobs:
           # Build proper binary Arch package tarball with .PKGINFO at root
           OUT_FILE="${PKG_NAME}-${VERSION}-1-${ARCH}.pkg.tar.zst"
           mkdir -p dist
-          tar -C "${PKG_DIR}" --owner=0 --group=0 --numeric-owner -cf - .PKGINFO . | zstd -19 -T0 > "dist/${OUT_FILE}"
+          (cd "${PKG_DIR}" && tar --owner=0 --group=0 --numeric-owner -cf - .PKGINFO usr) | zstd -19 -T0 > "dist/${OUT_FILE}"
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
