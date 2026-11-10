@@ -149,14 +149,16 @@ jobs:
           sudo apt-get install -y pacman-package-manager gpg
 
       - name: Import & Configure GPG Key
+        env:
+          GPG_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
         run: |
-          if [ -z "${{ secrets.GPG_PRIVATE_KEY }}" ]; then
+          if [ -z "$GPG_KEY" ]; then
             echo "Error: GPG_PRIVATE_KEY secret is missing."
             exit 1
           fi
 
-          # Strip unexpected newlines/spaces before base64 decoding
-          echo "${{ secrets.GPG_PRIVATE_KEY }}" | tr -d ' \r\n' | base64 --decode | gpg --batch --import
+          # Import raw ASCII GPG key safely via environment variable
+          echo "$GPG_KEY" | gpg --batch --import
 
           # Configure gpg-agent for non-interactive signing
           mkdir -p ~/.gnupg
