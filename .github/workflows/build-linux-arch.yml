@@ -88,7 +88,7 @@ jobs:
           cp -r ${BUILD_BUNDLE}/* "${PKG_DIR}/usr/lib/rusa-community/"
 
           # Symlink binary to /usr/bin
-          ln -s /usr/lib/rusa-community/rusa-community "${PKG_DIR}/usr/bin/rusa-community"
+          ln -s /usr/lib/rusa-community/rusa-community "${PKG_DIR}/usr/bin/rusa"
 
           # Copy icon if available
           if [ -f "assets/icon/icon.png" ]; then
@@ -100,7 +100,7 @@ jobs:
           [Desktop Entry]
           Name=Rusa Community
           Comment=MongoDB GUI Client Community Edition
-          Exec=/usr/bin/rusa-community %U
+          Exec=/usr/bin/rusa %U
           Icon=rusa-community
           Terminal=false
           Type=Application
