@@ -94,8 +94,12 @@ jobs:
             # Locate Flutter Linux bundle output
             BUILD_BUNDLE=$(find build/linux -type d -name "bundle" | head -n 1)
 
-            # 2. Spec file creation with proper %install stage
+            # 2. Spec file creation with QA_RPATHS ignore flags for Flutter plugins
             cat <<EOF > ${RPM_TOPDIR}/SPECS/rusa-community.spec
+            # Disable strict RPATH validation for Flutter plugin shared libraries
+            %define QA_RPATHS 0x0006
+            %global __brp_check_rpaths %{nil}
+
             Name:           rusa-community
             Version:        ${VERSION}
             Release:        1
@@ -111,7 +115,7 @@ jobs:
             # Skip prep stage
 
             %build
-            # Binaries are pre-built by Flutter
+            # Pre-built by Flutter
 
             %install
             mkdir -p %{buildroot}/usr/lib/rusa-community
