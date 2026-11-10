@@ -82,10 +82,10 @@ _Verified 2026-11-10 at HEAD `609e38b`._
 - **Theme default changed:** `rainForestNight` is now the default (not Dracula); the eight
   variant names are in invariant 11. The header options menu and touch action sheet group them
   as `DARK THEMES` / `LIGHT THEMES`.
-- **Releases:** pushing a `v*` tag triggers `.github/workflows/deploy-apt-repo.yml` (Linux
-  amd64/arm64 → APT repo on GitHub Pages + GitHub release). **No CI runs analyze or tests.**
-  The workflow is unfinished: it uploads `dist/*.deb`, but nothing in the repo generates
-  `.deb` files, and the "arm64" matrix leg still builds on the x86_64 host.
+- **Releases:** pushing a `v*` tag triggers `.github/workflows/build-linux-packages.yml`.
+  It builds Debian, Arch and Fedora packages for amd64/arm64 (native arm runners), then
+  publishes one GitHub Pages site with `apt/`, `arch/` and `rpm/` subdirectories plus one
+  GitHub release. **No CI runs analyze or tests.** Windows has a separate workflow.
 
 ## Commands
 
@@ -201,10 +201,6 @@ the legacy `src/` React app; `npm` is not needed for Flutter work).
 - `QueryFilterOptions.collation` / `maxTimeMS` are stored but never consumed by the engine.
 - `CompassQueryBar._handleSkipChange` / `_handleLimitChange` are **intentional no-ops**
   ("do not execute on type"); the numeric fields commit only on blur/Find.
-- The Linux release pipeline (`.github/workflows/deploy-apt-repo.yml`) is unfinished — it
-  expects `dist/*.deb` artifacts that no repo task produces, and its arm64 matrix leg builds on
-  the x86_64 host. Don't treat it as a working packaging recipe.
-
 The **sidebar search box works** — `_searchQuery` is mutable and filters the DB tree
 client-side (`compass_sidebar.dart`); don't add it to the dead list.
 

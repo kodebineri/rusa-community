@@ -1,0 +1,607 @@
+name: Build, Publish Linux Repos and GitHub Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "linux-pages"
+  cancel-in-progress: false
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # 1. Debian/Ubuntu package (amd64 + arm64)
+  # ---------------------------------------------------------------------------
+  build-deb:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target_arch: amd64
+          - os: ubuntu-24.04-arm
+            target_arch: arm64
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+
+      - name: Install Linux Build Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev liblzma-dev libstdc++-12-dev libsecret-1-dev git curl unzip
+
+      - name: Setup Flutter Engine (amd64)
+        if: matrix.target_arch == 'amd64'
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+
+      - name: Setup Flutter Engine (arm64 Git Fallback)
+        if: matrix.target_arch == 'arm64'
+        run: |
+          git clone https://github.com/flutter/flutter.git -b stable --depth 1 /opt/flutter
+          echo "/opt/flutter/bin" >> $GITHUB_PATH
+          echo "/opt/flutter/bin/cache/dart-sdk/bin" >> $GITHUB_PATH
+
+      - name: Enable Linux Desktop Build & Setup Platform
+        run: |
+          flutter config --enable-linux-desktop
+          if [ ! -d "linux" ]; then
+            flutter create --platforms=linux .
+          fi
+
+      - name: Install Pub Dependencies
+        run: flutter pub get
+
+      - name: Build Flutter Linux Release
+        run: flutter build linux --release
+
+      - name: Create .deb Package
+        run: |
+          RAW_TAG="${GITHUB_REF_NAME}"
+          VERSION="${RAW_TAG#v}"
+          if [ "${{ github.ref_type }}" != "tag" ] || [ -z "$VERSION" ]; then
+            VERSION="0.0.0-dev"
+          fi
+
+          ARCH="${{ matrix.target_arch }}"
+          PKG_DIR="build/debian/rusa-community_${VERSION}_${ARCH}"
+
+          mkdir -p "${PKG_DIR}/DEBIAN"
+          mkdir -p "${PKG_DIR}/usr/lib/rusa-community"
+          mkdir -p "${PKG_DIR}/usr/bin"
+          mkdir -p "${PKG_DIR}/usr/share/applications"
+          mkdir -p "${PKG_DIR}/usr/share/icons/hicolor/256x256/apps"
+
+          BUILD_BUNDLE=$(find build/linux -type d -name "bundle" | head -n 1)
+          cp -r ${BUILD_BUNDLE}/* "${PKG_DIR}/usr/lib/rusa-community/"
+
+          # The Flutter bundle's executable is `rusa`. Link both command names
+          # to the real target so the desktop entry and CLI both work.
+          ln -s /usr/lib/rusa-community/rusa "${PKG_DIR}/usr/bin/rusa"
+          ln -s /usr/lib/rusa-community/rusa "${PKG_DIR}/usr/bin/rusa-community"
+
+          if [ -f "assets/icon/icon.png" ]; then
+            cp assets/icon/icon.png "${PKG_DIR}/usr/share/icons/hicolor/256x256/apps/rusa-community.png"
+          fi
+
+          cat <<EOF > "${PKG_DIR}/usr/share/applications/rusa-community.desktop"
+          [Desktop Entry]
+          Name=Rusa Community
+          Comment=MongoDB GUI Client Community Edition
+          Exec=/usr/bin/rusa %U
+          Icon=rusa-community
+          Terminal=false
+          Type=Application
+          Categories=Development;Database;
+          EOF
+
+          cat <<EOF > "${PKG_DIR}/DEBIAN/control"
+          Package: rusa-community
+          Version: ${VERSION}
+          Architecture: ${ARCH}
+          Maintainer: Kodebineri <kodebineri@gmail.com>
+          Description: Rusa Community MongoDB GUI Client (${ARCH})
+          Section: utils
+          Priority: optional
+          Homepage: https://github.com/${{ github.repository }}
+          Depends: libc6, libstdc++6, libgtk-3-0 | libgtk-3-0t64, libsecret-1-0 | libsecret-1-0t64, libglib2.0-0 | libglib2.0-0t64
+          EOF
+
+          dpkg-deb --build "${PKG_DIR}"
+          mkdir -p dist
+          mv build/debian/*.deb dist/
+
+      - name: Upload .deb Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: deb-package-${{ matrix.target_arch }}
+          path: dist/*.deb
+
+  # ---------------------------------------------------------------------------
+  # 2. Arch Linux package (x86_64 + aarch64)
+  # ---------------------------------------------------------------------------
+  build-arch:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target_arch: x86_64
+          - os: ubuntu-24.04-arm
+            target_arch: aarch64
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+
+      - name: Install Linux Build Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev liblzma-dev libstdc++-12-dev libsecret-1-dev git curl unzip zstd libarchive-tools
+
+      - name: Setup Flutter Engine (x86_64)
+        if: matrix.target_arch == 'x86_64'
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+
+      - name: Setup Flutter Engine (aarch64 Git Fallback)
+        if: matrix.target_arch == 'aarch64'
+        run: |
+          git clone https://github.com/flutter/flutter.git -b stable --depth 1 /opt/flutter
+          echo "/opt/flutter/bin" >> $GITHUB_PATH
+          echo "/opt/flutter/bin/cache/dart-sdk/bin" >> $GITHUB_PATH
+
+      - name: Enable Linux Desktop Build & Setup Platform
+        run: |
+          flutter config --enable-linux-desktop
+          if [ ! -d "linux" ]; then
+            flutter create --platforms=linux .
+          fi
+
+      - name: Install Pub Dependencies
+        run: flutter pub get
+
+      - name: Build Flutter Linux Release
+        run: flutter build linux --release
+
+      - name: Create Native Arch Linux Package (.pkg.tar.zst)
+        run: |
+          RAW_TAG="${GITHUB_REF_NAME}"
+          RAW_VERSION="${RAW_TAG#v}"
+          if [ "${{ github.ref_type }}" != "tag" ] || [ -z "$RAW_VERSION" ]; then
+            RAW_VERSION="0.0.0"
+          fi
+          PKG_VERSION="${RAW_VERSION%%-*}"
+          PKG_RELEASE="${RAW_VERSION#*-}"
+          if [ "$PKG_RELEASE" = "$RAW_VERSION" ]; then
+            PKG_RELEASE="1"
+          fi
+
+          ARCH="${{ matrix.target_arch }}"
+          PKG_NAME="rusa-community"
+          PKG_DIR="build/pacman/pkg_root"
+
+          mkdir -p "${PKG_DIR}/usr/lib/rusa-community"
+          mkdir -p "${PKG_DIR}/usr/bin"
+          mkdir -p "${PKG_DIR}/usr/share/applications"
+          mkdir -p "${PKG_DIR}/usr/share/icons/hicolor/256x256/apps"
+
+          BUILD_BUNDLE=$(find build/linux -type d -name "bundle" | head -n 1)
+          cp -r ${BUILD_BUNDLE}/* "${PKG_DIR}/usr/lib/rusa-community/"
+
+          ln -s /usr/lib/rusa-community/rusa "${PKG_DIR}/usr/bin/rusa"
+          ln -s /usr/lib/rusa-community/rusa "${PKG_DIR}/usr/bin/rusa-community"
+
+          if [ -f "assets/icon/icon.png" ]; then
+            cp assets/icon/icon.png "${PKG_DIR}/usr/share/icons/hicolor/256x256/apps/rusa-community.png"
+          fi
+
+          cat <<EOF > "${PKG_DIR}/usr/share/applications/rusa-community.desktop"
+          [Desktop Entry]
+          Name=Rusa Community
+          Comment=MongoDB GUI Client Community Edition
+          Exec=/usr/bin/rusa %U
+          Icon=rusa-community
+          Terminal=false
+          Type=Application
+          Categories=Development;Database;
+          EOF
+
+          cat <<EOF > "${PKG_DIR}/.PKGINFO"
+          pkgname = ${PKG_NAME}
+          pkgver = ${PKG_VERSION}-${PKG_RELEASE}
+          pkgdesc = Rusa Community MongoDB GUI Client (${ARCH})
+          url = https://rusa.deveditortools.com
+          builddate = $(date +%s)
+          packager = Kodebineri <kodebineri@gmail.com>
+          size = $(du -sb "${PKG_DIR}" | cut -f1)
+          arch = ${ARCH}
+          license = GPL3
+          depend = gtk3
+          depend = glibc
+          depend = libsecret
+          depend = gcc-libs
+          EOF
+
+          cat <<EOF > "${PKG_DIR}/.BUILDINFO"
+          format = 2
+          pkgname = ${PKG_NAME}
+          pkgver = ${PKG_VERSION}-${PKG_RELEASE}
+          pkgarch = ${ARCH}
+          pkgbase = ${PKG_NAME}
+          builddate = $(date +%s)
+          packager = Kodebineri <kodebineri@gmail.com>
+          buildenv = !distcc !color !ccache check !sign
+          EOF
+
+          OUT_FILE="${PKG_NAME}-${PKG_VERSION}-${PKG_RELEASE}-${ARCH}.pkg.tar.zst"
+          mkdir -p dist
+          (cd "${PKG_DIR}" && bsdtar --uid 0 --gid 0 -cf - .PKGINFO .BUILDINFO usr) | zstd -19 -T0 > "dist/${OUT_FILE}"
+
+      - name: Upload Arch Package Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: pacman-package-${{ matrix.target_arch }}
+          path: dist/*.pkg.tar.zst
+
+  # ---------------------------------------------------------------------------
+  # 3. Fedora/RPM package (x86_64 + aarch64)
+  # ---------------------------------------------------------------------------
+  build-rpm:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target_arch: amd64
+            rpm_arch: x86_64
+          - os: ubuntu-24.04-arm
+            target_arch: arm64
+            rpm_arch: aarch64
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+
+      - name: Install Build Dependencies & Tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev liblzma-dev libstdc++-12-dev libsecret-1-dev git curl unzip
+
+      - name: Setup Flutter Engine (amd64)
+        if: matrix.target_arch == 'amd64'
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+
+      - name: Setup Flutter Engine (arm64 Git Fallback)
+        if: matrix.target_arch == 'arm64'
+        run: |
+          git clone https://github.com/flutter/flutter.git -b stable --depth 1 /opt/flutter
+          echo "/opt/flutter/bin" >> $GITHUB_PATH
+          echo "/opt/flutter/bin/cache/dart-sdk/bin" >> $GITHUB_PATH
+
+      - name: Enable Linux Desktop Build & Setup Platform
+        run: |
+          flutter config --enable-linux-desktop
+          if [ ! -d "linux" ]; then
+            flutter create --platforms=linux .
+          fi
+
+      - name: Install Pub Dependencies
+        run: flutter pub get
+
+      - name: Build Flutter Linux Release
+        run: flutter build linux --release
+
+      - name: Package and Sign RPM inside Fedora Container
+        uses: addnab/docker-run-action@v3
+        with:
+          image: fedora:latest
+          options: -v ${{ github.workspace }}:/workspace
+          run: |
+            dnf install -y rpm-build rpm-sign gpg
+
+            cd /workspace
+
+            RAW_TAG="${GITHUB_REF_NAME}"
+            RAW_VERSION="${RAW_TAG#v}"
+            if [ "${{ github.ref_type }}" != "tag" ] || [ -z "$RAW_VERSION" ]; then
+              RAW_VERSION="0.0.0"
+            fi
+            RPM_VERSION="${RAW_VERSION%%-*}"
+            RPM_RELEASE="${RAW_VERSION#*-}"
+            if [ "$RPM_RELEASE" = "$RAW_VERSION" ]; then
+              RPM_RELEASE="1"
+            fi
+
+            RPM_ARCH="${{ matrix.rpm_arch }}"
+            RPM_TOPDIR="/workspace/build/rpm"
+
+            mkdir -p "${RPM_TOPDIR}/"{BUILD,BUILDROOT,RPMS,SOURCES,SPECS,SRPMS}
+            BUILD_BUNDLE=$(find build/linux -type d -name "bundle" | head -n 1)
+
+            cat <<EOF > ${RPM_TOPDIR}/SPECS/rusa-community.spec
+            %define QA_RPATHS 0x0006
+            %global __brp_check_rpaths %{nil}
+
+            Name:           rusa-community
+            Version:        ${RPM_VERSION}
+            Release:        ${RPM_RELEASE}
+            Summary:        Rusa Community MongoDB GUI Client (${RPM_ARCH})
+            License:        GPL-3.0
+            URL:            https://github.com/${{ github.repository }}
+            AutoReqProv:    no
+            Requires:       glibc, libstdc++, gtk3, libsecret
+
+            %description
+            Rusa Community Edition GUI client built for Linux (${RPM_ARCH}).
+
+            %prep
+
+            %build
+
+            %install
+            mkdir -p %{buildroot}/usr/lib/rusa-community
+            mkdir -p %{buildroot}/usr/bin
+            mkdir -p %{buildroot}/usr/share/applications
+            mkdir -p %{buildroot}/usr/share/icons/hicolor/256x256/apps
+
+            cp -r /workspace/${BUILD_BUNDLE}/* %{buildroot}/usr/lib/rusa-community/
+            ln -s /usr/lib/rusa-community/rusa %{buildroot}/usr/bin/rusa
+            ln -s /usr/lib/rusa-community/rusa %{buildroot}/usr/bin/rusa-community
+
+            if [ -f "/workspace/assets/icon/icon.png" ]; then
+              cp /workspace/assets/icon/icon.png %{buildroot}/usr/share/icons/hicolor/256x256/apps/rusa-community.png
+            fi
+
+            cat <<DESK > %{buildroot}/usr/share/applications/rusa-community.desktop
+            [Desktop Entry]
+            Name=Rusa Community
+            Comment=MongoDB GUI Client Community Edition
+            Exec=/usr/bin/rusa %U
+            Icon=rusa-community
+            Terminal=false
+            Type=Application
+            Categories=Development;Database;
+            DESK
+
+            %files
+            /usr/lib/rusa-community
+            /usr/bin/rusa
+            /usr/bin/rusa-community
+            /usr/share/applications/rusa-community.desktop
+            /usr/share/icons/hicolor/256x256/apps/rusa-community.png
+
+            %changelog
+            * Tue Nov 10 2026 Maintainer <kodebineri@gmail.com> - ${RPM_VERSION}-${RPM_RELEASE}
+            - Release ${RPM_VERSION}-${RPM_RELEASE}
+            EOF
+
+            rpmbuild --define "_topdir ${RPM_TOPDIR}" --target ${RPM_ARCH} -bb ${RPM_TOPDIR}/SPECS/rusa-community.spec
+
+            mkdir -p dist
+            BUILT_RPM=$(find ${RPM_TOPDIR}/RPMS -type f -name "*.rpm" | head -n 1)
+            if [ -z "$BUILT_RPM" ]; then
+              echo "Error: rpmbuild failed to produce an RPM package!"
+              exit 1
+            fi
+            mv "$BUILT_RPM" dist/
+
+            GPG_KEY="${{ secrets.GPG_PRIVATE_KEY }}"
+            GPG_PASS="${{ secrets.GPG_PASSPHRASE }}"
+            if [ -z "$GPG_KEY" ]; then
+              echo "Error: GPG_PRIVATE_KEY secret is not defined."
+              exit 1
+            fi
+
+            echo "$GPG_KEY" | gpg --batch --import
+            GPG_KEY_ID=$(gpg --list-secret-keys --keyid-format LONG | grep -E '^sec' | awk '{print $2}' | cut -d'/' -f2 | head -n 1)
+            gpg --armor --export "$GPG_KEY_ID" > /tmp/public.key
+            rpm --import /tmp/public.key
+
+            cat <<EOF > ~/.rpmmacros
+            %_signature gpg
+            %_gpg_path ~/.gnupg
+            %_gpg_name $GPG_KEY_ID
+            %_gpgbin /usr/bin/gpg
+            EOF
+
+            for rpm_file in dist/*.rpm; do
+              echo "Signing $rpm_file..."
+              if [ -n "$GPG_PASS" ]; then
+                echo "$GPG_PASS" | rpmsign --addsign --pinentry-mode loopback --passphrase-fd 0 "$rpm_file"
+              else
+                rpmsign --addsign "$rpm_file"
+              fi
+              rpm -v -K "$rpm_file"
+            done
+
+      - name: Upload RPM Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: rpm-package-${{ matrix.target_arch }}
+          path: dist/*.rpm
+
+  # ---------------------------------------------------------------------------
+  # 4. Combine apt/, arch/, rpm/ into one Pages artifact and one release
+  # ---------------------------------------------------------------------------
+  publish:
+    needs: [build-deb, build-arch, build-rpm]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+
+      - name: Install Repository Tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y aptly gpg pacman-package-manager libarchive-tools
+
+      - name: Import GPG Key
+        run: |
+          if [ -z "${{ secrets.GPG_PRIVATE_KEY }}" ]; then
+            echo "Error: GPG_PRIVATE_KEY secret is missing or empty."
+            exit 1
+          fi
+          echo "${{ secrets.GPG_PRIVATE_KEY }}" | gpg --batch --import
+          mkdir -p ~/.gnupg
+          chmod 700 ~/.gnupg
+          echo "allow-loopback-pinentry" >> ~/.gnupg/gpg-agent.conf
+          gpgconf --reload gpg-agent
+          KEY_ID=$(gpg --list-secret-keys --with-colons | grep '^sec' | cut -d: -f5 | head -n 1)
+          echo "KEY_ID=$KEY_ID" >> "$GITHUB_ENV"
+
+      - name: Download All Packages
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          pattern: '*-package-*'
+          merge-multiple: false
+
+      - name: Build APT Repository
+        run: |
+          mkdir -p public/apt
+          DEB_COUNT=$(find artifacts/deb-package-* -name '*.deb' | wc -l)
+          if [ "$DEB_COUNT" -eq 0 ]; then
+            echo "Error: no .deb packages found"
+            exit 1
+          fi
+
+          aptly repo create -distribution=stable -component=main -architectures="amd64,arm64" rusa-repo
+          find artifacts/deb-package-* -name '*.deb' -print0 | xargs -0 -r aptly repo add rusa-repo
+          aptly publish repo -batch -architectures="amd64,arm64" rusa-repo
+          cp -r ~/.aptly/public/* public/apt/
+          gpg --armor --export "$KEY_ID" > public/apt/KEY.gpg
+
+      - name: Build Pacman Repository
+        env:
+          GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+        run: |
+          mkdir -p public/arch/x86_64 public/arch/aarch64
+          mv artifacts/pacman-package-x86_64/*-x86_64.pkg.tar.zst public/arch/x86_64/ 2>/dev/null || true
+          mv artifacts/pacman-package-aarch64/*-aarch64.pkg.tar.zst public/arch/aarch64/ 2>/dev/null || true
+
+          build_signed_repo() {
+            local target_dir="$1"
+            if ls "${target_dir}"/*.pkg.tar.zst 1> /dev/null 2>&1; then
+              cd "${target_dir}"
+              for pkg in *.pkg.tar.zst; do
+                if [ -n "$GPG_PASSPHRASE" ]; then
+                  echo "$GPG_PASSPHRASE" | gpg --batch --yes --pinentry-mode loopback --detach-sign -u "$KEY_ID" --passphrase-fd 0 "$pkg"
+                else
+                  gpg --batch --yes --detach-sign -u "$KEY_ID" "$pkg"
+                fi
+              done
+              repo-add --sign --key "$KEY_ID" --verify rusa.db.tar.gz *.pkg.tar.zst
+              cd - > /dev/null
+            fi
+          }
+
+          build_signed_repo "public/arch/x86_64"
+          build_signed_repo "public/arch/aarch64"
+          gpg --armor --export "$KEY_ID" > public/arch/KEY.gpg
+
+      - name: Build RPM Repository
+        uses: addnab/docker-run-action@v3
+        with:
+          image: fedora:latest
+          options: -v ${{ github.workspace }}:/workspace
+          run: |
+            dnf install -y createrepo_c gpg
+
+            cd /workspace
+            mkdir -p public/rpm/Packages
+            cp artifacts/rpm-package-*/*.rpm public/rpm/Packages/
+
+            createrepo_c public/rpm
+
+            echo "${{ secrets.GPG_PRIVATE_KEY }}" | gpg --batch --import
+            gpg --armor --export > public/rpm/RPM-GPG-KEY-rusa-community
+
+            GPG_PASS="${{ secrets.GPG_PASSPHRASE }}"
+            if [ -n "$GPG_PASS" ]; then
+              echo "$GPG_PASS" | gpg --batch --pinentry-mode loopback --passphrase-fd 0 --detach-sign --armor --yes public/rpm/repodata/repomd.xml
+            else
+              gpg --batch --detach-sign --armor --yes public/rpm/repodata/repomd.xml
+            fi
+
+            cat <<EOF > public/rpm/rusa-community.repo
+            [rusa-community]
+            name=Rusa Community Official Repository
+            baseurl=https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/rpm/
+            enabled=1
+            gpgcheck=1
+            repo_gpgcheck=1
+            gpgkey=https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/rpm/RPM-GPG-KEY-rusa-community
+            EOF
+
+      - name: Build Landing Page and Shared Key
+        run: |
+          gpg --armor --export "$KEY_ID" > public/KEY.gpg
+          cp public/KEY.gpg public/apt/KEY.gpg
+          cp public/KEY.gpg public/arch/KEY.gpg
+
+          cat <<EOF > public/index.html
+          <!doctype html>
+          <html lang="en">
+          <head>
+            <meta charset="utf-8">
+            <title>Rusa Linux packages</title>
+            <meta name="viewport" content="width=device-width, initial-scale=1">
+          </head>
+          <body style="font-family: system-ui, sans-serif; max-width: 760px; margin: 3rem auto; line-height: 1.6">
+            <h1>Rusa Linux packages</h1>
+            <p>Choose your distribution:</p>
+            <ul>
+              <li><a href="apt/">Debian / Ubuntu (APT)</a></li>
+              <li><a href="arch/">Arch Linux (pacman)</a></li>
+              <li><a href="rpm/">Fedora / RHEL (DNF)</a></li>
+            </ul>
+            <p>GPG public key: <a href="KEY.gpg">KEY.gpg</a></p>
+          </body>
+          </html>
+          EOF
+
+      - name: Upload GitHub Pages Artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: public/
+
+      - name: Upload Assets to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_type == 'tag' && github.ref_name || 'v0.0.0-dev' }}
+          name: ${{ github.ref_type == 'tag' && github.ref_name || 'Development Build (v0.0.0-dev)' }}
+          draft: false
+          prerelease: ${{ github.ref_type != 'tag' }}
+          files: |
+            artifacts/deb-package-*/*.deb
+            public/arch/x86_64/*.pkg.tar.zst
+            public/arch/x86_64/*.pkg.tar.zst.sig
+            public/arch/aarch64/*.pkg.tar.zst
+            public/arch/aarch64/*.pkg.tar.zst.sig
+            artifacts/rpm-package-*/*.rpm
+            public/KEY.gpg
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # ---------------------------------------------------------------------------
+  # 5. Deploy the combined site once
+  # ---------------------------------------------------------------------------
+  deploy-pages:
+    needs: publish
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy to GitHub Pages
+        uses: actions/deploy-pages@v4
