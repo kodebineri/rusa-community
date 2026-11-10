@@ -604,4 +604,19 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Deploy to GitHub Pages
+        id: pages
+        continue-on-error: true
         uses: actions/deploy-pages@v4
+        with:
+          # The Pages publish API can sit at `finished_file_sync` for several
+          # minutes on large/multi-repo artifacts. The default is 10 minutes.
+          timeout: 1200000
+          error_count: 30
+
+      - name: Retry GitHub Pages deployment
+        if: steps.pages.outcome == 'failure'
+        uses: actions/deploy-pages@v4
+        with:
+          # A canceled/stuck deployment is often transient; one retry covers it.
+          timeout: 1200000
+          error_count: 30
