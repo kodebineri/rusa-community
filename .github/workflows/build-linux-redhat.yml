@@ -17,7 +17,7 @@ concurrency:
 
 jobs:
   # ---------------------------------------------------------------------------
-  # 1. Build Linux Binaries, Package & Auto-Sign .rpm (x86_64 + aarch64)
+  # 1. Build Linux Binaries & Package/Sign .rpm via Fedora Container
   # ---------------------------------------------------------------------------
   build-linux:
     runs-on: ${{ matrix.os }}
@@ -34,10 +34,10 @@ jobs:
       - name: Checkout Source Code
         uses: actions/checkout@v4
 
-      - name: Install Build Dependencies, RPM Tools & GPG
+      - name: Install Build Dependencies & Tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev liblzma-dev libstdc++-12-dev git curl unzip rpm pinentry-tty gpg
+          sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev liblzma-dev libstdc++-12-dev git curl unzip
 
       # --- Setup Flutter for amd64 ---
       - name: Setup Flutter Engine (amd64)
@@ -68,125 +68,120 @@ jobs:
       - name: Build Flutter Linux Release
         run: flutter build linux --release
 
-      - name: Create .rpm Package
-        run: |
-          RAW_TAG="${{ github.ref_name }}"
-          VERSION="${RAW_TAG#v}"
-          if [ -z "$VERSION" ] \vert{}\vert{} [ "$RAW_TAG" = "main" ]; then
-            VERSION="0.0.0"
-          fi
+      # --- Package, Sign & Verify RPM inside Native Fedora Container ---
+      - name: Package and Sign RPM inside Fedora Container
+        uses: addnab/docker-run-action@v3
+        with:
+          image: fedora:latest
+          options: -v ${{ github.workspace }}:/workspace
+          run: |
+            dnf install -y rpm-build rpm-sign gpg
 
-          RPM_ARCH="${{ matrix.rpm_arch }}"
-          BUILD_ROOT="$(pwd)/build/rpm/BUILDROOT/rusa-community-${VERSION}-1.${RPM_ARCH}"
+            cd /workspace
 
-          mkdir -p "${BUILD_ROOT}/usr/lib/rusa-community"
-          mkdir -p "${BUILD_ROOT}/usr/bin"
-          mkdir -p "${BUILD_ROOT}/usr/share/applications"
-          mkdir -p "${BUILD_ROOT}/usr/share/icons/hicolor/256x256/apps"
-
-          # Copy Flutter Linux bundle outputs dynamically
-          BUILD_BUNDLE=$(find build/linux -type d -name "bundle" | head -n 1)
-          cp -r ${BUILD_BUNDLE}/* "${BUILD_ROOT}/usr/lib/rusa-community/"
-
-          # Symlink binary to /usr/bin
-          ln -s /usr/lib/rusa-community/rusa-community "${BUILD_ROOT}/usr/bin/rusa-community"
-
-          # Copy icon if available
-          if [ -f "assets/icon/icon.png" ]; then
-            cp assets/icon/icon.png "${BUILD_ROOT}/usr/share/icons/hicolor/256x256/apps/rusa-community.png"
-          fi
-
-          # Desktop entry metadata
-          cat <<EOF > "${BUILD_ROOT}/usr/share/applications/rusa-community.desktop"
-          [Desktop Entry]
-          Name=Rusa Community
-          Comment=MongoDB GUI Client Community Edition
-          Exec=/usr/bin/rusa-community %U
-          Icon=rusa-community
-          Terminal=false
-          Type=Application
-          Categories=Development;Database;
-          EOF
-
-          # Generate RPM Spec File dynamically
-          mkdir -p build/rpm/SPECS
-          cat <<EOF > build/rpm/SPECS/rusa-community.spec
-          Name:           rusa-community
-          Version:        ${VERSION}
-          Release:        1
-          Summary:        Rusa Community MongoDB GUI Client (${RPM_ARCH})
-          License:        GPL-3.0
-          URL:            https://github.com/${{ github.repository }}
-          AutoReqProv:    no
-
-          %description
-          Rusa Community Edition GUI client built for Linux (${RPM_ARCH}).
-
-          %files
-          /usr/lib/rusa-community
-          /usr/bin/rusa-community
-          /usr/share/applications/rusa-community.desktop
-          /usr/share/icons/hicolor/256x256/apps/rusa-community.png
-          EOF
-
-          # Build RPM binary package
-          rpmbuild --define "_topdir $(pwd)/build/rpm" --target ${RPM_ARCH} -bb build/rpm/SPECS/rusa-community.spec
-
-          mkdir -p dist
-          mv build/rpm/RPMS/${RPM_ARCH}/*.rpm dist/
-
-      - name: Sign RPM Packages with GPG
-        env:
-          GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
-          GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
-        run: |
-          if [ -z "$GPG_PRIVATE_KEY" ]; then
-            echo "Error: GPG_PRIVATE_KEY secret is missing!"
-            exit 1
-          fi
-
-          # 1. Import GPG Private Key
-          echo "$GPG_PRIVATE_KEY" | gpg --batch --import
-
-          # 2. Extract Key ID and Fingerprint
-          GPG_KEY_ID=$(gpg --list-secret-keys --keyid-format LONG | grep -E '^sec' | awk '{print $2}' | cut -d'/' -f2 | head -n 1)
-          GPG_FPR=$(gpg --list-secret-keys --with-colons | grep '^fpr' | head -n 1 | cut -d':' -f10)
-
-          if [ -n "$GPG_FPR" ]; then
-            echo "${GPG_FPR}:6:" | gpg --import-ownertrust
-          fi
-
-          # 3. Configure ~/.rpmmacros with explicit SHA256 digest algorithm
-          cat <<EOF > ~/.rpmmacros
-          %_signature gpg
-          %_gpg_path ~/.gnupg
-          %_gpg_name $GPG_KEY_ID
-          %_gpgbin /usr/bin/gpg
-          %_gpg_digest_algo sha256
-          %__gpg_sign_cmd %{__gpg} gpg --batch --no-verbose --no-armor --passphrase-fd 0 --pinentry-mode loopback --detach-sign --digest-algo sha256 -u "%{_gpg_name}" -s -o %{__signature_filename} %{__plaintext_filename}
-          EOF
-
-          # 4. Sign RPMs
-          for rpm_file in dist/*.rpm; do
-            echo "Signing $rpm_file..."
-            if [ -n "$GPG_PASSPHRASE" ]; then
-              echo "$GPG_PASSPHRASE" | rpmsign --addsign --pinentry-mode loopback --passphrase-fd 0 "$rpm_file"
-            else
-              rpmsign --addsign "$rpm_file"
+            RAW_TAG="${{ github.ref_name }}"
+            VERSION="${RAW_TAG#v}"
+            if [ -z "$VERSION" ] || [ "$RAW_TAG" = "main" ]; then
+              VERSION="0.0.0"
             fi
-          done
 
-      - name: Verify Signed RPM Packages
-        run: |
-          gpg --armor --export > /tmp/public.key
-          mkdir -p /tmp/rpm-keyring
-          rpmdb --initdb --dbpath /tmp/rpm-keyring
-          rpm --dbpath /tmp/rpm-keyring --import /tmp/public.key
+            RPM_ARCH="${{ matrix.rpm_arch }}"
+            BUILD_ROOT="/workspace/build/rpm/BUILDROOT/rusa-community-${VERSION}-1.${RPM_ARCH}"
 
-          for rpm_file in dist/*.rpm; do
-            echo "Verifying $rpm_file..."
-            rpm --dbpath /tmp/rpm-keyring -v -K "$rpm_file"
-          done
+            mkdir -p "${BUILD_ROOT}/usr/lib/rusa-community"
+            mkdir -p "${BUILD_ROOT}/usr/bin"
+            mkdir -p "${BUILD_ROOT}/usr/share/applications"
+            mkdir -p "${BUILD_ROOT}/usr/share/icons/hicolor/256x256/apps"
+
+            # Copy Flutter bundle output
+            BUILD_BUNDLE=$(find build/linux -type d -name "bundle" | head -n 1)
+            cp -r ${BUILD_BUNDLE}/* "${BUILD_ROOT}/usr/lib/rusa-community/"
+
+            # Symlink binary to /usr/bin
+            ln -s /usr/lib/rusa-community/rusa-community "${BUILD_ROOT}/usr/bin/rusa-community"
+
+            # Copy icon if present
+            if [ -f "assets/icon/icon.png" ]; then
+              cp assets/icon/icon.png "${BUILD_ROOT}/usr/share/icons/hicolor/256x256/apps/rusa-community.png"
+            fi
+
+            # Desktop entry metadata
+            cat <<EOF > "${BUILD_ROOT}/usr/share/applications/rusa-community.desktop"
+            [Desktop Entry]
+            Name=Rusa Community
+            Comment=MongoDB GUI Client Community Edition
+            Exec=/usr/bin/rusa-community %U
+            Icon=rusa-community
+            Terminal=false
+            Type=Application
+            Categories=Development;Database;
+            EOF
+
+            # Spec file creation
+            mkdir -p build/rpm/SPECS
+            cat <<EOF > build/rpm/SPECS/rusa-community.spec
+            Name:           rusa-community
+            Version:        ${VERSION}
+            Release:        1
+            Summary:        Rusa Community MongoDB GUI Client (${RPM_ARCH})
+            License:        GPL-3.0
+            URL:            https://github.com/${{ github.repository }}
+            AutoReqProv:    no
+
+            %description
+            Rusa Community Edition GUI client built for Linux (${RPM_ARCH}).
+
+            %files
+            /usr/lib/rusa-community
+            /usr/bin/rusa-community
+            /usr/share/applications/rusa-community.desktop
+            /usr/share/icons/hicolor/256x256/apps/rusa-community.png
+            EOF
+
+            # Build RPM
+            rpmbuild --define "_topdir /workspace/build/rpm" --target ${RPM_ARCH} -bb build/rpm/SPECS/rusa-community.spec
+
+            mkdir -p dist
+            mv build/rpm/RPMS/${RPM_ARCH}/*.rpm dist/
+
+            # --- GPG RPM Signing ---
+            GPG_KEY="${{ secrets.GPG_PRIVATE_KEY }}"
+            GPG_PASS="${{ secrets.GPG_PASSPHRASE }}"
+
+            if [ -z "$GPG_KEY" ]; then
+              echo "Error: GPG_PRIVATE_KEY secret is not defined."
+              exit 1
+            fi
+
+            echo "$GPG_KEY" | gpg --batch --import
+
+            GPG_KEY_ID=$(gpg --list-secret-keys --keyid-format LONG | grep -E '^sec' | awk '{print $2}' | cut -d'/' -f2 | head -n 1)
+
+            # Export public key & import into native RPM keyring
+            gpg --armor --export "$GPG_KEY_ID" > /tmp/public.key
+            rpm --import /tmp/public.key
+
+            # Native Fedora rpmmacros
+            cat <<EOF > ~/.rpmmacros
+            %_signature gpg
+            %_gpg_path ~/.gnupg
+            %_gpg_name $GPG_KEY_ID
+            %_gpgbin /usr/bin/gpg
+            EOF
+
+            # Sign RPM packages & verify natively
+            for rpm_file in dist/*.rpm; do
+              echo "Signing $rpm_file..."
+              if [ -n "$GPG_PASS" ]; then
+                echo "$GPG_PASS" | rpmsign --addsign --pinentry-mode loopback --passphrase-fd 0 "$rpm_file"
+              else
+                rpmsign --addsign "$rpm_file"
+              fi
+
+              echo "Verifying $rpm_file..."
+              rpm -v -K "$rpm_file"
+            done
+
       - name: Upload Signed RPM Artifact
         uses: actions/upload-artifact@v4
         with:
@@ -203,23 +198,19 @@ jobs:
       - name: Checkout Source Code
         uses: actions/checkout@v4
 
-      - name: Install Createrepo & GPG
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y createrepo-c gpg
+      - name: Generate Repository with Fedora Container
+        uses: addnab/docker-run-action@v3
+        with:
+          image: fedora:latest
+          options: -v ${{ github.workspace }}:/workspace
+          run: |
+            dnf install -y createrepo_c gpg
 
-      - name: Import GPG Private Key & Export Public Key
-        env:
-          GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
-          GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
-        run: |
-          if [ -z "$GPG_PRIVATE_KEY" ]; then
-            echo "Error: GPG_PRIVATE_KEY secret is not defined."
-            exit 1
-          fi
+            cd /workspace
+            mkdir -p public/Packages
 
-          echo "$GPG_PRIVATE_KEY" | gpg --batch --import
-          gpg --armor --export > public.key
+            # Downloaded artifacts path
+            cp rpm-artifacts/*.rpm public/Packages/ 2>/dev/null || true
 
       - name: Download Built & Signed .rpm Artifacts
         uses: actions/download-artifact@v4
@@ -228,35 +219,66 @@ jobs:
           pattern: rpm-package-*
           merge-multiple: true
 
-      - name: Generate Multi-Arch DNF Repository
+      - name: Generate DNF Repo Metadata & Sign repomd.xml
+        uses: addnab/docker-run-action@v3
+        with:
+          image: fedora:latest
+          options: -v ${{ github.workspace }}:/workspace
+          run: |
+            dnf install -y createrepo_c gpg
+
+            cd /workspace
+            mkdir -p public/Packages
+            cp rpm-artifacts/*.rpm public/Packages/
+
+            # Generate DNF metadata
+            createrepo_c public/
+
+            # Import GPG key & export public key
+            echo "${{ secrets.GPG_PRIVATE_KEY }}" | gpg --batch --import
+            gpg --armor --export > public/RPM-GPG-KEY-rusa-community
+
+            # Sign repomd.xml
+            GPG_PASS="${{ secrets.GPG_PASSPHRASE }}"
+            if [ -n "$GPG_PASS" ]; then
+              echo "$GPG_PASS" | gpg --batch --pinentry-mode loopback --passphrase-fd 0 --detach-sign --armor --yes public/repodata/repomd.xml
+            else
+              gpg --batch --detach-sign --armor --yes public/repodata/repomd.xml
+            fi
+
+            # Generate end-user .repo file
+            cat <<EOF > public/rusa-community.repo
+            [rusa-community]
+            name=Rusa Community Official Repository
+            baseurl=https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/
+            enabled=1
+            gpgcheck=1
+            repo_gpgcheck=1
+            gpgkey=https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/RPM-GPG-KEY-rusa-community
+            EOF
+
+      - name: Upload GitHub Pages Artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: public/
+
+      - name: Upload Assets to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_type == 'tag' && github.ref_name || 'v0.0.0-dev' }}
+          name: ${{ github.ref_type == 'tag' && github.ref_name || 'Development Build (v0.0.0-dev)' }}
+          draft: false
+          prerelease: ${{ github.ref_type != 'tag' }}
+          files: rpm-artifacts/*.rpm
         env:
-          GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
-        run: |
-          mkdir -p public/Packages
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-          RPM_COUNT=$(find rpm-artifacts -name "*.rpm" | wc -l)
-          if [ "$RPM_COUNT" -eq 0 ]; then
-            echo "Error: No .rpm packages found in rpm-artifacts directory!"
-            exit 1
-          fi
-
-          # Copy signed RPM packages into repo structure
-          cp rpm-artifacts/*.rpm public/Packages/
-
-          # Generate DNF metadata
-          createrepo_c public/
-
-          # Copy GPG Public Key to public directory
-          cp public.key public/RPM-GPG-KEY-rusa-community
-
-          # Detach-sign repomd.xml for repository integrity
-          if [ -n "$GPG_PASSPHRASE" ]; then
-            echo "$GPG_PASSPHRASE" | gpg --batch --pinentry-mode loopback --passphrase-fd 0 --detach-sign --armor --yes public/repodata/repomd.xml
-          else
-            gpg --batch --detach-sign --armor --yes public/repodata/repomd.xml
-          fi
-
-          # Generate DNF .repo configuration file for end users
-          cat <<EOF > public/rusa-community.repo
-          [rusa-community]
-          name=Rusa Community
+  # ---------------------------------------------------------------------------
+  # 3. Deploy DNF Repository to GitHub Pages
+  # ---------------------------------------------------------------------------
+  deploy-pages:
+    needs: publish-repo
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy to GitHub Pages
+        uses: actions/deploy-pages@v4
