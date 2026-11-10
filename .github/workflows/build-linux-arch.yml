@@ -115,17 +115,17 @@ jobs:
           url = https://rusa.deveditortools.com
           builddate = $(date +%s)
           packager = Kodebineri <kodebineri@gmail.com>
-          size = $(du -sk "${PKG_DIR}" | cut -f1)
+          size = $(du -sb "${PKG_DIR}" | cut -f1)
           arch = ${ARCH}
           license = GPL3
           depend = gtk3
           depend = glibc
           EOF
 
-          # Build .pkg.tar.zst package
+          # Build proper binary Arch package tarball including .PKGINFO metadata
           OUT_FILE="${PKG_NAME}-${VERSION}-1-${ARCH}.pkg.tar.zst"
           mkdir -p dist
-          tar -I 'zstd -19 -T0' -cvf "dist/${OUT_FILE}" -C "${PKG_DIR}" .
+          (cd "${PKG_DIR}" && tar --owner=0 --group=0 --numeric-owner -c * .PKGINFO) | zstd -19 -T0 > "dist/${OUT_FILE}"
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
@@ -134,7 +134,7 @@ jobs:
           path: dist/*.pkg.tar.zst
 
   # ---------------------------------------------------------------------------
-  # 2. Collect Artifacts, Publish Pacman Repo & GitHub Releases
+  # 2. Collect Artifacts, Sign Packages, Publish Signed Repo & GitHub Release
   # ---------------------------------------------------------------------------
   publish-repo:
     needs: build-arch
@@ -148,11 +148,21 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y pacman-package-manager gpg
 
-      - name: Import GPG Private Key
+      - name: Import & Configure GPG Key
         run: |
-          if [ -n "${{ secrets.GPG_PRIVATE_KEY }}" ]; then
-            echo "${{ secrets.GPG_PRIVATE_KEY }}" | gpg --batch --import
+          if [ -z "${{ secrets.GPG_PRIVATE_KEY }}" ]; then
+            echo "Error: GPG_PRIVATE_KEY secret is missing."
+            exit 1
           fi
+
+          # Import base64-decoded GPG private key
+          echo "${{ secrets.GPG_PRIVATE_KEY }}" | base64 --decode | gpg --batch --import
+
+          # Configure gpg-agent for non-interactive signing
+          mkdir -p ~/.gnupg
+          chmod 700 ~/.gnupg
+          echo "allow-loopback-pinentry" >> ~/.gnupg/gpg-agent.conf
+          gpgconf --reload gpg-agent
 
       - name: Download Built .pkg.tar.zst Artifacts
         uses: actions/download-artifact@v4
@@ -161,7 +171,9 @@ jobs:
           pattern: pacman-package-*
           merge-multiple: true
 
-      - name: Generate Arch Repository Database
+      - name: Sign Packages & Generate Pacman Repo Database
+        env:
+          GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
         run: |
           mkdir -p public/x86_64 public/aarch64
 
@@ -169,24 +181,41 @@ jobs:
           mv pacman-artifacts/*-x86_64.pkg.tar.zst public/x86_64/ 2>/dev/null || true
           mv pacman-artifacts/*-aarch64.pkg.tar.zst public/aarch64/ 2>/dev/null || true
 
-          # Create x86_64 repository database
-          if [ -f public/x86_64/*.pkg.tar.zst ]; then
-            cd public/x86_64
-            repo-add rusa.db.tar.gz *.pkg.tar.zst
-            cd ../..
-          fi
+          # Extract Key ID automatically from imported secret key
+          KEY_ID=$(gpg --list-secret-keys --with-colons | grep '^sec' | cut -d: -f5 | head -n 1)
 
-          # Create aarch64 repository database
-          if [ -f public/aarch64/*.pkg.tar.zst ]; then
-            cd public/aarch64
-            repo-add rusa.db.tar.gz *.pkg.tar.zst
-            cd ../..
-          fi
+          # Function to sign packages and build repository database
+          build_signed_repo() {
+            local target_dir="$1"
+            if ls ${target_dir}/*.pkg.tar.zst 1> /dev/null 2>&1; then
+              cd "${target_dir}"
 
-          # Export public key if available
-          if [ -n "${{ secrets.GPG_PRIVATE_KEY }}" ]; then
-            gpg --armor --export > public/KEY.gpg
-          fi
+              # Detach-sign all .pkg.tar.zst binary packages
+              for pkg in *.pkg.tar.zst; do
+                if [ -n "$GPG_PASSPHRASE" ]; then
+                  echo "$GPG_PASSPHRASE" | gpg --batch --yes --pinentry-mode loopback --detach-sign -u "$KEY_ID" --passphrase-fd 0 "$pkg"
+                else
+                  gpg --batch --yes --detach-sign -u "$KEY_ID" "$pkg"
+                fi
+              done
+
+              # Build and sign the Pacman repository database (rusa.db.tar.gz & rusa.files.tar.gz)
+              if [ -n "$GPG_PASSPHRASE" ]; then
+                repo-add --sign --key "$KEY_ID" --verify rusa.db.tar.gz *.pkg.tar.zst
+              else
+                repo-add --sign --key "$KEY_ID" --verify rusa.db.tar.gz *.pkg.tar.zst
+              fi
+
+              cd - > /dev/null
+            fi
+          }
+
+          # Build signed repos for both architectures
+          build_signed_repo "public/x86_64"
+          build_signed_repo "public/aarch64"
+
+          # Export public key for client-side keyring import
+          gpg --armor --export "$KEY_ID" > public/KEY.gpg
 
       - name: Upload GitHub Pages Artifact
         uses: actions/upload-pages-artifact@v3
@@ -200,7 +229,10 @@ jobs:
           name: ${{ github.ref_type == 'tag' && github.ref_name || 'Development Build (v0.0.0-dev)' }}
           draft: false
           prerelease: ${{ github.ref_type != 'tag' }}
-          files: public/*/*.pkg.tar.zst
+          files: |
+            public/*/*.pkg.tar.zst
+            public/*/*.pkg.tar.zst.sig
+            public/KEY.gpg
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
