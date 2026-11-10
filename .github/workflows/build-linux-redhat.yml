@@ -141,12 +141,14 @@ jobs:
           GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
         run: |
           if [ -z "$GPG_PRIVATE_KEY" ]; then
-            echo "Error: GPG_PRIVATE_KEY secret is not defined."
+            echo "Error: GPG_PRIVATE_KEY secret is missing!"
             exit 1
           fi
 
-          # Import GPG Private Key & set owner trust
+          # 1. Import GPG Private Key
           echo "$GPG_PRIVATE_KEY" | gpg --batch --import
+
+          # 2. Extract Key ID and Fingerprint
           GPG_KEY_ID=$(gpg --list-secret-keys --keyid-format LONG | grep -E '^sec' | awk '{print $2}' | cut -d'/' -f2 | head -n 1)
           GPG_FPR=$(gpg --list-secret-keys --with-colons | grep '^fpr' | head -n 1 | cut -d':' -f10)
 
@@ -154,18 +156,17 @@ jobs:
             echo "${GPG_FPR}:6:" | gpg --import-ownertrust
           fi
 
-          echo "Signing RPMs with GPG Key ID: $GPG_KEY_ID"
-
-          # Configure ~/.rpmmacros without legacy flags
+          # 3. Configure ~/.rpmmacros with explicit SHA256 digest algorithm
           cat <<EOF > ~/.rpmmacros
           %_signature gpg
           %_gpg_path ~/.gnupg
           %_gpg_name $GPG_KEY_ID
           %_gpgbin /usr/bin/gpg
-          %__gpg_sign_cmd %{__gpg} gpg --batch --no-verbose --no-armor --passphrase-fd 0 --pinentry-mode loopback --detach-sign --sign --detach-sign %{?_gpg_digest_algo:--digest-algo %{_gpg_digest_algo}} -u "%{_gpg_name}" -s -o %{__signature_filename} %{__plaintext_filename}
+          %_gpg_digest_algo sha256
+          %__gpg_sign_cmd %{__gpg} gpg --batch --no-verbose --no-armor --passphrase-fd 0 --pinentry-mode loopback --detach-sign --digest-algo sha256 -u "%{_gpg_name}" -s -o %{__signature_filename} %{__plaintext_filename}
           EOF
 
-          # Sign all built RPM files
+          # 4. Sign RPMs
           for rpm_file in dist/*.rpm; do
             echo "Signing $rpm_file..."
             if [ -n "$GPG_PASSPHRASE" ]; then
@@ -174,17 +175,14 @@ jobs:
               rpmsign --addsign "$rpm_file"
             fi
           done
+
       - name: Verify Signed RPM Packages
         run: |
-          # 1. Export GPG public key to a standard ASCII-armored key file
           gpg --armor --export > /tmp/public.key
-
-          # 2. Build a local temporary RPM keyring DB
           mkdir -p /tmp/rpm-keyring
           rpmdb --initdb --dbpath /tmp/rpm-keyring
           rpm --dbpath /tmp/rpm-keyring --import /tmp/public.key
 
-          # 3. Verify RPM packages against the isolated local RPM keyring
           for rpm_file in dist/*.rpm; do
             echo "Verifying $rpm_file..."
             rpm --dbpath /tmp/rpm-keyring -v -K "$rpm_file"
