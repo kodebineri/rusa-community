@@ -69,6 +69,7 @@ jobs:
         run: flutter build linux --release
 
       # --- Package, Sign & Verify RPM inside Native Fedora Container ---
+      # --- Package, Sign & Verify RPM inside Native Fedora Container ---
       - name: Package and Sign RPM inside Fedora Container
         uses: addnab/docker-run-action@v3
         with:
@@ -86,7 +87,11 @@ jobs:
             fi
 
             RPM_ARCH="${{ matrix.rpm_arch }}"
-            BUILD_ROOT="/workspace/build/rpm/BUILDROOT/rusa-community-${VERSION}-1.${RPM_ARCH}"
+            RPM_TOPDIR="/workspace/build/rpm"
+            BUILD_ROOT="${RPM_TOPDIR}/BUILDROOT/rusa-community-${VERSION}-1.${RPM_ARCH}"
+
+            # 1. Setup explicit RPM build tree structure
+            mkdir -p "${RPM_TOPDIR}/"{BUILD,BUILDROOT,RPMS,SOURCES,SPECS,SRPMS}
 
             mkdir -p "${BUILD_ROOT}/usr/lib/rusa-community"
             mkdir -p "${BUILD_ROOT}/usr/bin"
@@ -118,8 +123,7 @@ jobs:
             EOF
 
             # Spec file creation
-            mkdir -p build/rpm/SPECS
-            cat <<EOF > build/rpm/SPECS/rusa-community.spec
+            cat <<EOF > ${RPM_TOPDIR}/SPECS/rusa-community.spec
             Name:           rusa-community
             Version:        ${VERSION}
             Release:        1
@@ -138,11 +142,17 @@ jobs:
             /usr/share/icons/hicolor/256x256/apps/rusa-community.png
             EOF
 
-            # Build RPM
-            rpmbuild --define "_topdir /workspace/build/rpm" --target ${RPM_ARCH} -bb build/rpm/SPECS/rusa-community.spec
+            # 2. Build RPM package using explicit topdir
+            rpmbuild --define "_topdir ${RPM_TOPDIR}" --target ${RPM_ARCH} -bb ${RPM_TOPDIR}/SPECS/rusa-community.spec
 
+            # 3. Robust package collection into dist/
             mkdir -p dist
-            mv build/rpm/RPMS/${RPM_ARCH}/*.rpm dist/
+            BUILT_RPM=$(find ${RPM_TOPDIR}/RPMS -type f -name "*.rpm" | head -n 1)
+            if [ -z "$BUILT_RPM" ]; then
+              echo "Error: rpmbuild failed to produce an RPM package in ${RPM_TOPDIR}/RPMS!"
+              exit 1
+            fi
+            mv "$BUILT_RPM" dist/
 
             # --- GPG RPM Signing ---
             GPG_KEY="${{ secrets.GPG_PRIVATE_KEY }}"
@@ -154,7 +164,6 @@ jobs:
             fi
 
             echo "$GPG_KEY" | gpg --batch --import
-
             GPG_KEY_ID=$(gpg --list-secret-keys --keyid-format LONG | grep -E '^sec' | awk '{print $2}' | cut -d'/' -f2 | head -n 1)
 
             # Export public key & import into native RPM keyring
@@ -169,7 +178,7 @@ jobs:
             %_gpgbin /usr/bin/gpg
             EOF
 
-            # Sign RPM packages & verify natively
+            # 4. Sign RPM packages & verify natively
             for rpm_file in dist/*.rpm; do
               echo "Signing $rpm_file..."
               if [ -n "$GPG_PASS" ]; then
