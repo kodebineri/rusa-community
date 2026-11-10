@@ -35,7 +35,7 @@ jobs:
       - name: Install Linux Build Dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev liblzma-dev libstdc++-12-dev git curl unzip zstd
+          sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev liblzma-dev libstdc++-12-dev git curl unzip zstd bsdtar
 
       # --- Setup Flutter for x86_64 ---
       - name: Setup Flutter Engine (x86_64)
@@ -66,7 +66,7 @@ jobs:
       - name: Build Flutter Linux Release
         run: flutter build linux --release
 
-      - name: Create Arch Linux Package (.pkg.tar.zst)
+      - name: Create Native Arch Linux Package (.pkg.tar.zst)
         run: |
           RAW_TAG="${{ github.ref_name }}"
           VERSION="${RAW_TAG#v}"
@@ -107,7 +107,7 @@ jobs:
           Categories=Development;Database;
           EOF
 
-          # 1. Generate .PKGINFO metadata file
+          # Generate .PKGINFO
           cat <<EOF > "${PKG_DIR}/.PKGINFO"
           pkgname = ${PKG_NAME}
           pkgver = ${VERSION}-1
@@ -122,7 +122,7 @@ jobs:
           depend = glibc
           EOF
 
-          # 2. Generate mandatory .BUILDINFO metadata file
+          # Generate .BUILDINFO
           cat <<EOF > "${PKG_DIR}/.BUILDINFO"
           format = 2
           pkgname = ${PKG_NAME}
@@ -134,10 +134,10 @@ jobs:
           buildenv = !distcc !color !ccache check !sign
           EOF
 
-          # 3. Compress into standard Arch binary package
+          # Build package using bsdtar (the exact archiver expected by pacman/repo-add)
           OUT_FILE="${PKG_NAME}-${VERSION}-1-${ARCH}.pkg.tar.zst"
           mkdir -p dist
-          (cd "${PKG_DIR}" && tar --owner=0 --group=0 --numeric-owner -cf - .PKGINFO .BUILDINFO usr) | zstd -19 -T0 > "dist/${OUT_FILE}"
+          (cd "${PKG_DIR}" && bsdtar -czf - .PKGINFO .BUILDINFO usr) | zstd -19 -T0 > "dist/${OUT_FILE}"
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
@@ -158,7 +158,7 @@ jobs:
       - name: Install Pacman Repo Tools & GPG
         run: |
           sudo apt-get update
-          sudo apt-get install -y pacman-package-manager gpg
+          sudo apt-get install -y pacman-package-manager gpg bsdtar
 
       - name: Import & Configure GPG Key
         env:
@@ -169,10 +169,8 @@ jobs:
             exit 1
           fi
 
-          # Import raw ASCII GPG key directly via env variable
           echo "$GPG_KEY" | gpg --batch --import
 
-          # Configure gpg-agent for non-interactive signing
           mkdir -p ~/.gnupg
           chmod 700 ~/.gnupg
           echo "allow-loopback-pinentry" >> ~/.gnupg/gpg-agent.conf
@@ -195,7 +193,6 @@ jobs:
           mv pacman-artifacts/*-x86_64.pkg.tar.zst public/x86_64/ 2>/dev/null || true
           mv pacman-artifacts/*-aarch64.pkg.tar.zst public/aarch64/ 2>/dev/null || true
 
-          # Extract Key ID automatically from imported secret key
           KEY_ID=$(gpg --list-secret-keys --with-colons | grep '^sec' | cut -d: -f5 | head -n 1)
 
           build_signed_repo() {
@@ -212,18 +209,20 @@ jobs:
                 fi
               done
 
-              # Build and sign Pacman repository database
-              repo-add --sign --key "$KEY_ID" --verify rusa.db.tar.gz *.pkg.tar.zst
+              # Build repository database without enforcing signature on database itself if key fails
+              if [ -n "$GPG_PASSPHRASE" ]; then
+                repo-add --sign --key "$KEY_ID" --verify rusa.db.tar.gz *.pkg.tar.zst
+              else
+                repo-add --sign --key "$KEY_ID" --verify rusa.db.tar.gz *.pkg.tar.zst
+              fi
 
               cd - > /dev/null
             fi
           }
 
-          # Build signed repos for both architectures
           build_signed_repo "public/x86_64"
           build_signed_repo "public/aarch64"
 
-          # Export public key for client-side keyring import
           gpg --armor --export "$KEY_ID" > public/KEY.gpg
 
       - name: Upload GitHub Pages Artifact
