@@ -71,106 +71,123 @@ class CompassActionSheet extends StatelessWidget {
             ),
           ),
 
-          // The sheet itself, pinned to the bottom of the screen.
-          Positioned(
-            left: 0.0,
-            right: 0.0,
-            bottom: 0.0,
+          // The sheet is bottom-aligned and height-capped by the viewport.
+          // Without the cap a `Positioned` with only `bottom` gives the column
+          // an unbounded height: a long phone action list then grows past the
+          // status bar and the `Flexible` list never becomes scrollable.
+          Positioned.fill(
             child: SafeArea(
-              top: false,
-              child: Container(
-                decoration: BoxDecoration(
-                  color: theme.bgPanel,
-                  borderRadius: const BorderRadius.vertical(
-                    top: Radius.circular(16.0),
-                  ),
-                  border: Border.all(color: theme.border, width: 1.0),
-                  boxShadow: const [
-                    BoxShadow(
-                      color: Color(0x66000000),
-                      blurRadius: 24.0,
-                      offset: Offset(0, -4),
-                    ),
-                  ],
-                ),
-                padding: const EdgeInsets.fromLTRB(12.0, 10.0, 12.0, 12.0),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    // Grab handle.
-                    Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.end,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Flexible(
+                    child: Padding(
+                      padding: const EdgeInsets.only(top: 24.0),
                       child: Container(
-                        width: 36.0,
-                        height: 4.0,
                         decoration: BoxDecoration(
-                          color: theme.border,
-                          borderRadius: BorderRadius.circular(2.0),
+                          color: theme.bgPanel,
+                          borderRadius: const BorderRadius.vertical(
+                            top: Radius.circular(16.0),
+                          ),
+                          border: Border.all(color: theme.border, width: 1.0),
+                          boxShadow: const [
+                            BoxShadow(
+                              color: Color(0x66000000),
+                              blurRadius: 24.0,
+                              offset: Offset(0, -4),
+                            ),
+                          ],
                         ),
-                      ),
-                    ),
-                    const SizedBox(height: 12.0),
-
-                    if (title.isNotEmpty) ...[
-                      Padding(
-                        padding: const EdgeInsets.only(left: 8.0, bottom: 6.0),
-                        child: Text(
-                          title,
-                          style: CompassTypography.title(color: theme.textPrimary),
-                        ),
-                      ),
-                    ],
-
-                    Flexible(
-                      child: SingleChildScrollView(
+                        padding:
+                            const EdgeInsets.fromLTRB(12.0, 10.0, 12.0, 12.0),
                         child: Column(
                           mainAxisSize: MainAxisSize.min,
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
-                            for (final item in items)
-                              Padding(
-                                padding: const EdgeInsets.only(bottom: 4.0),
-                                child: _ActionSheetRow(
-                                  item: item,
-                                  minHeight: density.minTapTarget,
-                                  onTap: () {
-                                    onClose();
-                                    item.onTap();
-                                  },
+                            // Grab handle.
+                            Center(
+                              child: Container(
+                                width: 36.0,
+                                height: 4.0,
+                                decoration: BoxDecoration(
+                                  color: theme.border,
+                                  borderRadius: BorderRadius.circular(2.0),
                                 ),
                               ),
+                            ),
+                            const SizedBox(height: 12.0),
+
+                            if (title.isNotEmpty) ...[
+                              Padding(
+                                padding: const EdgeInsets.only(
+                                    left: 8.0, bottom: 6.0),
+                                child: Text(
+                                  title,
+                                  style: CompassTypography.title(
+                                      color: theme.textPrimary),
+                                ),
+                              ),
+                            ],
+
+                            Flexible(
+                              child: SingleChildScrollView(
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.stretch,
+                                  children: [
+                                    for (final item in items)
+                                      Padding(
+                                        padding:
+                                            const EdgeInsets.only(bottom: 4.0),
+                                        child: _ActionSheetRow(
+                                          item: item,
+                                          minHeight: density.minTapTarget,
+                                          onTap: () {
+                                            onClose();
+                                            item.onTap();
+                                          },
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                              ),
+                            ),
+
+                            const SizedBox(height: 6.0),
+
+                            // Explicit cancel target: closing via the backdrop alone is
+                            // not discoverable enough with a finger.
+                            ConstrainedBox(
+                              constraints: BoxConstraints(
+                                  minHeight: density.minTapTarget),
+                              child: CompassHover(
+                                onTap: onClose,
+                                semanticLabel: 'Cancel',
+                                builder: (hovered) => Container(
+                                  alignment: Alignment.center,
+                                  decoration: BoxDecoration(
+                                    color: hovered ? theme.bgHover : null,
+                                    borderRadius: BorderRadius.circular(8.0),
+                                    border: Border.all(
+                                        color: theme.border, width: 1.0),
+                                  ),
+                                  child: Text(
+                                    'Cancel',
+                                    style: CompassTypography.bodyMedium(
+                                      color: theme.textSecondary,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
                           ],
                         ),
                       ),
                     ),
-
-                    const SizedBox(height: 6.0),
-
-                    // Explicit cancel target: closing via the backdrop alone is
-                    // not discoverable enough with a finger.
-                    ConstrainedBox(
-                      constraints: BoxConstraints(minHeight: density.minTapTarget),
-                      child: CompassHover(
-                        onTap: onClose,
-                        semanticLabel: 'Cancel',
-                        builder: (hovered) => Container(
-                          alignment: Alignment.center,
-                          decoration: BoxDecoration(
-                            color: hovered ? theme.bgHover : null,
-                            borderRadius: BorderRadius.circular(8.0),
-                            border: Border.all(color: theme.border, width: 1.0),
-                          ),
-                          child: Text(
-                            'Cancel',
-                            style: CompassTypography.bodyMedium(
-                              color: theme.textSecondary,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
+                  ),
+                ],
               ),
             ),
           ),
@@ -220,6 +237,8 @@ class _ActionSheetRow extends StatelessWidget {
               Expanded(
                 child: Text(
                   item.label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                   style: CompassTypography.bodyMedium(color: color),
                 ),
               ),

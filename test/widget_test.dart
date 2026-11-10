@@ -23,6 +23,7 @@ import 'package:rusa/widgets/compass_icon_button.dart';
 import 'package:rusa/widgets/compass_query_bar.dart';
 import 'package:rusa/widgets/compass_sidebar.dart';
 import 'package:rusa/widgets/modals/about_modal.dart';
+import 'package:rusa/widgets/modals/compass_action_sheet.dart';
 import 'package:rusa/widgets/modals/compass_modal.dart';
 import 'package:rusa/widgets/modals/connection_modal.dart';
 import 'package:rusa/widgets/modals/create_index_modal.dart';
@@ -92,6 +93,35 @@ Widget queryBarFor({required double width, required bool touch}) {
                 optionsExpanded: false,
                 onToggleOptions: () {},
                 onOpenOverflow: () {},
+              ),
+            ),
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+/// A phone-sized frame for layout regression tests: touch density, the default
+/// theme, and a vertical scroll view so tall views are not clipped.
+Widget phoneFrame(Widget child, Size size) {
+  return Directionality(
+    textDirection: TextDirection.ltr,
+    child: Overlay(
+      initialEntries: [
+        OverlayEntry(
+          builder: (context) => CompassDensity.forWidth(
+            width: size.width,
+            touchDevice: true,
+            child: MediaQuery(
+              data: MediaQueryData(size: size),
+              child: CompassTheme(
+                variant: CompassThemeVariant.defaultVariant,
+                child: SizedBox(
+                  width: size.width,
+                  height: size.height,
+                  child: SingleChildScrollView(child: child),
+                ),
               ),
             ),
           ),
@@ -736,10 +766,10 @@ void main() {
       return (container.decoration as BoxDecoration).color;
     }
 
-    // Dracula (dark) is the default.
+    // Rain Forest Night (dark) is the default.
     expect(tester.widget<CompassTheme>(find.byType(CompassTheme)).variant,
-        CompassThemeVariant.dracula);
-    expect(headerColor(), CompassThemeVariant.dracula.palette.bgPanel);
+        CompassThemeVariant.rainForestNight);
+    expect(headerColor(), CompassThemeVariant.rainForestNight.palette.bgPanel);
 
     // Open the header options menu (the `⋮` button on desktop).
     final moreButton = find.descendant(
@@ -1487,10 +1517,10 @@ void main() {
     await tester.tap(find.text('Next'));
     await tester.pump();
     expect(inTour(find.text('Pick a look')), findsOneWidget);
-    await tester.tap(find.text('Material Light'));
+    await tester.tap(find.text('Sunny Rain Forest'));
     await tester.pump();
     expect(tester.widget<CompassTheme>(find.byType(CompassTheme)).variant,
-        CompassThemeVariant.materialLight);
+        CompassThemeVariant.sunnyRainForest);
 
     // Slide 4 — the full licence, inline, with a required acceptance box.
     await tester.tap(find.text('Next'));
@@ -1560,7 +1590,7 @@ void main() {
     expect(prefs.getBool('eula_accepted'), isTrue);
     expect(prefs.getBool('onboarding_done'), isTrue,
         reason: 'the "don\'t show this again" box is ticked by default');
-    expect(prefs.getString('theme_variant'), 'materialLight',
+    expect(prefs.getString('theme_variant'), 'sunnyRainForest',
         reason: 'the theme picked in the tour is persisted for next launch');
   });
 
@@ -1973,5 +2003,187 @@ void main() {
     expect(find.byType(AggregationsView), findsOneWidget);
     expect(find.text(r'$match'), findsWidgets);
     expect(find.textContaining('1 docs ('), findsWidgets);
+  });
+
+  testWidgets('mobile: aggregations view fits a 320 px phone',
+      (WidgetTester tester) async {
+    const size = Size(320.0, 640.0);
+    tester.view.physicalSize = size;
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(phoneFrame(
+      const AggregationsView(dbName: 'library', collName: 'books'),
+      size,
+    ));
+    await tester.pump(const Duration(milliseconds: 300));
+
+    expect(tester.takeException(), isNull,
+        reason: 'the mode tabs, quick-add chips and results header must wrap');
+  });
+
+  testWidgets('mobile: schema view fits a 320 px phone',
+      (WidgetTester tester) async {
+    const size = Size(320.0, 640.0);
+    tester.view.physicalSize = size;
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(phoneFrame(
+      const SchemaView(dbName: 'library', collName: 'books'),
+      size,
+    ));
+    await tester.pump(const Duration(milliseconds: 400));
+
+    expect(tester.takeException(), isNull,
+        reason: 'the schema header, paths and sample-values row must wrap');
+  });
+
+  testWidgets('mobile: indexes view fits a 320 px phone',
+      (WidgetTester tester) async {
+    const size = Size(320.0, 640.0);
+    tester.view.physicalSize = size;
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(phoneFrame(
+      IndexesView(
+        dbName: 'library',
+        collName: 'books',
+        indexes: [
+          MongoIndex(name: '_id_', keys: {'_id': 1}, unique: true),
+          MongoIndex(name: 'isbn_1', keys: {'isbn': 1}, unique: true),
+          MongoIndex(name: 'publisher_id_1', keys: {'publisher_id': 1}),
+        ],
+        onCreateIndex: () {},
+        onDropIndex: (_) {},
+      ),
+      size,
+    ));
+    await tester.pump();
+
+    expect(tester.takeException(), isNull,
+        reason: 'the Create Index button must drop below the heading');
+    expect(find.text('Create Index'), findsOneWidget);
+  });
+
+  testWidgets('mobile: action sheet caps its height and scrolls on a short phone',
+      (WidgetTester tester) async {
+    const size = Size(320.0, 560.0);
+    tester.view.physicalSize = size;
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(
+      Directionality(
+        textDirection: TextDirection.ltr,
+        child: Overlay(
+          initialEntries: [
+            OverlayEntry(
+              builder: (context) => CompassDensity.forWidth(
+                width: size.width,
+                touchDevice: true,
+                child: MediaQuery(
+                  data: const MediaQueryData(size: size),
+                  child: CompassTheme(
+                    variant: CompassThemeVariant.defaultVariant,
+                    child: Stack(
+                      children: [
+                        CompassActionSheet(
+                          isOpen: true,
+                          title: 'Actions',
+                          onClose: () {},
+                          items: [
+                            for (var i = 0; i < 20; i++)
+                              CompassActionSheetItem(
+                                label: 'Action $i',
+                                svg: CompassSvgIcons.plus,
+                                onTap: () {},
+                              ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+    await tester.pump();
+
+    expect(tester.takeException(), isNull);
+    expect(find.text('Cancel'), findsOneWidget);
+    // The first row must stay below the status bar...
+    expect(tester.getTopLeft(find.text('Action 0')).dy, greaterThan(0.0));
+    // ...and Cancel must stay inside the viewport.
+    expect(tester.getBottomLeft(find.text('Cancel')).dy,
+        lessThanOrEqualTo(size.height));
+
+    // The list itself must scroll to the last row.
+    await tester.drag(
+      find.byType(SingleChildScrollView),
+      const Offset(0.0, -600.0),
+    );
+    await tester.pump();
+    expect(tester.getTopLeft(find.text('Action 19')).dy, greaterThan(0.0));
+    expect(tester.getBottomLeft(find.text('Action 19')).dy,
+        lessThan(tester.getTopLeft(find.text('Cancel')).dy));
+  });
+
+  testWidgets('mobile: connection modal footer fits a phone',
+      (WidgetTester tester) async {
+    const size = Size(320.0, 560.0);
+    tester.view.physicalSize = size;
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(
+      Directionality(
+        textDirection: TextDirection.ltr,
+        child: Overlay(
+          initialEntries: [
+            OverlayEntry(
+              builder: (context) => CompassDensity.forWidth(
+                width: size.width,
+                touchDevice: true,
+                child: MediaQuery(
+                  data: const MediaQueryData(size: size),
+                  child: CompassTheme(
+                    variant: CompassThemeVariant.defaultVariant,
+                    child: Stack(
+                      children: [
+                        ConnectionModal(
+                          isOpen: true,
+                          onClose: () {},
+                          savedConnections: const [],
+                          onConnect: (_) async => null,
+                          onSaveConnection: (_) {},
+                          onDeleteConnection: (_) {},
+                          onConnectSampleData: () {},
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+    await tester.pump();
+
+    expect(tester.takeException(), isNull,
+        reason: 'the field labels and action footer must not overflow');
+    expect(find.text('Connect'), findsWidgets);
+    expect(find.text('Save & Connect'), findsOneWidget);
   });
 }

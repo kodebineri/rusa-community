@@ -95,10 +95,10 @@ class _SchemaViewState extends State<SchemaView> {
             borderRadius: BorderRadius.circular(8.0),
             border: Border.all(color: theme.border, width: 1.0),
           ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Row(
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final compact = constraints.maxWidth < 620.0;
+              final heading = Row(
                 children: [
                   CompassSvg(
                     svgString: CompassSvgIcons.barChart,
@@ -106,24 +106,26 @@ class _SchemaViewState extends State<SchemaView> {
                     color: theme.accent,
                   ),
                   const SizedBox(width: 8.0),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Schema Analysis',
-                        style: CompassTypography.header(color: theme.textPrimary),
-                      ),
-                      Text(
-                        'Analyzed ${_fields.length} unique fields in ${widget.collName}',
-                        style: CompassTypography.caption(color: theme.textMuted),
-                      ),
-                    ],
+                  Flexible(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Schema Analysis',
+                          style: CompassTypography.header(color: theme.textPrimary),
+                        ),
+                        Text(
+                          'Analyzed ${_fields.length} unique fields in ${widget.collName}',
+                          style: CompassTypography.caption(color: theme.textMuted),
+                        ),
+                      ],
+                    ),
                   ),
                 ],
-              ),
+              );
               // Disabled while an analysis runs (reference: disabled={isAnalyzing}
               // with disabled:opacity-50), label toggles to "Analyzing...".
-              GestureDetector(
+              final analyzeButton = GestureDetector(
                 onTap: _isAnalyzing ? null : () => setState(_startAnalysis),
                 child: Opacity(
                   opacity: _isAnalyzing ? 0.5 : 1.0,
@@ -134,6 +136,7 @@ class _SchemaViewState extends State<SchemaView> {
                       borderRadius: BorderRadius.circular(6.0),
                     ),
                     child: Row(
+                      mainAxisSize: MainAxisSize.min,
                       children: [
                         CompassSvg(
                           svgString: CompassSvgIcons.rotateCcw,
@@ -143,14 +146,36 @@ class _SchemaViewState extends State<SchemaView> {
                         const SizedBox(width: 6.0),
                         Text(
                           _isAnalyzing ? 'Analyzing...' : 'Analyze Schema',
+                          maxLines: 1,
                           style: CompassTypography.header(color: theme.onAccent),
                         ),
                       ],
                     ),
                   ),
                 ),
-              ),
-            ],
+              );
+              if (compact) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    heading,
+                    const SizedBox(height: 10.0),
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: analyzeButton,
+                    ),
+                  ],
+                );
+              }
+              return Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Expanded(child: heading),
+                  const SizedBox(width: 12.0),
+                  analyzeButton,
+                ],
+              );
+            },
           ),
         ),
 
@@ -176,14 +201,19 @@ class _SchemaViewState extends State<SchemaView> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           // Top Row: Path & Types
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Row(
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final compact = constraints.maxWidth < 520.0;
+              final path = Row(
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text(
-                    field.path,
-                    style: CompassTypography.monoBold(color: theme.textPrimary, size: 12.0),
+                  Flexible(
+                    child: Text(
+                      field.path,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: CompassTypography.monoBold(color: theme.textPrimary, size: 12.0),
+                    ),
                   ),
                   const SizedBox(width: 8.0),
                   Text(
@@ -191,12 +221,13 @@ class _SchemaViewState extends State<SchemaView> {
                     style: CompassTypography.caption(color: theme.textMuted),
                   ),
                 ],
-              ),
-              Row(
+              );
+              final types = Wrap(
+                spacing: 4.0,
+                runSpacing: 4.0,
                 children: [
                   for (final t in field.types)
                     Container(
-                      margin: const EdgeInsets.only(left: 4.0),
                       padding: const EdgeInsets.symmetric(horizontal: 6.0, vertical: 2.0),
                       decoration: BoxDecoration(
                         color: _getTypeColor(t.type, theme).withAlpha(30),
@@ -208,12 +239,32 @@ class _SchemaViewState extends State<SchemaView> {
                       ),
                       child: Text(
                         '${t.type} (${t.percentage}%)',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                         style: CompassTypography.monoSmall(color: _getTypeColor(t.type, theme)),
                       ),
                     ),
                 ],
-              ),
-            ],
+              );
+              if (compact) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    path,
+                    const SizedBox(height: 6.0),
+                    types,
+                  ],
+                );
+              }
+              return Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(child: path),
+                  const SizedBox(width: 8.0),
+                  Flexible(child: types),
+                ],
+              );
+            },
           ),
 
           const SizedBox(height: 8.0),
@@ -244,45 +295,76 @@ class _SchemaViewState extends State<SchemaView> {
           const SizedBox(height: 8.0),
 
           // Bottom Row: Sample Values
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Row(
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final compact = constraints.maxWidth < 520.0;
+              final chipMaxWidth =
+                  constraints.maxWidth < 160.0 ? constraints.maxWidth : 160.0;
+              final samples = Wrap(
+                spacing: 6.0,
+                runSpacing: 4.0,
+                crossAxisAlignment: WrapCrossAlignment.center,
                 children: [
                   Text(
                     'Sample values: ',
                     style: CompassTypography.caption(color: theme.textMuted),
                   ),
                   for (final sample in field.sampleValues.take(3))
-                    Container(
-                      margin: const EdgeInsets.only(right: 6.0),
-                      padding: const EdgeInsets.symmetric(horizontal: 6.0, vertical: 2.0),
-                      decoration: BoxDecoration(
-                        color: theme.bgInput,
-                        borderRadius: BorderRadius.circular(4.0),
-                        border: Border.all(color: theme.border, width: 1.0),
-                      ),
-                      child: Text(
-                        '$sample',
-                        style: CompassTypography.monoSmall(color: theme.textSecondary),
+                    ConstrainedBox(
+                      constraints: BoxConstraints(maxWidth: chipMaxWidth),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6.0, vertical: 2.0),
+                        decoration: BoxDecoration(
+                          color: theme.bgInput,
+                          borderRadius: BorderRadius.circular(4.0),
+                          border: Border.all(color: theme.border, width: 1.0),
+                        ),
+                        child: Text(
+                          '$sample',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: CompassTypography.monoSmall(color: theme.textSecondary),
+                        ),
                       ),
                     ),
                 ],
-              ),
-              if (field.min != null || field.max != null)
-                Row(
+              );
+              final range = field.min != null || field.max != null
+                  ? Text(
+                      'min: ${field.min}  max: ${field.max}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: CompassTypography.monoSmall(color: theme.textSecondary),
+                    )
+                  : null;
+              if (compact) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      'min: ${field.min}  ',
-                      style: CompassTypography.monoSmall(color: theme.textSecondary),
-                    ),
-                    Text(
-                      'max: ${field.max}',
-                      style: CompassTypography.monoSmall(color: theme.textSecondary),
+                    samples,
+                    if (range != null) ...[
+                      const SizedBox(height: 4.0),
+                      range,
+                    ],
+                  ],
+                );
+              }
+              return Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(child: samples),
+                  if (range != null) ...[
+                    const SizedBox(width: 12.0),
+                    Flexible(
+                      child: Align(
+                        alignment: Alignment.centerRight,
+                        child: range,
+                      ),
                     ),
                   ],
-                ),
-            ],
+                ],
+              );
+            },
           ),
         ],
       ),

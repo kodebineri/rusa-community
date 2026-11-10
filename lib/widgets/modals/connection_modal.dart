@@ -642,9 +642,13 @@ class _ConnectionModalState extends State<ConnectionModal> {
           onTap: () => setState(() => _showAdvanced = !_showAdvanced),
           child: Row(
             children: [
-              Text(
-                'Advanced Connection Options',
-                style: CompassTypography.bodyMedium(color: _theme.accent),
+              Flexible(
+                child: Text(
+                  'Advanced Connection Options',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: CompassTypography.bodyMedium(color: _theme.accent),
+                ),
               ),
               const SizedBox(width: 4.0),
               CompassSvg(
@@ -914,40 +918,57 @@ class _ConnectionModalState extends State<ConnectionModal> {
         color: _theme.bgSubtle,
         border: Border(top: BorderSide(color: _theme.border, width: 1.0)),
       ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(
-            'Rusa — a MongoDB client',
-            style: CompassTypography.caption(color: _theme.textMuted),
-          ),
-          Row(
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final compact = constraints.maxWidth < 560.0;
+          final actions = Wrap(
+            alignment: WrapAlignment.end,
+            spacing: 8.0,
+            runSpacing: 8.0,
             children: [
-              if (_editingId != null) ...[
+              if (_editingId != null)
                 CompassSecondaryButton(
                   label: 'Cancel',
                   onTap: _isConnecting ? null : _cancelEditing,
                 ),
-                const SizedBox(width: 8.0),
-              ],
               CompassSecondaryButton(
                 label: _isTesting ? 'Testing…' : 'Test',
                 onTap: busy ? null : _testConnection,
               ),
-              const SizedBox(width: 8.0),
               CompassSecondaryButton(
                 label:
                     _editingId != null ? 'Update & Connect' : 'Save & Connect',
                 onTap: _isConnecting ? null : _saveAndConnect,
               ),
-              const SizedBox(width: 8.0),
               CompassPrimaryButton(
                 label: _isConnecting ? 'Connecting…' : 'Connect',
                 onTap: _isConnecting ? null : _connect,
               ),
             ],
-          ),
-        ],
+          );
+          final signature = Text(
+            'Rusa — a MongoDB client',
+            style: CompassTypography.caption(color: _theme.textMuted),
+          );
+          if (compact) {
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                signature,
+                const SizedBox(height: 8.0),
+                actions,
+              ],
+            );
+          }
+          return Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              signature,
+              const SizedBox(width: 12.0),
+              Flexible(child: actions),
+            ],
+          );
+        },
       ),
     );
   }

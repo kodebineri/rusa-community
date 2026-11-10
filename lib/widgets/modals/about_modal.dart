@@ -102,6 +102,18 @@ class AboutModal extends StatelessWidget {
 
         const SizedBox(height: 8.0),
 
+        // Maker credit, set above the footer so it stays at the bottom of the
+        // dialog without competing with the Close action.
+        Center(
+          child: Text(
+            'Made with ❤️ by Kodebineri Software',
+            textAlign: TextAlign.center,
+            style: CompassTypography.caption(color: theme.textSecondary),
+          ),
+        ),
+
+        const SizedBox(height: 8.0),
+
         CompassModalFooter(
           children: [
             CompassSecondaryButton(label: 'Close', onTap: onClose),

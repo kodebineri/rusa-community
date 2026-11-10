@@ -523,29 +523,6 @@ class _AggregationsViewState extends State<AggregationsView> {
   /// **Run Pipeline** button is never clipped off-screen (tablets/phones), and
   /// uses finger-sized targets on touch layouts.
   Widget _buildActionBar() {
-    final switcher = Container(
-      padding: const EdgeInsets.all(3.0),
-      decoration: BoxDecoration(
-        color: _theme.bgSubtle,
-        borderRadius: BorderRadius.circular(6.0),
-        border: Border.all(color: _theme.border, width: 1.0),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          _buildModeTab('visual', 'Visual Pipeline', '${_stages.length} stages'),
-          const SizedBox(width: 4.0),
-          _buildModeTab('raw', 'Raw Aggregations', 'JSON Script'),
-        ],
-      ),
-    );
-
-    final actions = Wrap(
-      spacing: 8.0,
-      runSpacing: 8.0,
-      children: [_buildRunButton(), _buildSaveAsViewButton()],
-    );
-
     return Container(
       padding: const EdgeInsets.all(12.0),
       decoration: BoxDecoration(
@@ -555,7 +532,14 @@ class _AggregationsViewState extends State<AggregationsView> {
       ),
       child: LayoutBuilder(
         builder: (context, constraints) {
-          if (constraints.maxWidth < 620.0) {
+          final compact = constraints.maxWidth < 720.0;
+          final switcher = _buildModeSwitcher(compact: compact);
+          final actions = Wrap(
+            spacing: 8.0,
+            runSpacing: 8.0,
+            children: [_buildRunButton(), _buildSaveAsViewButton()],
+          );
+          if (compact) {
             return Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -570,6 +554,40 @@ class _AggregationsViewState extends State<AggregationsView> {
             children: [switcher, actions],
           );
         },
+      ),
+    );
+  }
+
+  /// The Visual/Raw toggle. On a phone there is no room for the per-tab badge,
+  /// so the tabs share the row equally and their labels ellipsize.
+  Widget _buildModeSwitcher({required bool compact}) {
+    return Container(
+      padding: const EdgeInsets.all(3.0),
+      decoration: BoxDecoration(
+        color: _theme.bgSubtle,
+        borderRadius: BorderRadius.circular(6.0),
+        border: Border.all(color: _theme.border, width: 1.0),
+      ),
+      child: Row(
+        mainAxisSize: compact ? MainAxisSize.max : MainAxisSize.min,
+        children: [
+          if (compact)
+            Expanded(
+              child: _buildModeTab('visual', 'Visual Pipeline',
+                  '${_stages.length} stages', compact: true),
+            )
+          else
+            _buildModeTab('visual', 'Visual Pipeline',
+                '${_stages.length} stages'),
+          const SizedBox(width: 4.0),
+          if (compact)
+            Expanded(
+              child: _buildModeTab(
+                  'raw', 'Raw Aggregations', 'JSON Script', compact: true),
+            )
+          else
+            _buildModeTab('raw', 'Raw Aggregations', 'JSON Script'),
+        ],
       ),
     );
   }
@@ -643,11 +661,28 @@ class _AggregationsViewState extends State<AggregationsView> {
     );
   }
 
-  Widget _buildModeTab(String modeKey, String title, String badge) {
+  Widget _buildModeTab(
+    String modeKey,
+    String title,
+    String badge, {
+    bool compact = false,
+  }) {
     final isActive = _activeMode == modeKey;
+    final titleStyle = isActive
+        ? CompassTypography.header(color: _theme.textPrimary)
+        : CompassTypography.bodyRegular(color: _theme.textMuted);
+    final titleText = Text(
+      title,
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+      textAlign: TextAlign.center,
+      style: titleStyle,
+    );
+
     return GestureDetector(
       onTap: () => _switchMode(modeKey),
       child: Container(
+        alignment: compact ? Alignment.center : null,
         padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 6.0),
         decoration: BoxDecoration(
           color: isActive ? _theme.bgPanel : const Color(0x00000000),
@@ -655,6 +690,8 @@ class _AggregationsViewState extends State<AggregationsView> {
           border: isActive ? Border.all(color: _theme.border, width: 1.0) : null,
         ),
         child: Row(
+          mainAxisSize: compact ? MainAxisSize.max : MainAxisSize.min,
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
             CompassSvg(
               svgString: modeKey == 'visual' ? CompassSvgIcons.layers : CompassSvgIcons.code,
@@ -662,24 +699,21 @@ class _AggregationsViewState extends State<AggregationsView> {
               color: isActive ? _theme.accent : _theme.textMuted,
             ),
             const SizedBox(width: 6.0),
-            Text(
-              title,
-              style: isActive
-                  ? CompassTypography.header(color: _theme.textPrimary)
-                  : CompassTypography.bodyRegular(color: _theme.textMuted),
-            ),
-            const SizedBox(width: 6.0),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 5.0, vertical: 1.0),
-              decoration: BoxDecoration(
-                color: _theme.bgSubtle,
-                borderRadius: BorderRadius.circular(10.0),
+            if (compact) Flexible(child: titleText) else titleText,
+            if (!compact) ...[
+              const SizedBox(width: 6.0),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 5.0, vertical: 1.0),
+                decoration: BoxDecoration(
+                  color: _theme.bgSubtle,
+                  borderRadius: BorderRadius.circular(10.0),
+                ),
+                child: Text(
+                  badge,
+                  style: CompassTypography.caption(color: _theme.textMuted),
+                ),
               ),
-              child: Text(
-                badge,
-                style: CompassTypography.caption(color: _theme.textMuted),
-              ),
-            ),
+            ],
           ],
         ),
       ),
@@ -750,10 +784,11 @@ class _AggregationsViewState extends State<AggregationsView> {
             borderRadius: BorderRadius.circular(8.0),
             border: Border.all(color: _theme.border, width: 1.0),
           ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Row(
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final compact = constraints.maxWidth < 720.0;
+              final heading = Row(
+                mainAxisSize: MainAxisSize.min,
                 children: [
                   CompassSvg(
                     svgString: CompassSvgIcons.layers,
@@ -761,15 +796,20 @@ class _AggregationsViewState extends State<AggregationsView> {
                     color: _theme.accent,
                   ),
                   const SizedBox(width: 8.0),
-                  Text(
-                    'Visual Pipeline Stages',
-                    style: CompassTypography.header(color: _theme.textPrimary),
+                  Flexible(
+                    child: Text(
+                      'Visual Pipeline Stages',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: CompassTypography.header(color: _theme.textPrimary),
+                    ),
                   ),
                 ],
-              ),
+              );
               // Quick Stage Add Buttons
-              Wrap(
+              final quickAdd = Wrap(
                 spacing: 6.0,
+                runSpacing: 6.0,
                 crossAxisAlignment: WrapCrossAlignment.center,
                 children: [
                   for (final op in const [r'$match', r'$group', r'$sort', r'$project', r'$limit'])
@@ -825,8 +865,22 @@ class _AggregationsViewState extends State<AggregationsView> {
                     ),
                   ),
                 ],
-              ),
-            ],
+              );
+              if (compact) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    heading,
+                    const SizedBox(height: 8.0),
+                    quickAdd,
+                  ],
+                );
+              }
+              return Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [heading, quickAdd],
+              );
+            },
           ),
         ),
 
@@ -1226,10 +1280,13 @@ class _AggregationsViewState extends State<AggregationsView> {
                 bottom: BorderSide(color: _theme.border, width: 1.0),
               ),
             ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            child: Wrap(
+              alignment: WrapAlignment.spaceBetween,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              runSpacing: 8.0,
               children: [
                 Row(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
                     CompassSvg(
                       svgString: CompassSvgIcons.table,
@@ -1237,21 +1294,29 @@ class _AggregationsViewState extends State<AggregationsView> {
                       color: _theme.accent,
                     ),
                     const SizedBox(width: 8.0),
-                    Text(
-                      'Pipeline Results',
-                      style: CompassTypography.header(color: _theme.textPrimary),
+                    Flexible(
+                      child: Text(
+                        'Pipeline Results',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: CompassTypography.header(color: _theme.textPrimary),
+                      ),
                     ),
                     const SizedBox(width: 8.0),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6.0, vertical: 2.0),
-                      decoration: BoxDecoration(
-                        color: _theme.bgInput,
-                        borderRadius: BorderRadius.circular(10.0),
-                        border: Border.all(color: _theme.border, width: 1.0),
-                      ),
-                      child: Text(
-                        '$_totalResultCount docs (${_executionTimeMs.toStringAsFixed(1)} ms)',
-                        style: CompassTypography.monoSmall(color: _theme.textMuted),
+                    Flexible(
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6.0, vertical: 2.0),
+                        decoration: BoxDecoration(
+                          color: _theme.bgInput,
+                          borderRadius: BorderRadius.circular(10.0),
+                          border: Border.all(color: _theme.border, width: 1.0),
+                        ),
+                        child: Text(
+                          '$_totalResultCount docs (${_executionTimeMs.toStringAsFixed(1)} ms)',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: CompassTypography.monoSmall(color: _theme.textMuted),
+                        ),
                       ),
                     ),
                     if (total > 0) ...[
@@ -1262,6 +1327,7 @@ class _AggregationsViewState extends State<AggregationsView> {
                 ),
 
                 Row(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
                     // View Mode Switcher: JSON / Table
                     Container(

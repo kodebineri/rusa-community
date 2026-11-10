@@ -1,6 +1,6 @@
 # Testing — `test/`
 
-Companion to root `AGENTS.md`. Seven files, **129 tests**:
+Companion to root `AGENTS.md`. Seven files, **134 tests**:
 
 | File | What it covers |
 |---|---|
@@ -12,12 +12,12 @@ Companion to root `AGENTS.md`. Seven files, **129 tests**:
 | `test/compass_density_test.dart` | unit tests for the desktop/touch density profiles |
 | `test/json_auto_indent_formatter_test.dart` | unit tests for the JSON auto-indent formatter |
 
-> **Status: 129 pass / 0 fail, `flutter analyze` clean.**
+> **Status: 134 pass / 0 fail, `flutter analyze` clean.**
 
 ## Commands
 
 ```bash
-flutter test                              # all — expect 129/129
+flutter test                              # all — expect 134/134
 flutter test test/widget_test.dart        # just the widget tests
 flutter test test/mongosh_interpreter_test.dart
 flutter analyze                           # expect "No issues found!"
@@ -71,12 +71,13 @@ misuse that would fail the test anyway.
 | 15 | `tree view starts with data structures collapsed` | default `library.books` tree: zero `chevronDown`, two `chevronRight` (one `genre_ids` per doc), `[ ... 2 items ]` + `[ ... 1 items ]` summaries, no `0:` child rows; tap chevron → child rows `0:`/`1:` appear + summary gone; tap again → summary restored |
 | 16 | `json view edit button saves changes to the document` | switch to **JSON** mode → one pencil per card; tap pencil → body becomes an `EditableText` (pencil replaced by check/close on that card only); edit `copies_available`, **remove `rating`**, enterText, tap **check** → engine doc updated, `rating` gone (replacement semantics), `_id` preserved, editor closes, pencil returns. Uses `resetToDefaults` teardown |
 | 17 | `updateMany with a plain map replaces matched documents` | engine-level: `mongoEngine.updateMany(db, coll, {_id:…}, {title, copies_available})` → matched doc has only those fields (+`_id`), `author`/`rating` gone, the other doc untouched; a `$set` update then merges without removing fields. Uses `resetToDefaults` teardown |
-| 18 | `first-time user lands on the welcome tour and accepts the EULA` | overrides the prefs mock with `{}` → `OnboardingModal` slide 1 (`Step 1 of 4`), **no** connect popup; **Next** → sample data (`library`, `social_networks`) → theme (tap **Material Light**, root `CompassTheme` switches) → terms (`EULA.md` body + **I Accept**); `eula_accepted` still unset until the tap, then `eula_accepted`/`onboarding_done`/`theme_variant` persisted and the shell revealed |
+| 18 | `first-time user lands on the welcome tour and accepts the EULA` | overrides the prefs mock with `{}` → `OnboardingModal` slide 1 (`Step 1 of 4`), **no** connect popup; **Next** → sample data (`library`, `social_networks`) → theme (tap **Sunny Rain Forest**, root `CompassTheme` switches) → terms (`EULA.md` body + **I Accept**); `eula_accepted` still unset until the tap, then `eula_accepted`/`onboarding_done`/`theme_variant` persisted and the shell revealed |
 | 19 | `the welcome tour's Skip jumps to the licence slide` | `{}` → **Skip** lands on the terms slide (`I Accept` present, `Skip` gone) and nothing is persisted yet |
 | 20 | `unticking "don't show this again" replays the tour without re-asking for consent` | `{eula_accepted: true, onboarding_done: false}` → tour shown, last slide reads **Done** (not `I Accept`), finishing leaves `onboarding_done == false` |
 | 21 | `a returning user skips the tour and gets the connect popup` | default prefs (no `onboarding_done`) → no tour, connect popup open at boot |
 | 22 | `the theme stored on the device is restored on the next launch` | `{eula_accepted: true, theme_variant: 'monokaiLight'}` → root `CompassTheme.variant == monokaiLight` |
 | 23 | `"Show Welcome Screen" in the header menu replays the tour` | returning user → `⋮` menu → **Show Welcome Screen** → `Step 1 of 4` |
+| 24-28 | `mobile: …` layout regressions | Aggregations / Schema / Indexes at **320 px** wide, the header action sheet on a short phone (first row stays below the status bar, last row scrolls into view), and the connection-modal footer (no overflow) |
 
 ## Recurring techniques (copy these patterns)
 

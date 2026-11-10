@@ -192,16 +192,31 @@ class CompassFieldLabel extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.only(bottom: 4.0),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Row(
-            children: [
-              Text(label, style: CompassTypography.bodyMedium(color: theme.textSecondary)),
-              if (trailing != null) trailing!,
-            ],
+          Expanded(
+            child: Row(
+              children: [
+                Flexible(
+                  child: Text(
+                    label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: CompassTypography.bodyMedium(color: theme.textSecondary),
+                  ),
+                ),
+                if (trailing != null) trailing!,
+              ],
+            ),
           ),
-          if (hint != null)
-            Text(hint!, style: CompassTypography.caption(color: theme.textMuted)),
+          if (hint != null) ...[
+            const SizedBox(width: 8.0),
+            Text(
+              hint!,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: CompassTypography.caption(color: theme.textMuted),
+            ),
+          ],
         ],
       ),
     );

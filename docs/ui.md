@@ -82,6 +82,10 @@ A `MouseRegion` + optional `GestureDetector` + optional `Semantics(button: true)
   explicit `Cancel` row because backdrop-only dismissal is not finger-discoverable.
 - Rows are `≥ density.minTapTarget` tall, icon + label, destructive rows use
   `CompassColors.errorRed`.
+- The sheet is bottom-aligned inside a `SafeArea` and capped by the viewport (with a
+  24 px top gap); the row list is a `Flexible` + `SingleChildScrollView`, so a long action
+  list (eight themes + app actions) scrolls instead of pushing **Change connection** up under
+  the status bar.
 
 ### Layout rules that follow from the density
 
