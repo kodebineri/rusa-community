@@ -92,9 +92,10 @@ class AboutModal extends StatelessWidget {
         // Non-affiliation disclaimer (trademark hygiene).
         Center(
           child: Text(
-            'Rusa is an independent, unofficial client. It is not affiliated '
-            'with, endorsed by, or sponsored by MongoDB, Inc. "MongoDB" is a '
-            'trademark of MongoDB, Inc., used only to describe compatibility.',
+            'MongoDB® is a registered trademark of MongoDB, Inc. '
+            'Rusa for MongoDB is an independent open-source client application '
+            'developed by PT Kodebineri Algoritma Inovasi. '
+            'It is not affiliated with, authorized by, sponsored by, or endorsed by MongoDB, Inc.',
             textAlign: TextAlign.center,
             style: CompassTypography.caption(color: theme.textMuted),
           ),
