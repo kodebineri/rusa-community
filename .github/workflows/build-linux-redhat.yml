@@ -88,15 +88,11 @@ jobs:
             RPM_ARCH="${{ matrix.rpm_arch }}"
             RPM_TOPDIR="/workspace/build/rpm"
 
-            # 1. Setup explicit RPM build tree structure
             mkdir -p "${RPM_TOPDIR}/"{BUILD,BUILDROOT,RPMS,SOURCES,SPECS,SRPMS}
 
-            # Locate Flutter Linux bundle output
             BUILD_BUNDLE=$(find build/linux -type d -name "bundle" | head -n 1)
 
-            # 2. Spec file creation with QA_RPATHS ignore flags for Flutter plugins
             cat <<EOF > ${RPM_TOPDIR}/SPECS/rusa-community.spec
-            # Disable strict RPATH validation for Flutter plugin shared libraries
             %define QA_RPATHS 0x0006
             %global __brp_check_rpaths %{nil}
 
@@ -112,10 +108,8 @@ jobs:
             Rusa Community Edition GUI client built for Linux (${RPM_ARCH}).
 
             %prep
-            # Skip prep stage
 
             %build
-            # Pre-built by Flutter
 
             %install
             mkdir -p %{buildroot}/usr/lib/rusa-community
@@ -123,18 +117,13 @@ jobs:
             mkdir -p %{buildroot}/usr/share/applications
             mkdir -p %{buildroot}/usr/share/icons/hicolor/256x256/apps
 
-            # Copy Flutter bundle contents into buildroot
             cp -r /workspace/${BUILD_BUNDLE}/* %{buildroot}/usr/lib/rusa-community/
-
-            # Create symlink in /usr/bin
             ln -s /usr/lib/rusa-community/rusa-community %{buildroot}/usr/bin/rusa-community
 
-            # Copy desktop icon if present
             if [ -f "/workspace/assets/icon/icon.png" ]; then
               cp /workspace/assets/icon/icon.png %{buildroot}/usr/share/icons/hicolor/256x256/apps/rusa-community.png
             fi
 
-            # Desktop entry
             cat <<DESK > %{buildroot}/usr/share/applications/rusa-community.desktop
             [Desktop Entry]
             Name=Rusa Community
@@ -157,19 +146,16 @@ jobs:
             - Release ${VERSION}
             EOF
 
-            # 3. Build RPM package
             rpmbuild --define "_topdir ${RPM_TOPDIR}" --target ${RPM_ARCH} -bb ${RPM_TOPDIR}/SPECS/rusa-community.spec
 
-            # 4. Collect built package into dist/
             mkdir -p dist
             BUILT_RPM=$(find ${RPM_TOPDIR}/RPMS -type f -name "*.rpm" | head -n 1)
             if [ -z "$BUILT_RPM" ]; then
-              echo "Error: rpmbuild failed to produce an RPM package in ${RPM_TOPDIR}/RPMS!"
+              echo "Error: rpmbuild failed to produce an RPM package!"
               exit 1
             fi
             mv "$BUILT_RPM" dist/
 
-            # --- GPG RPM Signing ---
             GPG_KEY="${{ secrets.GPG_PRIVATE_KEY }}"
             GPG_PASS="${{ secrets.GPG_PASSPHRASE }}"
 
@@ -181,11 +167,9 @@ jobs:
             echo "$GPG_KEY" | gpg --batch --import
             GPG_KEY_ID=$(gpg --list-secret-keys --keyid-format LONG | grep -E '^sec' | awk '{print $2}' | cut -d'/' -f2 | head -n 1)
 
-            # Export public key & import into native RPM keyring
             gpg --armor --export "$GPG_KEY_ID" > /tmp/public.key
             rpm --import /tmp/public.key
 
-            # Native Fedora rpmmacros
             cat <<EOF > ~/.rpmmacros
             %_signature gpg
             %_gpg_path ~/.gnupg
@@ -193,7 +177,6 @@ jobs:
             %_gpgbin /usr/bin/gpg
             EOF
 
-            # 5. Sign RPM packages & verify natively
             for rpm_file in dist/*.rpm; do
               echo "Signing $rpm_file..."
               if [ -n "$GPG_PASS" ]; then
@@ -221,20 +204,6 @@ jobs:
     steps:
       - name: Checkout Source Code
         uses: actions/checkout@v4
-
-      - name: Generate Repository with Fedora Container
-        uses: addnab/docker-run-action@v3
-        with:
-          image: fedora:latest
-          options: -v ${{ github.workspace }}:/workspace
-          run: |
-            dnf install -y createrepo_c gpg
-
-            cd /workspace
-            mkdir -p public/Packages
-
-            # Downloaded artifacts path
-            cp rpm-artifacts/*.rpm public/Packages/ 2>/dev/null || true
 
       - name: Download Built & Signed .rpm Artifacts
         uses: actions/download-artifact@v4
