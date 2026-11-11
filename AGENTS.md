@@ -11,6 +11,8 @@ it runs fully against an **in-memory local Mongo engine** seeded with sample dat
 a **real MongoDB server** (via `mongo_dart`) swaps the global engine instance.
 
 - Active product: `lib/` (Dart/Flutter) — this is what you modify.
+- **State:** no Provider/Riverpod/Bloc; app state lives in `_CompassAppState` (`lib/main.dart`)
+  and is updated with `setState`. Tabs are state, not routes.
 - The React/TSX reference app it was ported from is **deleted from the repo** (commit
   `36cbc8d`; it lives only in git history). Dart comments saying "Converted from
   `src/components/X.tsx`" point at those deleted files — don't go looking for them in the tree.
@@ -42,12 +44,18 @@ a **real MongoDB server** (via `mongo_dart`) swaps the global engine instance.
   `ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS` to `AppIcon` (it must stay
   `YES`).
 - **Identifiers:** OS app id is **`com.kodebineri.rusa`** (Android `applicationId`/`namespace`
-  + `MainActivity` package, iOS `PRODUCT_BUNDLE_IDENTIFIER`, Windows `CompanyName`). The **Dart
-  package name is `rusa`** (`name:` in `pubspec.yaml`, so imports use `package:rusa/…`).
+  + `MainActivity` package, iOS `PRODUCT_BUNDLE_IDENTIFIER`); Windows `Runner.rc` uses
+  `CompanyName = kodebineri` / `ProductName = Rusa`. The **Dart package name is `rusa`**
+  (`name:` in `pubspec.yaml`, so imports use `package:rusa/…`); the Linux package/repo is
+  **`rusa-community`**.
+- **Version:** `version:` in `pubspec.yaml` is duplicated in `lib/app_info.dart`
+  (`AppInfo.version` / `buildNumber`); bump both or the
+  `AboutModal.appVersion mirrors pubspec.yaml` test fails. Release workflows derive package
+  versions from the pushed `v*` tag.
 
 ## Current status — read before you change anything
 
-_Verified 2026-11-11 at HEAD `b2bcacb` (analyze clean, tests 139/139)._
+_Verified 2026-11-11 at HEAD `4f0ff4e` (analyze clean, tests 139/139)._
 
 - **`flutter analyze` is clean.** `analysis_options.yaml` excludes `build/`, `windows/`,
   `android/`, `ios/` and `linux/`, so native-side edits are never analyzed.
@@ -55,11 +63,9 @@ _Verified 2026-11-11 at HEAD `b2bcacb` (analyze clean, tests 139/139)._
   guard the phone layouts (aggregations/schema/indexes at 320 px, the action sheet height cap,
   the connection-modal footer, the export format cards, and the keyboard inset above the Shell
   prompt).
-- **`docs/ui.md` is stale on theme names**: it still says Dracula is the default, lists six
-  variants, and shows `Material Light` in the tour. The header doc comment in
-  `lib/theme/compass_theme_presets.dart` is stale the same way (claims three dark / three light
-  and Dracula default). Trust the `CompassThemeVariant` enum and `defaultVariant` at the bottom
-  of that file, `OnboardingModal` and the current 139-test suite over those lines.
+- **Theme source of truth:** `rainForestNight` is the default (not Dracula), with eight
+  variants (four dark / four light). If docs or comments drift again, trust
+  `CompassThemeVariant` / `defaultVariant` and `OnboardingModal.previewVariants`.
 - **A returning user boots into the connection popup** (`_isConnectModalOpen = true`, decided
   by `_loadPreferences`). Full-app widget tests must dismiss it first — use the
   `closeConnectionPopup(tester)` helper in `test/widget_test.dart`, or shell taps land on the
@@ -85,9 +91,8 @@ _Verified 2026-11-11 at HEAD `b2bcacb` (analyze clean, tests 139/139)._
   (minimal header + `n / N` counter + Skip, one centered 448 px column, 12 px-radius cards with
   an accent border/ring when selected, quiet bottom bar). Keep new slides in that vocabulary
   (see `docs/ui.md` → `OnboardingModal`).
-- **Theme default changed:** `rainForestNight` is now the default (not Dracula); the eight
-  variant names are in invariant 11. The header options menu and touch action sheet group them
-  as `DARK THEMES` / `LIGHT THEMES`.
+- **Theme menu:** the header options menu and touch action sheet group the eight variants as
+  `DARK THEMES` / `LIGHT THEMES`; the variant names are in invariant 11.
 - **Releases:** pushing a `v*` tag triggers `.github/workflows/build-linux-packages.yml`.
   It builds Debian, Arch and Fedora packages for amd64/arm64 (native arm runners), then
   publishes one GitHub Pages site with `apt/`, `arch/` and `rpm/` subdirectories plus one
@@ -105,9 +110,12 @@ _Verified 2026-11-11 at HEAD `b2bcacb` (analyze clean, tests 139/139)._
 | Run desktop app (Linux) | `flutter run -d linux` |
 | Run on Android | `flutter run -d <device>` (needs `INTERNET` — already in the main manifest) |
 | Build Linux release | `flutter build linux --release` |
+| Build Windows release | `flutter build windows --release` |
+| Build Android APK | `flutter build apk --release` |
 | Regenerate launcher icons | `dart run flutter_launcher_icons` (after replacing `assets/icon/icon.png`) |
 
-There is no JS/npm build step anywhere in the repo — Flutter tooling only.
+Run `flutter analyze` before `flutter test`; both must stay green. There is no JS/npm build
+step, codegen, or `build_runner` in the repo — Flutter tooling only.
 
 ## Doc index
 
@@ -115,14 +123,15 @@ There is no JS/npm build step anywhere in the repo — Flutter tooling only.
 |---|---|
 | `docs/architecture.md` | understand app shell, state fields, navigation, tabs, CRUD handlers, modal orchestration, `build()` layout, or edit `lib/main.dart` |
 | `docs/engine.md` | touch data/query/aggregation behavior, seed data, indexes, models, or connect/real-server logic (`lib/services/*`, `lib/models/*`) |
-| `docs/ui.md` | touch any widget: modals, document views, header/sidebar/query bar/tab bar/terminal, icons, or theme (`lib/widgets/*`, `lib/theme/*`, `lib/icons/*`) — but note its theme section is stale |
-| `docs/testing.md` | write or fix tests in `test/widget_test.dart` — but note its status/default-theme claims are stale |
+| `docs/ui.md` | touch any widget: modals, document views, header/sidebar/query bar/tab bar/terminal, icons, or theme (`lib/widgets/*`, `lib/theme/*`, `lib/icons/*`) |
+| `docs/testing.md` | write or fix tests in `test/widget_test.dart` |
 | `docs/play-store-listing.md` | prepare Google Play metadata, screenshots, data-safety answers, or a release checklist |
 
 ## Hard invariants (do not break)
 
-1. **No Material app.** No `MaterialApp`, `Scaffold`, `Navigator`, `Theme`, or `Icon` widgets.
-   Root is `AnnotatedRegion` → `CompassTheme` → manual `MediaQuery` → `Directionality` →
+1. **No Material app.** No `MaterialApp`, `Scaffold`, `Navigator`, `Theme`, or `Icon` widgets
+   (`pubspec.yaml` sets `uses-material-design: false`). Root is `AnnotatedRegion` →
+   `CompassTheme` → manual `MediaQuery` → `Directionality` →
    `TapRegionSurface` → `Overlay(key: _overlayKey, initialEntries: [_shellEntry])`; the shell
    (`_buildShell`) is a `Stack` living inside that overlay (see `docs/architecture.md`). The
    `TapRegionSurface` + `Overlay` exist so bare `EditableText` fields get tap-outside dismissal
@@ -140,11 +149,12 @@ There is no JS/npm build step anywhere in the repo — Flutter tooling only.
    `LocalMongoEngine mongoEngine = LocalMongoEngine.instance;`. It is a mutable top-level
    global, swapped to a `RealMongoService` on connect and back on disconnect; call `setState`
    afterwards. All reads are synchronous during `build()` — never make the engine async.
-5. **Closed modals render `SizedBox.shrink()`.** `CompassModalShell.build` returns shrink when
+5. **Closed modals render `SizedBox.shrink()`.** Every root-stack modal returns shrink when
    `!isOpen`, so closed modal children are constructed but **not mounted** (finders won't see
-   them; no stray hit-testing). All 16 modals plus **two** `CompassActionSheet` overlays (header
-   + query-bar) live permanently in the root `Stack` (`main.dart` ~L1320–L1585). The
-   `OnboardingModal` follows the same rule (it returns shrink when closed) but is a
+   them; no stray hit-testing). 14 of the 16 use `CompassModalShell`; `ConnectionModal` and
+   `MongoshConfirmationModal` have their own `Positioned.fill` overlays. All 16 modals plus
+   **two** `CompassActionSheet` overlays (header + query-bar) live permanently in the root
+   `Stack` (`main.dart` ~L1319–L1597). `OnboardingModal` follows the same rule but is a
    full-window cover, not a `CompassModalShell` (root-stack child at ~L1591).
 6. **`InsertDocumentModal.onInsert` returns `String?`**: `null` = success (modal closes
    itself), non-null = error message shown in the modal's `CompassErrorBanner`. The handler in
@@ -208,8 +218,8 @@ There is no JS/npm build step anywhere in the repo — Flutter tooling only.
   ("do not execute on type"); the numeric fields commit only on blur/Find.
 - `temp_test.txt` (repo root) is a tracked scratch copy of two tests that already live in
   `test/widget_test.dart`; nothing reads it — don't treat it as a source or bother updating it.
-The **sidebar search box works** — `_searchQuery` is mutable and filters the DB tree
-client-side (`compass_sidebar.dart`); don't add it to the dead list.
+- The **sidebar search box works** — `_searchQuery` is mutable and filters the DB tree
+  client-side (`compass_sidebar.dart`); don't add it to the dead list.
 
 ## Quick symbol map
 

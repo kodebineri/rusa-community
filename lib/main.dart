@@ -299,8 +299,8 @@ class _CompassAppState extends State<CompassApp> {
     );
   }
 
-  /// Selected colour theme. Defaults to Dracula (dark); changed from the
-  /// header options menu or the touch action sheet.
+  /// Selected colour theme. Defaults to rainForestNight (dark); changed from
+  /// the header options menu or the touch action sheet.
   CompassThemeVariant _themeVariant = CompassThemeVariant.defaultVariant;
   ConnectionProfile? _connection;
 
@@ -1024,7 +1024,7 @@ class _CompassAppState extends State<CompassApp> {
   ///
   /// NOTE: this state's own `context` sits *above* the root [CompassTheme]
   /// created in `build`, so `CompassTheme.of(context)` here would not find it
-  /// and silently fall back to Dracula. Use the palette-only instance instead.
+  /// and silently fall back to rainForestNight. Use the palette-only instance instead.
   CompassTheme get _theme => CompassTheme.palette(_themeVariant);
 
   /// The app shell, hosted in an [OverlayEntry].

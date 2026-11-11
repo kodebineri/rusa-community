@@ -19,7 +19,7 @@ import 'compass_theme_presets.dart';
 ///   CompassTheme(variant: _themeVariant, child: ...)
 class CompassTheme extends InheritedWidget {
   /// The selected theme. Defaults to [CompassThemeVariant.defaultVariant]
-  /// (Dracula, dark) so a bare `CompassTheme(child: …)` stays dark.
+  /// (rainForestNight, dark) so a bare `CompassTheme(child: …)` stays dark.
   final CompassThemeVariant variant;
 
   const CompassTheme({
@@ -34,12 +34,12 @@ class CompassTheme extends InheritedWidget {
   ///
   /// Needed *above* the root provider — e.g. by `CompassApp`'s own `build`,
   /// whose `context` sits above the `CompassTheme` it creates, so
-  /// `CompassTheme.of(context)` would miss it and fall back to Dracula.
+  /// `CompassTheme.of(context)` would miss it and fall back to rainForestNight.
   const CompassTheme.palette(this.variant, {super.key})
       : super(child: const SizedBox.shrink());
 
   /// Returns the nearest [CompassTheme] ancestor.
-  /// Falls back to the default (Dracula, dark) when no ancestor is found.
+  /// Falls back to the default (rainForestNight, dark) when no ancestor is found.
   static CompassTheme of(BuildContext context) {
     return context.dependOnInheritedWidgetOfExactType<CompassTheme>() ??
         const CompassTheme(child: SizedBox.shrink());

@@ -224,7 +224,7 @@ the full `CompassApp` (which includes it via `main()`'s wrapper).
   cancels the timer in `dispose()` (test 10 leaves the section mid-analysis; no pending-timer
   failure).
 - The default boot state (fresh `CompassApp`): **the connection popup is open** over
-  `library.books` (section `documents`, view mode `tree`, empty query, Dracula dark theme,
+  `library.books` (section `documents`, view mode `tree`, empty query, Rain Forest Night dark theme,
   sidebar with `library` + `social_networks` pre-expanded). Dismiss the popup before asserting
   on the shell.
 - The custom copy/paste menu is inserted into the root `Overlay`; a widget pumped in isolation

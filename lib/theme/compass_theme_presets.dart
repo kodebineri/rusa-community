@@ -58,7 +58,7 @@ class CompassPalette {
 
 /// The selectable themes, modelled after popular VS Code colour themes.
 ///
-/// Three dark and three light variants. [dracula] is the default (see
+/// Four dark and four light variants. [rainForestNight] is the default (see
 /// [defaultVariant]); the rest are grouped by [isDark] in the options menu.
 enum CompassThemeVariant {
   rainForestNight(

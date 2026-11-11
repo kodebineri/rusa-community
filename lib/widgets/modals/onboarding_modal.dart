@@ -513,7 +513,7 @@ class _OnboardingModalState extends State<OnboardingModal> {
           theme,
           'Pick a look',
           'Choose a theme to start with. It is remembered next time, and you '
-              'can switch between all six variants from the ⋮ menu.',
+              'can switch between all eight variants from the ⋮ menu.',
         ),
         const SizedBox(height: 20.0),
         Row(
