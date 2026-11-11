@@ -1073,18 +1073,43 @@ class _CompassAppState extends State<CompassApp> {
                   (a, b) => a.id.toLowerCase().compareTo(b.id.toLowerCase())))
             : queryResult.documents;
 
+        // Leave the terminal its natural height when there is room, but cap it
+        // when the soft keyboard is up so header + terminal cannot overflow on
+        // a short phone. The 56 px header and 48 px content area are the
+        // minimum chrome above the terminal.
+        final shellMq = MediaQuery.of(context);
+        // While typing in the Shell on a phone, the body is hidden so the
+        // terminal can use the full area above the keyboard without forcing a
+        // 220 px drawer plus the body chrome into a 200 px viewport.
+        final terminalTakesOver =
+            shellMq.viewInsets.bottom > 0 && _isTerminalOpen;
+        final terminalMaxHeight = (shellMq.size.height -
+                shellMq.viewInsets.bottom -
+                shellMq.padding.top -
+                shellMq.padding.bottom -
+                56.0 -
+                (terminalTakesOver ? 2.0 : 48.0))
+            .clamp(74.0, 380.0)
+            .toDouble();
+
         final appShell = Container(
           color: _theme.bgApp,
           child: Stack(
             children: [
               // Keep the shell clear of the bottom system inset (Android
               // navigation bar / iOS home indicator). The header handles the
-              // top inset itself.
+              // top inset itself. The keyboard inset shrinks the whole shell so
+              // the docked Shell's prompt stays visible above the soft keyboard
+              // on phones/tablets instead of being painted over by it.
               SafeArea(
                 top: false,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
+                child: Padding(
+                  padding: EdgeInsets.only(
+                    bottom: MediaQuery.viewInsetsOf(context).bottom,
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
                     // Header (h-14 / 56px)
                     CompassHeader(
                       connection: _connection,
@@ -1124,8 +1149,9 @@ class _CompassAppState extends State<CompassApp> {
                     ),
 
                     // Main Body: Side-by-side on desktop, or off-canvas sidebar
-                    Expanded(
-                      child: Row(
+                    if (!terminalTakesOver)
+                      Expanded(
+                        child: Row(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
                           if (isDesktop || _isMobileSidebarOpen)
@@ -1266,20 +1292,29 @@ class _CompassAppState extends State<CompassApp> {
                     ),
 
                     // Dockable Mongosh Shell at Bottom
-                    CompassTerminal(
-                      isOpen: _isTerminalOpen,
-                      onClose: () {
-                        setState(() => _isTerminalOpen = false);
-                      },
-                      activeDbName: _selectedDbName.isEmpty
-                          ? (mongoEngine.getDatabases().firstOrNull?.name ?? '')
-                          : _selectedDbName,
-                      onCommandExecuted: _handleTerminalResult,
-                      onRequestConfirmation: _requestTerminalConfirmation,
+                    ConstrainedBox(
+                      constraints: BoxConstraints(
+                        maxHeight: terminalMaxHeight,
+                        minHeight:
+                            terminalTakesOver ? terminalMaxHeight : 0.0,
+                      ),
+                      child: CompassTerminal(
+                        isOpen: _isTerminalOpen,
+                        onClose: () {
+                          setState(() => _isTerminalOpen = false);
+                        },
+                        activeDbName: _selectedDbName.isEmpty
+                            ? (mongoEngine.getDatabases().firstOrNull?.name ??
+                                '')
+                            : _selectedDbName,
+                        onCommandExecuted: _handleTerminalResult,
+                        onRequestConfirmation: _requestTerminalConfirmation,
+                      ),
                     ),
                   ],
                 ),
               ),
+            ),
 
               // Connection Modal Overlay
               ConnectionModal(

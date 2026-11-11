@@ -115,7 +115,7 @@ A `MouseRegion` + optional `GestureDetector` + optional `Semantics(button: true)
 
 ### System insets and OS text scaling (`lib/main.dart` → `_CompassAppState.build`)
 
-The shell is dense and pixel-precise, so two OS-level inputs are normalised in `build()`:
+The shell is dense and pixel-precise, so three OS-level inputs are normalised in `build()`:
 
 - **Text scaling is clamped to 0.8–1.3.** The app builds its own `MediaQuery` (there is no
   Material app), so `build()` wraps the tree in a `Builder` that re-provides
@@ -128,6 +128,11 @@ The shell is dense and pixel-precise, so two OS-level inputs are normalised in `
   indicator. Top is left to `CompassHeader`, which has its own `SafeArea`. The modals and
   action sheets are siblings of that widget in the `Stack` and keep their own `SafeArea`, so
   they still reach the screen edge (invariant 5).
+- **The soft keyboard shrinks the shell.** The same `Column` is padded by
+  `MediaQuery.viewInsets.bottom`. While the Shell is open and the keyboard is visible, the
+  document body is hidden and `CompassTerminal` fills the space above the keyboard (its height
+  is capped by `terminalMaxHeight`), so the prompt and typed text stay visible instead of being
+  painted over. The terminal header drops its long connection string below 560 px.
 
 ## Text selection context menu & syntax colouring
 
@@ -191,7 +196,7 @@ modals): the header overflow sheet and the query-bar overflow sheet.
 |---|---|---|
 | **`InsertDocumentModal`** | `isOpen, onClose, onInsert: String? Function(Map)`, `initialDoc?`, `isClone = false` | The tri-modal: insert / edit (`initialDoc != null && !isClone`) / **clone** (`isClone`). `maxWidth 576`. Title: `isEdit ? 'Edit Document' : 'Insert Document'`. JSON editor (`maxLines 12`, autofocus) prefilled via `JsonEncoder.withIndent('  ')`; "Generate New _id" action. **`_submit`**: `jsonDecode` → non-Map ⇒ `'Document must be a JSON object.'`; `final error = widget.onInsert(parsed)` — `null` = success → calls `onClose()`; non-null → shown in `CompassErrorBanner`, modal **stays open**. Footer label: `isEdit ? 'Save Changes' : (isClone ? 'Insert Document' : 'Insert')`. Parse exceptions ⇒ `'JSON Parse Error: $err'` |
 | `DeleteDocumentModal` | `isOpen, onClose, onConfirm, dbName, collName, documentId, document?` | red header, warning box, `ObjectId("<id>")` row with copy→check icon swap, optional JSON preview, `Delete Document` danger button → `onConfirm(); onClose();` |
-| `ImportExportModal` | `isOpen, onClose, mode: ImportExportMode{export,import}, dbName, collName, documents: List<MongoDocument>, onImportComplete` | `maxWidth 512`. Export: JSON/CSV format cards, CSV quoting, Copy to Clipboard / Download (`file_selector`), preview + status banner. Import: file picker (JSON only) + paste area (`maxLines 8`) → `mongoEngine.insertDocument` per item → `onImportComplete(); onClose()` |
+| `ImportExportModal` | `isOpen, onClose, mode: ImportExportMode{export,import}, dbName, collName, documents: List<MongoDocument>, onImportComplete` | `maxWidth 512`. Export: JSON/CSV format cards (stacked below 360 px), CSV quoting, Copy to Clipboard / Download (`file_selector`; below 420 px the footer becomes an equal three-column Cancel / Copy / Download row), preview + status banner. Import: file picker (JSON only) + paste area (`maxLines 8`) → `mongoEngine.insertDocument` per item → `onImportComplete(); onClose()` |
 | `SaveViewModal` | `isOpen, onClose, dbName, sourceCollName, pipeline, pipelineJsonString, onViewSaved: fn(String)` | auto-names `<coll>_view` (+4-digit suffix), validates (required, no `$`, no leading `.`, no clash), copies pipeline JSON to clipboard, `mongoEngine.createView(...)` |
 | `ConnectionModal` | `isOpen, onClose, savedConnections, onConnect: Future<String?> fn, onSaveConnection, onDeleteConnection, onConnectSampleData` | **own overlay** (fixed width 560). URI + name + advanced fields (bi-directional URI sync via `_syncingUri` guard), "Local Sample Datasets" section (`Connect` → `onConnectSampleData`), saved connections list, footer Save & Connect / Connect. Default `mongodb://localhost:27017`. Saved profiles are persisted locally in secure storage through `AppPreferences.savedConnections`; an empty stored list stays empty instead of restoring the sample profiles. |
 | `MongoshConfirmationModal` | `isOpen, operation: RiskyOperationDetails?, onConfirm, onCancel` | **own overlay** (width 512). Keyboard-driven: Esc/N = cancel, Y = confirm, arrows/Tab select, Enter/Space execute; destructive confirm blocked for 200 ms after open (`_canConfirmDestructive`); defaults to cancel. Data class `RiskyOperationDetails {type, title, command, dbName, collName?, description, impact, filterPreview?, updatePreview?}` with `isDestructive`/`typeLabel` |

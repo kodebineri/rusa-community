@@ -414,30 +414,41 @@ class _CompassTerminalState extends State<CompassTerminal> {
                 bottom: BorderSide(color: Color(0xFF21313C), width: 1.0),
               ),
             ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Row(
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final compact = constraints.maxWidth < 560.0;
+                return Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const CompassSvg(
-                      svgString: CompassSvgIcons.terminal,
-                      size: 14.0,
-                      color: CompassColors.greenAccent,
+                    Expanded(
+                      child: Row(
+                        children: [
+                          const CompassSvg(
+                            svgString: CompassSvgIcons.terminal,
+                            size: 14.0,
+                            color: CompassColors.greenAccent,
+                          ),
+                          const SizedBox(width: 8.0),
+                          Text(
+                            'Shell',
+                            style: CompassTypography.monoBold(
+                                color: const Color(0xFFF1F5F9), size: 12.0),
+                          ),
+                          if (!compact) ...[
+                            const SizedBox(width: 8.0),
+                            Flexible(
+                              child: Text(
+                                'mongodb://127.0.0.1:27017 (${widget.activeDbName})',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: CompassTypography.monoSmall(
+                                    color: CompassColors.darkTextMuted),
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
                     ),
-                    const SizedBox(width: 8.0),
-                    Text(
-                      'Shell',
-                      style: CompassTypography.monoBold(
-                          color: const Color(0xFFF1F5F9), size: 12.0),
-                    ),
-                    const SizedBox(width: 8.0),
-                    Text(
-                      'mongodb://127.0.0.1:27017 (${widget.activeDbName})',
-                      style: CompassTypography.monoSmall(
-                          color: CompassColors.darkTextMuted),
-                    ),
-                  ],
-                ),
                 // Terminal Header Controls
                 Row(
                   children: [
@@ -484,6 +495,8 @@ class _CompassTerminalState extends State<CompassTerminal> {
                   ],
                 ),
               ],
+            );
+              },
             ),
           ),
 

@@ -23,6 +23,7 @@ import 'package:rusa/widgets/collection_tab_bar.dart';
 import 'package:rusa/widgets/compass_header.dart';
 import 'package:rusa/widgets/compass_icon_button.dart';
 import 'package:rusa/widgets/compass_query_bar.dart';
+import 'package:rusa/widgets/compass_terminal.dart';
 import 'package:rusa/widgets/compass_sidebar.dart';
 import 'package:rusa/widgets/modals/about_modal.dart';
 import 'package:rusa/widgets/modals/compass_action_sheet.dart';
@@ -30,6 +31,7 @@ import 'package:rusa/widgets/modals/compass_modal.dart';
 import 'package:rusa/widgets/modals/connection_modal.dart';
 import 'package:rusa/widgets/modals/create_index_modal.dart';
 import 'package:rusa/widgets/modals/drop_index_modal.dart';
+import 'package:rusa/widgets/modals/import_export_modal.dart';
 import 'package:rusa/widgets/modals/onboarding_modal.dart';
 import 'package:rusa/widgets/modals/insert_document_modal.dart';
 import 'package:rusa/widgets/views/aggregations_view.dart';
@@ -2228,6 +2230,107 @@ void main() {
     expect(tester.getTopLeft(find.text('Action 19')).dy, greaterThan(0.0));
     expect(tester.getBottomLeft(find.text('Action 19')).dy,
         lessThan(tester.getTopLeft(find.text('Cancel')).dy));
+  });
+
+  testWidgets('mobile: soft keyboard keeps the Shell prompt visible',
+      (WidgetTester tester) async {
+    const size = Size(360.0, 640.0);
+    const keyboard = 300.0;
+    tester.view.physicalSize = size;
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    addTearDown(tester.view.resetViewInsets);
+
+    await tester.pumpWidget(const CompassApp());
+    await tester.pump();
+    for (var i = 0; i < 50 && tester.takeException() != null; i++) {}
+    await closeConnectionPopup(tester);
+
+    // On touch layouts the Shell lives in the header action sheet.
+    final moreButton = find.descendant(
+      of: find.byType(CompassHeader),
+      matching: find.byWidgetPredicate(
+        (w) => w is CompassSvg && w.svgString == CompassSvgIcons.moreVertical,
+      ),
+    );
+    await tester.tap(moreButton.first);
+    await tester.pump();
+    await tester.tap(find.text('Open Shell'));
+    await tester.pump();
+
+    final terminal = find.byType(CompassTerminal);
+    expect(terminal, findsOneWidget);
+
+    // The soft keyboard covers the bottom 300 px of the viewport.
+    tester.view.viewInsets = const FakeViewPadding(bottom: keyboard);
+    await tester.pump();
+
+    expect(tester.takeException(), isNull,
+        reason: 'the shell must shrink instead of overflowing');
+    final prompt = find.descendant(
+      of: terminal,
+      matching: find.byType(EditableText),
+    );
+    expect(prompt, findsOneWidget);
+    expect(tester.getRect(prompt).bottom,
+        lessThanOrEqualTo(size.height - keyboard + 0.001),
+        reason: 'the prompt must sit above the keyboard');
+  });
+
+  testWidgets('mobile: export format cards fit a phone',
+      (WidgetTester tester) async {
+    const size = Size(360.0, 640.0);
+    tester.view.physicalSize = size;
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(
+      Directionality(
+        textDirection: TextDirection.ltr,
+        child: Overlay(
+          initialEntries: [
+            OverlayEntry(
+              builder: (context) => CompassDensity.forWidth(
+                width: size.width,
+                touchDevice: true,
+                child: MediaQuery(
+                  data: const MediaQueryData(size: size),
+                  child: CompassTheme(
+                    variant: CompassThemeVariant.defaultVariant,
+                    child: Stack(
+                      children: [
+                        ImportExportModal(
+                          isOpen: true,
+                          onClose: () {},
+                          mode: ImportExportMode.export,
+                          dbName: 'library',
+                          collName: 'books',
+                          documents: const [],
+                          onImportComplete: () {},
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+    await tester.pump();
+
+    expect(tester.takeException(), isNull,
+        reason: 'the format cards must stack and wrap on a phone');
+    expect(find.text('Full BSON / nested structures'), findsOneWidget);
+    expect(find.text('Spreadsheet comma-separated'), findsOneWidget);
+
+    // Cancel / Copy / Download must stay on one footer row.
+    final cancelY = tester.getTopLeft(find.text('Cancel')).dy;
+    expect(tester.getTopLeft(find.text('Copy')).dy, closeTo(cancelY, 0.5));
+    expect(tester.getTopLeft(find.text('Download')).dy, closeTo(cancelY, 0.5));
   });
 
   testWidgets('mobile: connection modal footer fits a phone',

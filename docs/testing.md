@@ -1,6 +1,6 @@
 # Testing — `test/`
 
-Companion to root `AGENTS.md`. Seven files, **137 tests**:
+Companion to root `AGENTS.md`. Seven files, **139 tests**:
 
 | File | What it covers |
 |---|---|
@@ -12,12 +12,12 @@ Companion to root `AGENTS.md`. Seven files, **137 tests**:
 | `test/compass_density_test.dart` | unit tests for the desktop/touch density profiles |
 | `test/json_auto_indent_formatter_test.dart` | unit tests for the JSON auto-indent formatter |
 
-> **Status: 137 pass / 0 fail, `flutter analyze` clean.**
+> **Status: 139 pass / 0 fail, `flutter analyze` clean.**
 
 ## Commands
 
 ```bash
-flutter test                              # all — expect 137/137
+flutter test                              # all — expect 139/139
 flutter test test/widget_test.dart        # just the widget tests
 flutter test test/mongosh_interpreter_test.dart
 flutter analyze                           # expect "No issues found!"
@@ -81,6 +81,8 @@ misuse that would fail the test anyway.
 | 29 | `saved connections round-trip through AppPreferences` | Profile JSON preserves id, name, URI (including credentials), colour, favourite, lastConnected and readOnly; writing `[]` stays empty instead of restoring the sample profiles |
 | 30 | `saved connections are restored from device storage` | `saved_connections` seeded in secure storage → booting `CompassApp` shows the persisted profile in `ConnectionModal` |
 | 31 | `legacy plaintext connections migrate to secure storage` | A `saved_connections` value left in `SharedPreferences` is read, written to secure storage, removed from preferences, and survives a second load |
+| 32 | `mobile: soft keyboard keeps the Shell prompt visible` | 360 px phone, Shell opened from the header action sheet, `viewInsets.bottom = 300` → no overflow and the prompt sits above the keyboard; the body yields to the terminal while typing |
+| 33 | `mobile: export format cards fit a phone` | 360 px Export Collection modal: JSON/CSV cards stack below 360 px and their descriptions wrap; Cancel / Copy / Download stay on one footer row |
 
 ## Recurring techniques (copy these patterns)
 

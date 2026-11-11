@@ -268,24 +268,38 @@ class _ImportExportModalState extends State<ImportExportModal> {
   List<Widget> _buildExportBody() {
     return [
       const CompassFieldLabel(label: 'Select Export Format'),
-      Row(
-        children: [
-          Expanded(
-            child: _formatCard(
-              id: 'json',
-              title: 'JSON',
-              description: 'Full BSON / nested structures',
-            ),
-          ),
-          const SizedBox(width: 10.0),
-          Expanded(
-            child: _formatCard(
-              id: 'csv',
-              title: 'CSV',
-              description: 'Spreadsheet comma-separated',
-            ),
-          ),
-        ],
+      LayoutBuilder(
+        builder: (context, constraints) {
+          final jsonCard = _formatCard(
+            id: 'json',
+            title: 'JSON',
+            description: 'Full BSON / nested structures',
+          );
+          final csvCard = _formatCard(
+            id: 'csv',
+            title: 'CSV',
+            description: 'Spreadsheet comma-separated',
+          );
+          // Two side-by-side cards leave ~100 px for the description on a
+          // phone; stack them instead so the text can wrap.
+          if (constraints.maxWidth < 360.0) {
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                jsonCard,
+                const SizedBox(height: 10.0),
+                csvCard,
+              ],
+            );
+          }
+          return Row(
+            children: [
+              Expanded(child: jsonCard),
+              const SizedBox(width: 10.0),
+              Expanded(child: csvCard),
+            ],
+          );
+        },
       ),
       const SizedBox(height: 12.0),
       Text(
@@ -305,8 +319,7 @@ class _ImportExportModalState extends State<ImportExportModal> {
           child: SingleChildScrollView(
             child: Text(
               _exportPreview,
-              style: CompassTypography.monoSmall(
-                  color: _theme.textSecondary),
+              style: CompassTypography.monoSmall(color: _theme.textSecondary),
             ),
           ),
         ),
@@ -315,22 +328,66 @@ class _ImportExportModalState extends State<ImportExportModal> {
         const SizedBox(height: 10.0),
         _statusBanner(),
       ],
-      CompassModalFooter(
+      LayoutBuilder(
+        builder: (context, constraints) {
+          final compact = constraints.maxWidth < 420.0;
+          if (compact) {
+            return _buildCompactExportFooter();
+          }
+          return CompassModalFooter(
+            children: [
+              CompassSecondaryButton(label: 'Cancel', onTap: widget.onClose),
+              CompassSecondaryButton(
+                label: 'Copy to Clipboard',
+                iconSvg: CompassSvgIcons.copy,
+                onTap: _handleExport,
+              ),
+              CompassPrimaryButton(
+                label: 'Download',
+                iconSvg: CompassSvgIcons.download,
+                onTap: _handleDownload,
+              ),
+            ],
+          );
+        },
+      ),
+    ];
+  }
+
+  /// Phone footer: three equal columns so Cancel / Copy / Download stay on
+  /// one line. Labels ellipsize rather than forcing the buttons to wrap.
+  Widget _buildCompactExportFooter() {
+    return Container(
+      padding: const EdgeInsets.only(top: 12.0),
+      margin: const EdgeInsets.only(top: 4.0),
+      decoration: BoxDecoration(
+        border: Border(top: BorderSide(color: _theme.border, width: 1.0)),
+      ),
+      child: Row(
         children: [
-          CompassSecondaryButton(label: 'Cancel', onTap: widget.onClose),
-          CompassSecondaryButton(
-            label: 'Copy to Clipboard',
-            iconSvg: CompassSvgIcons.copy,
-            onTap: _handleExport,
+          Expanded(
+            child: CompassSecondaryButton(
+              label: 'Cancel',
+              onTap: widget.onClose,
+            ),
           ),
-          CompassPrimaryButton(
-            label: 'Download',
-            iconSvg: CompassSvgIcons.download,
-            onTap: _handleDownload,
+          const SizedBox(width: 8.0),
+          Expanded(
+            child: CompassSecondaryButton(
+              label: 'Copy',
+              onTap: _handleExport,
+            ),
+          ),
+          const SizedBox(width: 8.0),
+          Expanded(
+            child: CompassPrimaryButton(
+              label: 'Download',
+              onTap: _handleDownload,
+            ),
           ),
         ],
       ),
-    ];
+    );
   }
 
   List<Widget> _buildImportBody() {
@@ -388,9 +445,7 @@ class _ImportExportModalState extends State<ImportExportModal> {
           CompassSvg(
             svgString: hasFile ? CompassSvgIcons.file : CompassSvgIcons.upload,
             size: 18.0,
-            color: hasFile
-                ? _theme.accent
-                : _theme.textMuted,
+            color: hasFile ? _theme.accent : _theme.textMuted,
           ),
           const SizedBox(width: 10.0),
           Expanded(
@@ -400,16 +455,13 @@ class _ImportExportModalState extends State<ImportExportModal> {
                 Text(
                   hasFile ? _fileName! : 'No file selected',
                   style: CompassTypography.bodyMedium(
-                    color: hasFile
-                        ? _theme.textPrimary
-                        : _theme.textSecondary,
+                    color: hasFile ? _theme.textPrimary : _theme.textSecondary,
                   ),
                 ),
                 const SizedBox(height: 2.0),
                 Text(
                   subtitle,
-                  style: CompassTypography.caption(
-                      color: _theme.textMuted),
+                  style: CompassTypography.caption(color: _theme.textMuted),
                 ),
               ],
             ),
@@ -441,12 +493,10 @@ class _ImportExportModalState extends State<ImportExportModal> {
       child: Container(
         padding: const EdgeInsets.all(12.0),
         decoration: BoxDecoration(
-          color:
-              selected ? _theme.greenBadgeBg : _theme.bgInput,
+          color: selected ? _theme.greenBadgeBg : _theme.bgInput,
           borderRadius: BorderRadius.circular(8.0),
           border: Border.all(
-            color:
-                selected ? _theme.accent : _theme.border,
+            color: selected ? _theme.accent : _theme.border,
             width: 1.0,
           ),
         ),
@@ -457,16 +507,26 @@ class _ImportExportModalState extends State<ImportExportModal> {
                 size: 15.0,
                 color: _theme.accent),
             const SizedBox(width: 8.0),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(title,
-                    style: CompassTypography.header(
-                        color: _theme.textPrimary)),
-                Text(description,
-                    style: CompassTypography.caption(
-                        color: _theme.textMuted)),
-              ],
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style:
+                        CompassTypography.header(color: _theme.textPrimary),
+                  ),
+                  Text(
+                    description,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style:
+                        CompassTypography.caption(color: _theme.textMuted),
+                  ),
+                ],
+              ),
             ),
           ],
         ),
@@ -475,13 +535,10 @@ class _ImportExportModalState extends State<ImportExportModal> {
   }
 
   Widget _statusBanner() {
-    final color =
-        _statusIsError ? CompassColors.errorRed : _theme.accent;
-    final bg =
-        _statusIsError ? CompassColors.errorRedBg : _theme.greenBadgeBg;
-    final border = _statusIsError
-        ? CompassColors.errorRedBorder
-        : _theme.greenBadgeBorder;
+    final color = _statusIsError ? CompassColors.errorRed : _theme.accent;
+    final bg = _statusIsError ? CompassColors.errorRedBg : _theme.greenBadgeBg;
+    final border =
+        _statusIsError ? CompassColors.errorRedBorder : _theme.greenBadgeBorder;
     return Container(
       padding: const EdgeInsets.all(10.0),
       decoration: BoxDecoration(

@@ -17,7 +17,7 @@ a **real MongoDB server** (via `mongo_dart`) swaps the global engine instance.
 - Saved connection profiles live in platform secure storage (`flutter_secure_storage`;
   Android `minSdk 24`, Linux needs `libsecret-1-dev` to build); EULA/theme flags stay in
   `SharedPreferences`.
-- Tests: seven files in `test/`, **137 tests** — widget tests in `test/widget_test.dart` plus
+- Tests: seven files in `test/`, **139 tests** — widget tests in `test/widget_test.dart` plus
   `compass_density`, `json_auto_indent_formatter`, `mongo_json_parser`, `mongosh_interpreter`,
   `mongosh_completer`, `terminal`. Patterns live in `docs/testing.md`.
 - Sample data sources of truth: `sample_library.json`, `sample_social_network.json` (repo root).
@@ -47,12 +47,13 @@ _Verified 2026-11-10 at HEAD `609e38b`._
 
 - **`flutter analyze` is clean.** `analysis_options.yaml` excludes `build/`, `windows/`,
   `android/`, `ios/` and `linux/`, so native-side edits are never analyzed.
-- **`flutter test` is 137/137.** Keep both analyze and tests green. The five `mobile:` tests
+- **`flutter test` is 139/139.** Keep both analyze and tests green. The seven `mobile:` tests
   guard the phone layouts (aggregations/schema/indexes at 320 px, the action sheet height cap,
-  and the connection-modal footer).
+  the connection-modal footer, the export format cards, and the keyboard inset above the Shell
+  prompt).
 - **`docs/ui.md` is stale on theme names**: it still says Dracula is the default, lists six
   variants, and shows `Material Light` in the tour. Trust
-  `lib/theme/compass_theme_presets.dart`, `OnboardingModal` and the current 137-test suite over
+  `lib/theme/compass_theme_presets.dart`, `OnboardingModal` and the current 139-test suite over
   those lines.
 - **A returning user boots into the connection popup** (`_isConnectModalOpen = true`, decided
   by `_loadPreferences`). Full-app widget tests must dismiss it first — use the

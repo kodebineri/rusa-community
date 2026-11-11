@@ -401,10 +401,14 @@ class CompassPrimaryButton extends StatelessWidget {
                 ),
                 const SizedBox(width: 6.0),
               ],
-              Text(
-                label,
-                style: CompassTypography.header(
-                  color: onTap == null ? theme.textMuted : theme.onAccent,
+              Flexible(
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: CompassTypography.header(
+                    color: onTap == null ? theme.textMuted : theme.onAccent,
+                  ),
                 ),
               ),
             ],
@@ -455,7 +459,14 @@ class CompassSecondaryButton extends StatelessWidget {
                 CompassSvg(svgString: iconSvg!, size: 13.0, color: theme.textSecondary),
                 const SizedBox(width: 6.0),
               ],
-              Text(label, style: CompassTypography.bodyMedium(color: theme.textSecondary)),
+              Flexible(
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: CompassTypography.bodyMedium(color: theme.textSecondary),
+                ),
+              ),
             ],
           ),
         ),
