@@ -24,7 +24,9 @@ a **real MongoDB server** (via `mongo_dart`) swaps the global engine instance.
 - Legal text: `EULA.md` and `PRIVACY.md` (repo root) — bundled as Flutter assets
   (`pubspec.yaml`) and rendered by `EulaModal` / `OnboardingModal` (its last slide) /
   `PrivacyPolicyModal` via `CompassMarkdownView`; edit the Markdown, not the widgets.
-- `README.md` is stale `flutter create` boilerplate — ignore it.
+- `README.md` is the user-facing README (about + per-OS install instructions). Keep its
+  commands, URLs, and GPG fingerprint in sync when the release pipeline, package names,
+  Pages repo layout, or signing key change.
 - **Branding:** the product name is **Rusa**, tagline "a MongoDB database client". User-visible
   strings must not say "Compass" and must not use the MongoDB leaf logo — the brand mark is
   `CompassSvgIcons.rusa` (placeholder deer mark). "MongoDB" appears only descriptively, and
