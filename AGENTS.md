@@ -11,8 +11,9 @@ it runs fully against an **in-memory local Mongo engine** seeded with sample dat
 a **real MongoDB server** (via `mongo_dart`) swaps the global engine instance.
 
 - Active product: `lib/` (Dart/Flutter) — this is what you modify.
-- Reference only: `src/` (TSX) — read-only, not compiled by Flutter. Comments in Dart files say
-  "Converted from `src/components/X.tsx`".
+- The React/TSX reference app it was ported from is **deleted from the repo** (commit
+  `36cbc8d`; it lives only in git history). Dart comments saying "Converted from
+  `src/components/X.tsx`" point at those deleted files — don't go looking for them in the tree.
 - Platforms: `windows/`, `android/`, `ios/`, `linux/` (macOS is not scaffolded).
 - Saved connection profiles live in platform secure storage (`flutter_secure_storage`;
   Android `minSdk 24`, Linux needs `libsecret-1-dev` to build); EULA/theme flags stay in
@@ -26,7 +27,8 @@ a **real MongoDB server** (via `mongo_dart`) swaps the global engine instance.
   `PrivacyPolicyModal` via `CompassMarkdownView`; edit the Markdown, not the widgets.
 - `README.md` is the user-facing README (about + per-OS install instructions). Keep its
   commands, URLs, and GPG fingerprint in sync when the release pipeline, package names,
-  Pages repo layout, or signing key change.
+  Pages repo layout, or signing key change (`public.key` at the repo root is that signing
+  key, published to the Pages site as `KEY.gpg`).
 - **Branding:** the product name is **Rusa**, tagline "a MongoDB database client". User-visible
   strings must not say "Compass" and must not use the MongoDB leaf logo — the brand mark is
   `CompassSvgIcons.rusa` (placeholder deer mark). "MongoDB" appears only descriptively, and
@@ -45,7 +47,7 @@ a **real MongoDB server** (via `mongo_dart`) swaps the global engine instance.
 
 ## Current status — read before you change anything
 
-_Verified 2026-11-10 at HEAD `609e38b`._
+_Verified 2026-11-11 at HEAD `b2bcacb` (analyze clean, tests 139/139)._
 
 - **`flutter analyze` is clean.** `analysis_options.yaml` excludes `build/`, `windows/`,
   `android/`, `ios/` and `linux/`, so native-side edits are never analyzed.
@@ -54,9 +56,10 @@ _Verified 2026-11-10 at HEAD `609e38b`._
   the connection-modal footer, the export format cards, and the keyboard inset above the Shell
   prompt).
 - **`docs/ui.md` is stale on theme names**: it still says Dracula is the default, lists six
-  variants, and shows `Material Light` in the tour. Trust
-  `lib/theme/compass_theme_presets.dart`, `OnboardingModal` and the current 139-test suite over
-  those lines.
+  variants, and shows `Material Light` in the tour. The header doc comment in
+  `lib/theme/compass_theme_presets.dart` is stale the same way (claims three dark / three light
+  and Dracula default). Trust the `CompassThemeVariant` enum and `defaultVariant` at the bottom
+  of that file, `OnboardingModal` and the current 139-test suite over those lines.
 - **A returning user boots into the connection popup** (`_isConnectModalOpen = true`, decided
   by `_loadPreferences`). Full-app widget tests must dismiss it first — use the
   `closeConnectionPopup(tester)` helper in `test/widget_test.dart`, or shell taps land on the
@@ -95,7 +98,7 @@ _Verified 2026-11-10 at HEAD `609e38b`._
 | Task | Command |
 |---|---|
 | Static analysis (must be clean) | `flutter analyze` |
-| Tests (target 129/129; baseline 127/129 — see status) | `flutter test` |
+| Tests (139/139 — keep green; see status) | `flutter test` |
 | Run a single test file | `flutter test test/widget_test.dart` |
 | Run one test by name | `flutter test test/widget_test.dart --plain-name "exact test name"` |
 | Run desktop app (Windows) | `flutter run -d windows` |
@@ -104,8 +107,7 @@ _Verified 2026-11-10 at HEAD `609e38b`._
 | Build Linux release | `flutter build linux --release` |
 | Regenerate launcher icons | `dart run flutter_launcher_icons` (after replacing `assets/icon/icon.png`) |
 
-There is no JS build step for the Flutter app (root `package.json`/`vite.config.ts` belong to
-the legacy `src/` React app; `npm` is not needed for Flutter work).
+There is no JS/npm build step anywhere in the repo — Flutter tooling only.
 
 ## Doc index
 
@@ -141,9 +143,9 @@ the legacy `src/` React app; `npm` is not needed for Flutter work).
 5. **Closed modals render `SizedBox.shrink()`.** `CompassModalShell.build` returns shrink when
    `!isOpen`, so closed modal children are constructed but **not mounted** (finders won't see
    them; no stray hit-testing). All 16 modals plus **two** `CompassActionSheet` overlays (header
-   + query-bar) live permanently in the root `Stack` (`main.dart` ~L1277–L1405). The
+   + query-bar) live permanently in the root `Stack` (`main.dart` ~L1320–L1585). The
    `OnboardingModal` follows the same rule (it returns shrink when closed) but is a
-   full-window cover, not a `CompassModalShell` (root-stack child at ~L1548).
+   full-window cover, not a `CompassModalShell` (root-stack child at ~L1591).
 6. **`InsertDocumentModal.onInsert` returns `String?`**: `null` = success (modal closes
    itself), non-null = error message shown in the modal's `CompassErrorBanner`. The handler in
    `main.dart` (`_handleInsertDocument`) must NOT close the modal.
@@ -204,6 +206,8 @@ the legacy `src/` React app; `npm` is not needed for Flutter work).
 - `QueryFilterOptions.collation` / `maxTimeMS` are stored but never consumed by the engine.
 - `CompassQueryBar._handleSkipChange` / `_handleLimitChange` are **intentional no-ops**
   ("do not execute on type"); the numeric fields commit only on blur/Find.
+- `temp_test.txt` (repo root) is a tracked scratch copy of two tests that already live in
+  `test/widget_test.dart`; nothing reads it — don't treat it as a source or bother updating it.
 The **sidebar search box works** — `_searchQuery` is mutable and filters the DB tree
 client-side (`compass_sidebar.dart`); don't add it to the dead list.
 
