@@ -11,17 +11,68 @@ permissions:
 
 jobs:
   build-windows:
-    runs-on: windows-latest
+    name: Windows ${{ matrix.arch }}
+    strategy:
+      # A failing/queued Arm64 leg must not cancel the x64 release upload.
+      fail-fast: false
+      matrix:
+        include:
+          # x64 uses the prebuilt SDK from the stable archives.
+          - runner: windows-latest
+            arch: x64
+            pe_machine: '8664'
+          # Flutter publishes no Windows Arm64 SDK archive yet (releases_windows.json
+          # has no arm64 entry), so flutter-action would install the x64 SDK, which
+          # runs under emulation and makes `flutter build windows` emit an x64
+          # bundle. Cloning the SDK from git on a native Arm64 runner makes
+          # bin/internal/update_dart_sdk.ps1 fetch dart-sdk-windows-arm64.zip, and
+          # the Windows build then targets Arm64 from the host platform.
+          # NOTE: the `windows-11-arm` label is only available to public repos.
+          - runner: windows-11-arm
+            arch: arm64
+            pe_machine: 'AA64'
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 90
+    env:
+      FLUTTER_HOME: C:\flutter
+      # Forces the Arm64 Dart SDK download instead of the silent emulated x64
+      # fallback that update_dart_sdk.ps1 does when the arm64 archive is missing.
+      FLUTTER_HOST_ARCH: ${{ matrix.arch }}
 
     steps:
       - name: Checkout Source Code
         uses: actions/checkout@v4
 
-      - name: Setup Flutter Engine
+      - name: Enable Developer Mode (plugin symlinks)
+        shell: pwsh
+        run: |
+          # Flutter creates symlinks for plugin registration; without Developer
+          # Mode the build aborts with "Building with plugins requires symlink
+          # support". This is a no-op if the image already has it enabled.
+          reg add "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\AppModelUnlock" /t REG_DWORD /f /v AllowDevelopmentWithoutDevLicense /d 1
+
+      - name: Setup Flutter Engine (prebuilt x64)
+        if: matrix.arch == 'x64'
         uses: subosito/flutter-action@v2
         with:
           channel: 'stable'
           cache: true
+
+      - name: Setup Flutter Engine (native Arm64 from git)
+        if: matrix.arch == 'arm64'
+        shell: pwsh
+        run: |
+          git clone --depth 1 --branch stable https://github.com/flutter/flutter.git "$env:FLUTTER_HOME"
+          "$env:FLUTTER_HOME\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+          $env:PATH = "$env:FLUTTER_HOME\bin;$env:PATH"
+          # Bootstraps the tool: engine.stamp + the native Dart SDK.
+          flutter --version
+
+          $dartVersion = (& "$env:FLUTTER_HOME\bin\cache\dart-sdk\bin\dart.exe" --version 2>&1 | Out-String).Trim()
+          Write-Host $dartVersion
+          if ($dartVersion -notmatch 'windows_arm64') {
+            throw "Flutter is using a non-Arm64 Dart SDK ($dartVersion); the build would target x64."
+          }
 
       - name: Enable Windows Desktop Build & Setup Platform
         run: |
@@ -33,30 +84,47 @@ jobs:
       - name: Install Pub Dependencies
         run: flutter pub get
 
-      - name: Build Flutter Windows Release
+      - name: Build Flutter Windows Release (${{ matrix.arch }})
         run: flutter build windows --release
 
       - name: Extract Version & Package Windows Release
         shell: powershell
         run: |
-          $rawTag = "${{ github.ref_name }}"
+          $rawTag = "${{ github.ref_type == 'tag' && github.ref_name || '' }}"
           $version = $rawTag -replace '^v', ''
-          if ([string]::IsNullOrEmpty($version) -or $rawTag -eq "main") {
+          if ([string]::IsNullOrWhiteSpace($version)) {
             $version = "0.0.0-dev"
           }
 
-          New-Item -ItemType Directory -Force -Path "dist"
+          $arch = "${{ matrix.arch }}"
+          $releaseDir = "build\windows\$arch\runner\Release"
+          $exe = Join-Path $releaseDir "rusa.exe"
+          if (!(Test-Path $exe)) {
+            throw "$exe not found - the build did not produce an $arch bundle."
+          }
+
+          # PE machine field: 0x8664 = x64, 0xAA64 = Arm64. This guards against
+          # shipping an emulated/wrong-architecture bundle under this name.
+          $bytes = [System.IO.File]::ReadAllBytes((Resolve-Path $exe).Path)
+          $peHeader = [BitConverter]::ToInt32($bytes, 0x3C)
+          $machine = [BitConverter]::ToUInt16($bytes, $peHeader + 4)
+          $expected = [Convert]::ToUInt16("${{ matrix.pe_machine }}", 16)
+          if ($machine -ne $expected) {
+            throw ("Expected a {0} executable (0x{1:X4}), got 0x{2:X4}." -f $arch, $expected, $machine)
+          }
+
+          New-Item -ItemType Directory -Force -Path "dist" | Out-Null
 
           # 1. Zip Portable Release Bundle
-          $bundlePath = "build\windows\x64\runner\Release\*"
-          $zipName = "dist\rusa-community_${version}_windows_x64.zip"
-          Compress-Archive -Path $bundlePath -DestinationPath $zipName -Force
+          $zipName = "dist\rusa-community_${version}_windows_${arch}.zip"
+          Compress-Archive -Path "$releaseDir\*" -DestinationPath $zipName -Force
 
           # Write environment variable for release asset pattern
           echo "APP_VERSION=$version" >> $env:GITHUB_ENV
 
       # Optional: Create NSIS Installer EXE if nsis is available/configured
       - name: Build NSIS Installer (Optional)
+        if: matrix.arch == 'x64'
         shell: powershell
         run: |
           if (Get-Command makensis -ErrorAction SilentlyContinue) {

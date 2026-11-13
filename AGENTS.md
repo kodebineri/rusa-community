@@ -96,7 +96,11 @@ _Verified 2026-11-11 at HEAD `4f0ff4e` (analyze clean, tests 139/139)._
 - **Releases:** pushing a `v*` tag triggers `.github/workflows/build-linux-packages.yml`.
   It builds Debian, Arch and Fedora packages for amd64/arm64 (native arm runners), then
   publishes one GitHub Pages site with `apt/`, `arch/` and `rpm/` subdirectories plus one
-  GitHub release. **No CI runs analyze or tests.** Windows has a separate workflow.
+  GitHub release. **No CI runs analyze or tests.** Windows is one workflow,
+  `.github/workflows/build-windows.yml`, with an x64 + Arm64 matrix: the Arm64 leg runs on
+  the native `windows-11-arm` runner (public repos only) and clones the SDK from git
+  because Flutter ships no Windows Arm64 SDK archive yet; each leg asserts the built
+  `rusa.exe` PE machine field (`0x8664` / `0xAA64`) before packaging.
 
 ## Commands
 

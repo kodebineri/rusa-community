@@ -92,6 +92,7 @@ Rusa is free software under the **GPL-3.0** licence.
 | Linux — Arch Linux | Supported | pacman repository or `.pkg.tar.zst` (see below) |
 | Linux — Fedora, RHEL, CentOS… | Supported | DNF repository or `.rpm` (see below) |
 | Windows 10/11 (x64) | Supported | Portable `.zip` from [releases] |
+| Windows 11 (Arm64) | Supported | Portable `.zip` from [releases] |
 | Android 7.0+ | Supported | Google Play (in preparation) or build an APK |
 | iOS | Source builds only | Build with Flutter + Xcode (needs macOS) |
 | macOS | Not supported | — |
@@ -178,8 +179,9 @@ checks, so `dnf` verifies everything automatically.
 
 ### Windows
 
-1. Download `rusa-community_<version>_windows_x64.zip` from the
-   [latest release][releases].
+1. Download `rusa-community_<version>_windows_x64.zip` (Intel/AMD) or
+   `rusa-community_<version>_windows_arm64.zip` (Snapdragon / Copilot+ PCs)
+   from the [latest release][releases].
 2. Extract it anywhere (for example `C:\Tools\Rusa`) — Rusa is fully
    portable: no installer, no admin rights, no registry entries.
 3. Run `rusa.exe`.
@@ -228,10 +230,16 @@ Release builds:
 
 ```bash
 flutter build linux --release      # → build/linux/*/release/bundle/
-flutter build windows --release    # → build/windows/x64/runner/Release/
+flutter build windows --release    # → build/windows/x64/runner/Release/ (or arm64)
 flutter build apk --release        # → build/app/outputs/flutter-apk/
 flutter build appbundle --release  # → build/app/outputs/bundle/release/
 ```
+
+The Windows target architecture follows the host: an Arm64 build needs an
+Arm64 Windows machine **and** a Flutter SDK checked out from git rather than the
+stable archive (Flutter does not publish a Windows Arm64 SDK archive yet; the
+tool then downloads the Arm64 Dart SDK itself). See the `arm64` leg of
+`.github/workflows/build-windows.yml` for the exact CI steps.
 
 Contributions should keep `flutter analyze` clean and `flutter test` green.
 
