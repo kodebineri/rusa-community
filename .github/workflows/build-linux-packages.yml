@@ -314,10 +314,14 @@ jobs:
 
             cd /workspace
 
-            RAW_TAG="${GITHUB_REF_NAME}"
+            # NB: this script runs inside the container, so GITHUB_* env vars are
+            # NOT present. Derive the version from workflow expressions (expanded
+            # by the runner before the container starts) or the tag is lost and
+            # every package becomes 0.0.0-1.
+            RAW_TAG="${{ github.ref_name }}"
             RAW_VERSION="${RAW_TAG#v}"
             if [ "${{ github.ref_type }}" != "tag" ] || [ -z "$RAW_VERSION" ]; then
-              RAW_VERSION="0.0.0"
+              RAW_VERSION="0.0.0-dev"
             fi
             RPM_VERSION="${RAW_VERSION%%-*}"
             RPM_RELEASE="${RAW_VERSION#*-}"
