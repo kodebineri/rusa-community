@@ -5,24 +5,32 @@ Ready-to-paste store metadata. Character limits are shown next to each field.
 ## App name (max 30)
 
 ```text
-Rusa: MongoDB Client
+Rusa for MongoDB - DB Client
 ```
 
-20 characters. Fallback if review questions the trademark in the title:
+28 characters. `Rusa` stays the brand; `for MongoDB` mirrors the pattern MongoDB's Trademark
+Standards explicitly permit ("services for MongoDB") — the mark describes compatibility rather
+than becoming part of the product name. `DB Client` supplies the category keyword. Keep the
+non-affiliation disclaimer in the full description.
+
+Fallback if MongoDB, Inc. or Play review objects:
 
 ```text
 Rusa: Database Client
 ```
 
-21 characters. Keep the MongoDB disclaimer in the full description either way.
+21 characters and mark-free. `Rusa for MongoDB` (16) is a middle option that keeps the
+compatibility phrase without the category suffix.
 
 ## Short description (max 80)
 
 ```text
-Explore MongoDB databases: browse, query, aggregate, manage indexes.
+A viewer and client for MongoDB: browse, query, aggregate, manage.
 ```
 
-68 characters.
+66 characters (14 spare). Opens with the two category keywords (`viewer`, `client`) as
+descriptive compatibility (`for MongoDB`), then the four actions. Atlas is covered in the full
+description rather than the short description.
 
 ## Full description (max 4000; this copy is 2432 characters)
 
@@ -99,8 +107,8 @@ Initial release.
 
 | Setting | Value |
 |---|---|
-| App name | `Rusa: MongoDB Client` (20 / 30) |
-| Short description | `Explore MongoDB databases: browse, query, aggregate, manage indexes.` (68 / 80) |
+| App name | `Rusa for MongoDB - DB Client` (28 / 30) |
+| Short description | `A viewer and client for MongoDB: browse, query, aggregate, manage.` (66 / 80) |
 | Category | **Tools** (alternative: Productivity) |
 | Tags | Developer tools, Database, Productivity |
 | Contact email | *your support address* — Play requires a monitored address |
@@ -172,4 +180,8 @@ Suggested screenshot captions, in order:
 - Verify the package name stays `com.kodebineri.rusa`; it cannot change after the first
   upload.
 - Do not use the MongoDB leaf logo or imply endorsement. The word "MongoDB" is used
-  descriptively only.
+  descriptively only, in the `for MongoDB` pattern (never `MongoDBClient` or a combined mark).
+- Consider emailing `trademark@mongodb.com` for written approval of the title. MongoDB's
+  standards invite the question, and a written yes removes the remaining ambiguity.
+- Keep `Rusa` the more prominent mark in the icon and feature graphic; MongoDB's standards ask
+  that a third party's name and logo never outshine theirs.
