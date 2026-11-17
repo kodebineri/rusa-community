@@ -1,7 +1,7 @@
 name: rusa
 description: "Rusa — an independent MongoDB database client built with Flutter. Not affiliated with MongoDB, Inc."
 publish_to: "none"
-version: 1.0.2
+version: 1.0.2+4
 
 environment:
   sdk: ^3.5.0

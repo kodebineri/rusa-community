@@ -2,6 +2,9 @@
 
 Ready-to-paste store metadata. Character limits are shown next to each field.
 
+Live listing: <https://play.google.com/store/apps/details?id=com.kodebineri.rusa>
+(package `com.kodebineri.rusa`).
+
 ## App name (max 30)
 
 ```text
@@ -109,15 +112,15 @@ Initial release.
 |---|---|
 | App name | `Rusa for MongoDB - DB Client` (28 / 30) |
 | Short description | `A viewer and client for MongoDB: browse, query, aggregate, manage.` (66 / 80) |
-| Category | **Tools** (alternative: Productivity) |
+| Category | **Productivity** (the live listing's category; Tools is the alternative) |
 | Tags | Developer tools, Database, Productivity |
-| Contact email | *your support address* — Play requires a monitored address |
-| Privacy policy URL | *public URL for `PRIVACY.md`* — Play requires a reachable HTTPS page |
+| Contact email | `support@deveditortools.com` (monitored) |
+| Privacy policy URL | `https://github.com/kodebineri/rusa-community/blob/main/PRIVACY.md` |
 | Website | Optional: `https://github.com/kodebineri/rusa-community` |
 | Ads | No |
 | In-app purchases | No |
 | Target audience | **18+** (developer tool; keeps it out of Families) |
-| Content rating | Complete the questionnaire; expect **Everyone** |
+| Content rating | **Rated for 3+** (questionnaire complete) |
 | App access | No account. Reviewers can use the bundled sample data; live connections need a MongoDB URI |
 | Data safety | No data collected or shared; saved profiles stay on-device in encrypted platform storage; no analytics or telemetry. Credentials go only to the server the user configures |
 | Government app | No |
@@ -158,25 +161,29 @@ Suggested screenshot captions, in order:
 7. Light and dark themes
 8. Sample data included
 
-## Before uploading
+## Release checklist
 
-- **Replace the release signing config.** `android/app/build.gradle.kts` still signs
-  `release` with the debug key (`TODO` comment). Create a release keystore, keep it out of
-  Git, and configure `signingConfigs.release` before building.
-- Bump `version:` in `pubspec.yaml` (`1.0.1+2` → `1.0.1+3`, or a new version name). Play
-  rejects a duplicate version code.
+- The live listing still shows the previous title, short description, and full description.
+  Paste the copy above into Play Console — metadata updates ship without a new build.
+- **Release signing is configured** through `android/key.properties` (keystore path and
+  passwords, kept out of Git) and `signingConfigs.release` in
+  `android/app/build.gradle.kts`. Verify both are present before building.
+- Bump `version:` in `pubspec.yaml` **and** `AppInfo` in `lib/app_info.dart` together — a test
+  asserts they match. The build number after `+` is the Play version code, so it must increase
+  for every upload; for example the next build is `1.0.2+4`. Play rejects a duplicate version
+  code.
 - Build the bundle with `flutter build appbundle --release`, then upload
   `build/app/outputs/bundle/release/app-release.aab`.
 - Confirm the current Play target-API requirement against the Flutter SDK's
   `targetSdkVersion`; update the Flutter/Android toolchain if needed.
-- Host `PRIVACY.md` at a stable public HTTPS URL and use that exact URL in Play Console.
+- `PRIVACY.md` is hosted at the URL in the table above; keep that page reachable and its text
+  identical to the bundled asset.
 - Make the Data safety answers match `PRIVACY.md`: no collection, no sharing, no analytics,
   no ads, no account.
 - Upload the 512 × 512 Play icon separately — `flutter_launcher_icons` only generates the
   in-app launcher assets.
-- Start with an **Internal testing** track, install from the Play link, and verify the
-  first-run tour, connection flow, and the phone/tablet layouts before promoting to
-  production.
+- Test each build on the **Internal testing** track (first-run tour, connection flow,
+  phone/tablet layouts) before promoting it to production.
 - Verify the package name stays `com.kodebineri.rusa`; it cannot change after the first
   upload.
 - Do not use the MongoDB leaf logo or imply endorsement. The word "MongoDB" is used

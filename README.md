@@ -4,6 +4,7 @@
 
 [![Linux packages](https://github.com/kodebineri/rusa-community/actions/workflows/build-linux-packages.yml/badge.svg)](https://github.com/kodebineri/rusa-community/actions/workflows/build-linux-packages.yml)
 [![Windows build](https://github.com/kodebineri/rusa-community/actions/workflows/build-windows.yml/badge.svg)](https://github.com/kodebineri/rusa-community/actions/workflows/build-windows.yml)
+[![Google Play](https://img.shields.io/badge/Google_Play-Rusa-3DDC84?logo=googleplay&logoColor=white)][play]
 
 Rusa is an independent, open-source GUI client for MongoDB, built with
 [Flutter](https://flutter.dev). Browse and edit documents, build aggregation
@@ -93,7 +94,7 @@ Rusa is free software under the **GPL-3.0** licence.
 | Linux — Fedora, RHEL, CentOS… | Supported | DNF repository or `.rpm` (see below) |
 | Windows 10/11 (x64) | Supported | Portable `.zip` from [releases] |
 | Windows 11 (Arm64) | Supported | Portable `.zip` from [releases] |
-| Android 7.0+ | Supported | Google Play (in preparation) or build an APK |
+| Android 7.0+ | Supported | [Google Play][play] or sideload an APK |
 | iOS | Source builds only | Build with Flutter + Xcode (needs macOS) |
 | macOS | Not supported | — |
 
@@ -103,6 +104,7 @@ plain `.deb`, `.pkg.tar.zst`, and `.rpm` files if you prefer one-off
 downloads.
 
 [releases]: https://github.com/kodebineri/rusa-community/releases/latest
+[play]: https://play.google.com/store/apps/details?id=com.kodebineri.rusa
 
 ## Installing
 
@@ -188,8 +190,9 @@ checks, so `dnf` verifies everything automatically.
 
 ### Android
 
-Rusa runs on Android 7.0 (API 24) or later. A Google Play listing is in
-preparation; until it is live you can sideload an APK built from source:
+Rusa runs on Android 7.0 (API 24) or later. Install it from [Google Play][play].
+
+To sideload the APK instead, build it from source:
 
 ```bash
 flutter build apk --release
