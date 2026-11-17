@@ -9,7 +9,7 @@
 Rusa is an independent, open-source GUI client for MongoDB, built with
 [Flutter](https://flutter.dev). Browse and edit documents, build aggregation
 pipelines, analyse schemas, manage indexes, and run a mongosh-style shell —
-from a Linux or Windows desktop, an Android phone, or a tablet.
+from a Linux, Windows or macOS desktop, an Android phone, or a tablet.
 
 Out of the box, Rusa runs fully offline against a built-in local database
 engine seeded with sample data, so you can explore every feature without a
@@ -19,8 +19,9 @@ and MongoDB Atlas are all supported.
 
 **Private by design:** no account, no ads, no analytics, no telemetry. Saved
 connection profiles are kept in your device's encrypted platform storage
-(libsecret on Linux, DPAPI on Windows, Keystore on Android), and your data
-only ever travels between your device and the server you point it at.
+(libsecret on Linux, DPAPI on Windows, Keychain on macOS and iOS, Keystore on
+Android), and your data only ever travels between your device and the server you
+point it at.
 
 Rusa is free software under the **GPL-3.0** licence.
 
@@ -29,7 +30,7 @@ Rusa is free software under the **GPL-3.0** licence.
 ## Contents
 
 - [About Rusa](#about-rusa) — features and platform support
-- [Installing](#installing) — Linux (APT / pacman / DNF), Windows, Android, iOS, and from source
+- [Installing](#installing) — Linux (APT / pacman / DNF), Windows, Android, iOS, macOS, and from source
 - [Verifying packages](#verifying-packages) — the repository signing key
 - [Documentation](#documentation)
 - [Licence and trademark](#licence-and-trademark)
@@ -96,7 +97,7 @@ Rusa is free software under the **GPL-3.0** licence.
 | Windows 11 (Arm64) | Supported | Portable `.zip` from [releases] |
 | Android 7.0+ | Supported | [Google Play][play] or sideload an APK |
 | iOS | Source builds only | Build with Flutter + Xcode (needs macOS) |
-| macOS | Not supported | — |
+| macOS | Source builds only | Build with Flutter + Xcode on a Mac (see below) |
 
 All Linux repositories publish both `x86_64`/`amd64` and `aarch64`/`arm64`
 builds. Every release is also attached to the [releases page][releases] as
@@ -209,18 +210,28 @@ flutter pub get
 open ios/Runner.xcworkspace   # then pick your signing team and run
 ```
 
+### macOS
+
+Rusa is not yet distributed as a signed `.app` or on the Mac App Store, but the
+macOS platform is part of the source tree. With a Mac running Xcode:
+
+```bash
+flutter pub get
+open macos/Runner.xcworkspace   # then pick your signing team and run
+```
+
 ### Any OS — build from source
 
 Requirements: the [Flutter SDK](https://docs.flutter.dev/get-started/install)
 (3.24 or newer) and the platform toolchains (Visual Studio + Windows SDK on
-Windows, or the packages below on Linux).
+Windows, Xcode on macOS, or the packages below on Linux).
 
 ```bash
 git clone https://github.com/kodebineri/rusa-community.git
 cd rusa-community
 flutter pub get
 flutter run                 # first available device
-flutter run -d windows      # or: -d linux, -d <android-device-id>
+flutter run -d windows      # or: -d linux, -d macos, -d <android-device-id>
 ```
 
 Linux build prerequisites (Debian/Ubuntu package names):
@@ -234,6 +245,7 @@ Release builds:
 ```bash
 flutter build linux --release      # → build/linux/*/release/bundle/
 flutter build windows --release    # → build/windows/x64/runner/Release/ (or arm64)
+flutter build macos --release      # → build/macos/Build/Products/Release/
 flutter build apk --release        # → build/app/outputs/flutter-apk/
 flutter build appbundle --release  # → build/app/outputs/bundle/release/
 ```

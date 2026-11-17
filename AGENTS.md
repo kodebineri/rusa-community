@@ -16,7 +16,9 @@ a **real MongoDB server** (via `mongo_dart`) swaps the global engine instance.
 - The React/TSX reference app it was ported from is **deleted from the repo** (commit
   `36cbc8d`; it lives only in git history). Dart comments saying "Converted from
   `src/components/X.tsx`" point at those deleted files — don't go looking for them in the tree.
-- Platforms: `windows/`, `android/`, `ios/`, `linux/` (macOS is not scaffolded).
+- Platform dirs: `windows/`, `android/`, `ios/`, `linux/`, `macos/`. Linux/Windows ship as
+  packages, Android via Play; iOS and macOS are source-build only (no App Store / Mac App Store
+  and no macOS CI). The macOS Runner is preconfigured with the Rusa bundle id and icon set.
 - Saved connection profiles live in platform secure storage (`flutter_secure_storage`;
   Android `minSdk 24`, Linux needs `libsecret-1-dev` to build); EULA/theme flags stay in
   `SharedPreferences`.
@@ -36,16 +38,17 @@ a **real MongoDB server** (via `mongo_dart`) swaps the global engine instance.
   `CompassSvgIcons.rusa` (placeholder deer mark). "MongoDB" appears only descriptively, and
   About / EULA / Privacy carry a non-affiliation disclaimer.
 - **Launcher icon:** `assets/icon/icon.png` (1024×1024, no alpha) is the source of truth.
-  `flutter_launcher_icons` (dev dependency, configured under `flutter_launcher_icons:` in
-  `pubspec.yaml`) generates the Android mipmaps, the iOS `AppIcon` set and
-  `windows/runner/resources/app_icon.ico`. After replacing the PNG, run
-  `dart run flutter_launcher_icons` — then check
-  `ios/Runner.xcodeproj/project.pbxproj`: recent versions wrongly rewrite
-  `ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS` to `AppIcon` (it must stay
-  `YES`).
+  `flutter_launcher_icons` (dev dependency; `flutter_launcher_icons:` in `pubspec.yaml` covers
+  android, ios, windows and `macos: generate: true`) generates the Android mipmaps, both
+  `AppIcon.appiconset`s (iOS and `macos/Runner/Assets.xcassets/`) and
+  `windows/runner/resources/app_icon.ico`. After replacing the PNG run
+  `dart run flutter_launcher_icons` — then check `ios/Runner.xcodeproj/project.pbxproj`:
+  recent versions wrongly rewrite `ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS`
+  to `AppIcon` (it must stay `YES`).
 - **Identifiers:** OS app id is **`com.kodebineri.rusa`** (Android `applicationId`/`namespace`
-  + `MainActivity` package, iOS `PRODUCT_BUNDLE_IDENTIFIER`); Windows `Runner.rc` uses
-  `CompanyName = kodebineri` / `ProductName = Rusa`. The **Dart package name is `rusa`**
+  + `MainActivity` package, iOS `PRODUCT_BUNDLE_IDENTIFIER`; macOS
+  `macos/Runner/Configs/AppInfo.xcconfig`, where `PRODUCT_NAME = rusa`). Windows `Runner.rc`
+  uses `CompanyName = kodebineri` / `ProductName = Rusa`. The **Dart package name is `rusa`**
   (`name:` in `pubspec.yaml`, so imports use `package:rusa/…`); the Linux package/repo is
   **`rusa-community`**.
 - **Version:** `version:` in `pubspec.yaml` is duplicated in `lib/app_info.dart`
@@ -55,14 +58,19 @@ a **real MongoDB server** (via `mongo_dart`) swaps the global engine instance.
 
 ## Current status — read before you change anything
 
-_Verified 2026-11-11 at HEAD `4f0ff4e` (analyze clean, tests 139/139)._
+_Verified 2026-11-17 at HEAD `37ad480` (Flutter 3.50.0 / Dart 3.14.0): tests 139/139;
+`flutter analyze` exits 1 with 3 pre-existing deprecation infos — see below._
 
-- **`flutter analyze` is clean.** `analysis_options.yaml` excludes `build/`, `windows/`,
-  `android/`, `ios/` and `linux/`, so native-side edits are never analyzed.
-- **`flutter test` is 139/139.** Keep both analyze and tests green. The seven `mobile:` tests
-  guard the phone layouts (aggregations/schema/indexes at 320 px, the action sheet height cap,
-  the connection-modal footer, the export format cards, and the keyboard inset above the Shell
+- **`flutter test` is 139/139 — keep it green.** The seven `mobile:` tests guard the phone
+  layouts (aggregations/schema/indexes at 320 px, the action sheet height cap, the
+  connection-modal footer, the export format cards, and the keyboard inset above the Shell
   prompt).
+- **`flutter analyze` is not clean on Flutter ≥3.47.** It reports 3 `deprecated_member_use`
+  infos — `package:flutter/cupertino.dart` in `lib/utils/json_syntax_text_controller.dart` and
+  `lib/widgets/compass_query_bar.dart`, plus `package:flutter/material.dart` in the latter —
+  and exits 1. They are pre-existing, harmless core-type imports; CI does not run analyze, so
+  don't assume you caused them. `analysis_options.yaml` excludes `build/` and all native
+  platform dirs, so native-side edits are never analyzed.
 - **Theme source of truth:** `rainForestNight` is the default (not Dracula), with eight
   variants (four dark / four light). If docs or comments drift again, trust
   `CompassThemeVariant` / `defaultVariant` and `OnboardingModal.previewVariants`.
@@ -106,20 +114,23 @@ _Verified 2026-11-11 at HEAD `4f0ff4e` (analyze clean, tests 139/139)._
 
 | Task | Command |
 |---|---|
-| Static analysis (must be clean) | `flutter analyze` |
-| Tests (139/139 — keep green; see status) | `flutter test` |
+| Static analysis | `flutter analyze` (3 pre-existing deprecation infos; see status) |
+| Tests (139/139 — keep green) | `flutter test` |
 | Run a single test file | `flutter test test/widget_test.dart` |
 | Run one test by name | `flutter test test/widget_test.dart --plain-name "exact test name"` |
 | Run desktop app (Windows) | `flutter run -d windows` |
 | Run desktop app (Linux) | `flutter run -d linux` |
+| Run desktop app (macOS) | `flutter run -d macos` (needs Xcode) |
 | Run on Android | `flutter run -d <device>` (needs `INTERNET` — already in the main manifest) |
 | Build Linux release | `flutter build linux --release` |
 | Build Windows release | `flutter build windows --release` |
+| Build macOS release | `flutter build macos --release` |
 | Build Android APK | `flutter build apk --release` |
 | Regenerate launcher icons | `dart run flutter_launcher_icons` (after replacing `assets/icon/icon.png`) |
 
-Run `flutter analyze` before `flutter test`; both must stay green. There is no JS/npm build
-step, codegen, or `build_runner` in the repo — Flutter tooling only.
+Run `flutter analyze` before `flutter test`; keep tests green and introduce no new analyze
+issues (the 3 above are pre-existing). There is no JS/npm build step, codegen, or `build_runner`
+in the repo — Flutter tooling only.
 
 ## Doc index
 
@@ -130,6 +141,7 @@ step, codegen, or `build_runner` in the repo — Flutter tooling only.
 | `docs/ui.md` | touch any widget: modals, document views, header/sidebar/query bar/tab bar/terminal, icons, or theme (`lib/widgets/*`, `lib/theme/*`, `lib/icons/*`) |
 | `docs/testing.md` | write or fix tests in `test/widget_test.dart` |
 | `docs/play-store-listing.md` | prepare Google Play metadata, screenshots, data-safety answers, or a release checklist |
+| `docs/performance-benchmarks.md` | refresh/cite Windows startup, memory and binary-size numbers (one-off local measurements, 2026-11-12) |
 
 ## Hard invariants (do not break)
 
@@ -190,8 +202,8 @@ step, codegen, or `build_runner` in the repo — Flutter tooling only.
 13. **Touch layer (mobile/tablet):** metrics come from `CompassDensity.of(context)`
     (`lib/theme/compass_density.dart`; tap target 20 dp desktop / **44 dp** touch). The touch
     profile is used when the viewport is < 768 dp wide **or**
-    `CompassDensity.isTouchPrimaryPlatform` is true (Android/iOS/Fuchsia, read from `dart:io`
-    so `flutter test` stays on the desktop profile) — this keeps 8-inch tablets in landscape
+    `CompassDensity.isTouchPrimaryPlatform` is true (Android/iOS/Fuchsia, read from `dart:io`,
+    so tests and macOS use the desktop profile) — this keeps 8-inch tablets in landscape
     finger-sized. The docked desktop layout switches at 1024 dp on touch platforms
     (`desktopBreakpointFor`). Icon-only controls use `CompassIconButton` (guarantees the hit
     area without changing the glyph size); hover/tap feedback uses `CompassHover` (builder

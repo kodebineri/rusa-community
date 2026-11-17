@@ -36,6 +36,8 @@ flutter_launcher_icons:
     generate: true
     image_path: "assets/icon/icon.png"
     icon_size: 256
+  macos:
+    generate: true
 
 flutter:
   uses-material-design: false
