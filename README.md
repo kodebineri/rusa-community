@@ -43,6 +43,10 @@ Rusa is free software under the **GPL-3.0** licence.
 
 - `mongodb://` and `mongodb+srv://` connection strings
 - Self-hosted MongoDB, replica sets, and MongoDB Atlas
+- Authentication Database field (`authSource`, defaults to `admin`) so Docker
+  root users connect without editing the URI
+- Optional SSH tunnel through a bastion host (password or private-key auth)
+  for servers that are not directly reachable
 - Save connection profiles in encrypted platform storage and reuse them after
   a restart
 

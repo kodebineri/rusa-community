@@ -5,7 +5,9 @@ import 'dart:typed_data';
 import 'package:mongo_dart/mongo_dart.dart' as mdb;
 
 import '../models/mongo_models.dart';
+import '../models/ssh_tunnel_config.dart';
 import 'local_mongo_engine.dart';
+import 'ssh_tunnel.dart';
 
 /// A [LocalMongoEngine] backed by an actual MongoDB server.
 ///
@@ -19,7 +21,7 @@ import 'local_mongo_engine.dart';
 /// `DateTime` → ISO string, binaries → base64) so the existing views can render
 /// them with `jsonEncode`.
 class RealMongoService extends LocalMongoEngine {
-  RealMongoService._(this.uri, this._primary) {
+  RealMongoService._(this.uri, this._connectUri, this._primary, this._sshTunnel) {
     final primaryDb = _primary.databaseName;
     if (primaryDb != null && primaryDb.isNotEmpty) {
       _handles[primaryDb] = _primary;
@@ -40,7 +42,21 @@ class RealMongoService extends LocalMongoEngine {
   static const int docLoadChunkSize = 200;
 
   final String uri;
+
+  /// The URI actually handed to the driver. It differs from [uri] when an SSH
+  /// tunnel is used: the host:port are replaced by the tunnel's local port.
+  final String _connectUri;
+
   final mdb.Db _primary;
+
+  /// The SSH tunnel backing this connection, or `null` for a direct connection.
+  /// Closed by [dispose].
+  final SshTunnel? _sshTunnel;
+
+  /// The bastion host key fingerprint this session saw (`SHA256:…`), or `null`
+  /// when the connection did not use an SSH tunnel. `main.dart` pins it onto the
+  /// saved profile when the profile had no fingerprint yet.
+  String? get sshHostKeyFingerprint => _sshTunnel?.hostKeyFingerprint;
 
   /// One connection handle per (non-system) database.
   final Map<String, mdb.Db> _handles = {};
@@ -59,42 +75,81 @@ class RealMongoService extends LocalMongoEngine {
   bool _disposed = false;
 
   /// Quick connectivity test without mirroring all collections/documents.
-  static Future<void> test(String uri) async {
-    final trimmed = uri.trim();
-    final safeUri = _ensureDbPath(trimmed);
-    final primary = await mdb.Db.create(safeUri);
+  ///
+  /// When [sshTunnel] is active the probe runs through a temporary local SSH
+  /// port forward that is closed again before returning. Returns the bastion
+  /// host key fingerprint the session saw (to pin on the saved profile), or
+  /// `null` for a direct connection.
+  static Future<String?> test(
+    String uri, {
+    SshTunnelConfig? sshTunnel,
+  }) async {
+    final tunnel = await _openTunnel(uri, sshTunnel);
     try {
-      await primary.open().timeout(const Duration(seconds: 15));
+      final trimmed = uri.trim();
+      final targetUri = tunnel == null
+          ? trimmed
+          : rewriteMongoUriForLocalPort(trimmed, tunnel.localPort);
+      final safeUri = _ensureDbPath(targetUri);
+      final primary = await mdb.Db.create(safeUri);
       try {
-        await primary.pingCommand().timeout(const Duration(seconds: 5));
-      } catch (_) {
-        await primary.listDatabases().timeout(const Duration(seconds: 5));
+        await primary.open().timeout(const Duration(seconds: 15));
+        try {
+          await primary.pingCommand().timeout(const Duration(seconds: 5));
+        } catch (_) {
+          await primary.listDatabases().timeout(const Duration(seconds: 5));
+        }
+      } catch (error) {
+        throw _explainForwardFailure(tunnel, error);
+      } finally {
+        try {
+          await primary.close();
+        } catch (_) {}
       }
+      return tunnel?.hostKeyFingerprint;
     } finally {
-      try {
-        await primary.close();
-      } catch (_) {}
+      await tunnel?.close();
     }
   }
 
   /// Connects to [uri], verifies the server is reachable, then mirrors it.
   ///
+  /// When [sshTunnel] is active the driver talks to a local port forwarded over
+  /// SSH to the URI's host:port; the tunnel stays open for the whole session and
+  /// is closed by [dispose].
+  ///
   /// Throws (with the driver error) when the URI is invalid, the server is
-  /// unreachable, or authentication fails.
-  static Future<RealMongoService> connect(String uri) async {
+  /// unreachable, or authentication fails; throws [SshTunnelException] when the
+  /// bastion cannot be reached or authenticated against.
+  static Future<RealMongoService> connect(
+    String uri, {
+    SshTunnelConfig? sshTunnel,
+  }) async {
     final trimmed = uri.trim();
-    final safeUri = _ensureDbPath(trimmed);
-    final primary = await mdb.Db.create(safeUri);
+    final tunnel = await _openTunnel(trimmed, sshTunnel);
+    final connectUri = tunnel == null
+        ? trimmed
+        : rewriteMongoUriForLocalPort(trimmed, tunnel.localPort);
+    final safeUri = _ensureDbPath(connectUri);
+    final mdb.Db primary;
+    try {
+      primary = await mdb.Db.create(safeUri);
+    } catch (e) {
+      await tunnel?.close();
+      rethrow;
+    }
     try {
       await primary.open().timeout(const Duration(seconds: 20));
     } catch (e) {
       try {
         await primary.close();
       } catch (_) {}
-      rethrow;
+      final explained = _explainForwardFailure(tunnel, e);
+      await tunnel?.close();
+      throw explained;
     }
 
-    final service = RealMongoService._(trimmed, primary);
+    final service = RealMongoService._(trimmed, connectUri, primary, tunnel);
     try {
       await service.reloadFast().timeout(const Duration(seconds: 20));
     } catch (e) {
@@ -104,6 +159,37 @@ class RealMongoService extends LocalMongoEngine {
       rethrow;
     }
     return service;
+  }
+
+  /// Turns a socket/driver failure into an [SshTunnelException] when the bastion
+  /// itself refused to open the connection to the MongoDB side (wrong host or
+  /// port, container port not published, firewall). Otherwise returns [error]
+  /// unchanged so the normal driver message is preserved.
+  static Object _explainForwardFailure(SshTunnel? tunnel, Object error) {
+    final forward = tunnel?.lastForwardError;
+    if (forward == null) return error;
+    return SshTunnelException(
+      'The SSH bastion could not connect to '
+      '${tunnel!.remoteHost}:${tunnel.remotePort}: $forward. '
+      'That address is resolved from the bastion, not from this computer - '
+      'check the port is reachable there (for Docker, publish it on the host '
+      'or use the container/host address that the bastion can see).',
+    );
+  }
+
+  /// Opens the bastion forward when [config] is active, or returns `null` for a
+  /// direct connection.
+  static Future<SshTunnel?> _openTunnel(
+    String uri,
+    SshTunnelConfig? config,
+  ) async {
+    if (config == null || !config.isActive) return null;
+    final target = parseMongoUriTarget(uri);
+    return SshTunnel.open(
+      config: config,
+      remoteHost: target.host,
+      remotePort: target.port,
+    );
   }
 
   /// Fast reload: list databases and collection names immediately so the UI
@@ -402,7 +488,7 @@ class RealMongoService extends LocalMongoEngine {
     databases = result;
   }
 
-  /// Closes every server connection.
+  /// Closes every server connection, then the SSH tunnel (if any).
   Future<void> dispose() async {
     if (_disposed) return;
     _disposed = true;
@@ -416,6 +502,9 @@ class RealMongoService extends LocalMongoEngine {
     _handles.clear();
     try {
       await _primary.close();
+    } catch (_) {/* ignore */}
+    try {
+      await _sshTunnel?.close();
     } catch (_) {/* ignore */}
   }
 
@@ -448,7 +537,7 @@ class RealMongoService extends LocalMongoEngine {
     }
 
     // Fallback: If uri is SRV or standard, create and open
-    final dbUri = _withDatabase(uri, dbName);
+    final dbUri = _withDatabase(_connectUri, dbName);
     final db = await mdb.Db.create(dbUri);
     await db.open().timeout(const Duration(seconds: 15));
     _handles[dbName] = db;

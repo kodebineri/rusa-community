@@ -1,6 +1,6 @@
 # Testing — `test/`
 
-Companion to root `AGENTS.md`. Seven files, **139 tests**:
+Companion to root `AGENTS.md`. Nine files, **173 tests**:
 
 | File | What it covers |
 |---|---|
@@ -11,13 +11,16 @@ Companion to root `AGENTS.md`. Seven files, **139 tests**:
 | `test/mongo_json_parser_test.dart` | unit tests for the mongosh-flavoured JSON parser |
 | `test/compass_density_test.dart` | unit tests for the desktop/touch density profiles |
 | `test/json_auto_indent_formatter_test.dart` | unit tests for the JSON auto-indent formatter |
+| `test/ssh_tunnel_test.dart` | URI targeting/rewriting for the SSH tunnel, `SshTunnelConfig` / profile persistence, host-key pin matching, and the connect dialog's tunnel form (including the pinned-key Clear action) |
+| `test/mongo_uri_test.dart` | `appendAuthSource` / `authSourceFromUri` — the Authentication Database field's effect on connection URIs |
+| `test/support/modal_harness.dart` | not a test file: shared `Directionality`/`Overlay`/theme/density wrapper for tests that pump a bare modal |
 
-> **Status: 139 pass / 0 fail, `flutter analyze` clean.**
+> **Status: 173 pass / 0 fail, `flutter analyze` clean.**
 
 ## Commands
 
 ```bash
-flutter test                              # all — expect 139/139
+flutter test                              # all — expect 173/173
 flutter test test/widget_test.dart        # just the widget tests
 flutter test test/mongosh_interpreter_test.dart
 flutter analyze                           # expect "No issues found!"

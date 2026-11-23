@@ -14,6 +14,7 @@ import 'services/local_mongo_engine.dart';
 import 'services/mongo_engine.dart';
 import 'services/mongosh_interpreter.dart';
 import 'services/real_mongo_service.dart';
+import 'services/ssh_tunnel.dart';
 import 'services/app_preferences.dart';
 import 'widgets/compass_header.dart';
 import 'widgets/compass_hover.dart';
@@ -129,14 +130,21 @@ class _CompassAppState extends State<CompassApp> {
 
   /// Called by the welcome tour's last slide. Persists consent (first run only)
   /// and the "don't show this again" choice, then reveals the app shell.
+  ///
+  /// A user who is not connected lands on the connect popup with an empty
+  /// workspace — the bundled sample data must be an explicit choice, not the
+  /// implicit first view. Replaying the tour while connected keeps the current
+  /// workspace and does not reopen the popup.
   void _finishOnboarding({required bool dontShowAgain}) {
     final needsConsent = _eulaAccepted != true;
     setState(() {
       _eulaAccepted = true;
       _onboardingDone = dontShowAgain;
       _isOnboardingOpen = false;
-      // Finishing the tour lands on the sample data, not the connect popup.
-      _isConnectModalOpen = false;
+      if (_connection == null) {
+        _clearWorkspace();
+        _isConnectModalOpen = true;
+      }
     });
     if (needsConsent) unawaited(appPreferences.setEulaAccepted(true));
     unawaited(appPreferences.setOnboardingDone(dontShowAgain));
@@ -550,9 +558,14 @@ class _CompassAppState extends State<CompassApp> {
   /// still reachable through the dialog's "Load Sample Datasets" card).
   Future<String?> _handleConnectProfile(ConnectionProfile profile) async {
     RealMongoService connected;
+    final timeout = (profile.sshTunnel?.enabled ?? false)
+        ? const Duration(seconds: 90)
+        : const Duration(seconds: 45);
     try {
-      connected = await RealMongoService.connect(profile.uri)
-          .timeout(const Duration(seconds: 45));
+      connected = await RealMongoService.connect(
+        profile.uri,
+        sshTunnel: profile.sshTunnel,
+      ).timeout(timeout);
     } catch (err) {
       return _formatConnectError(err);
     }
@@ -583,7 +596,48 @@ class _CompassAppState extends State<CompassApp> {
       _resetTabsTo(firstDb.name, firstColl ?? '');
       _isConnectModalOpen = false;
     });
+    final fingerprint = connected.sshHostKeyFingerprint;
+    if (fingerprint != null) _pinSshHostKey(profile, fingerprint);
     return null;
+  }
+
+  /// Trust on first use: records the bastion's host key on the saved profile
+  /// the first time a connection through it succeeds, so a later key change is
+  /// refused instead of silently accepted.
+  ///
+  /// Does nothing when the profile is not saved, the tunnel is off, or a key is
+  /// already pinned (the user clears it from the connection dialog to re-pin).
+  void _pinSshHostKey(ConnectionProfile profile, String fingerprint) {
+    final byId = _savedConnections.indexWhere((c) => c.id == profile.id);
+    final index = byId >= 0
+        ? byId
+        : _savedConnections.indexWhere((c) => c.uri == profile.uri);
+    if (index < 0) return;
+
+    final existing = _savedConnections[index];
+    final tunnel = existing.sshTunnel;
+    if (tunnel == null || !tunnel.enabled || tunnel.hostKeyFingerprint != null) {
+      return;
+    }
+    // Matching by URI alone could target a profile pointing at a different
+    // bastion; only pin when the tunnel we actually used is the stored one.
+    final used = profile.sshTunnel;
+    if (byId < 0 &&
+        (used == null ||
+            used.host != tunnel.host ||
+            used.port != tunnel.port ||
+            used.username != tunnel.username)) {
+      return;
+    }
+
+    final updated = existing.copyWith(
+      sshTunnel: tunnel.copyWith(hostKeyFingerprint: fingerprint),
+    );
+    setState(() {
+      _savedConnections = [..._savedConnections]..[index] = updated;
+      if (_connection?.id == updated.id) _connection = updated;
+    });
+    unawaited(appPreferences.setSavedConnections(List.of(_savedConnections)));
   }
 
   void _disposeRealService() {
@@ -595,8 +649,11 @@ class _CompassAppState extends State<CompassApp> {
     _realService = null;
   }
 
-  /// Turns a driver/socket exception into a concise, user-facing message.
+  /// Turns a driver / SSH / socket exception into a concise, user-facing message.
   String _formatConnectError(Object error) {
+    if (error is SshTunnelException) {
+      return 'SSH tunnel: ${error.message}';
+    }
     final text = error.toString();
     if (text.contains('Connection refused') ||
         text.contains('SocketException') ||
@@ -606,9 +663,16 @@ class _CompassAppState extends State<CompassApp> {
       return 'Could not reach the MongoDB server. Check network, DNS (SRV), IP allowlist, and credentials.';
     }
     if (text.contains('Authentication failed') ||
-        text.contains('auth') ||
-        text.contains('bad auth')) {
-      return 'Authentication failed. Check the username, password and auth source.';
+        text.contains('AuthenticationFailed') ||
+        text.contains('bad auth') ||
+        text.contains('SCRAM')) {
+      final detail = text
+          .replaceFirst('MongoDartError: ', '')
+          .replaceFirst('Exception: ', '');
+      return 'MongoDB authentication failed. Check the username, password and '
+          'authSource. Users created with MONGO_INITDB_ROOT_USERNAME (Docker) '
+          'live in admin, so the URI needs ?authSource=admin. '
+          'Driver said: $detail';
     }
     return text
         .replaceFirst('MongoDartError: ', '')
@@ -952,8 +1016,28 @@ class _CompassAppState extends State<CompassApp> {
     setState(() {
       mongoEngine = LocalMongoEngine.instance;
       _connection = null;
-      _resetTabsTo('library', 'books');
+      // Disconnecting returns to the connection popup; the local sample data
+      // must not look like the still-connected default view.
+      _clearWorkspace();
+      _isConnectModalOpen = true;
     });
+  }
+
+  /// Empties the tab strip and selection so the shell shows its
+  /// "Select a collection to view data" placeholder instead of the bundled
+  /// sample data. Callers wrap this in `setState`.
+  ///
+  /// Used whenever the connection popup is what the user should see first
+  /// (first run finishing the tour, disconnecting) so the offline sample data
+  /// is never presented as an implicit default connection.
+  void _clearWorkspace() {
+    _openTabs.clear();
+    _activeTabIndex = -1;
+    _selectedDbName = '';
+    _selectedCollName = '';
+    _activeTab = 'documents';
+    _docViewMode = 'tree';
+    _queryOptions = QueryFilterOptions();
   }
 
   void _requestTerminalConfirmation(
@@ -1329,7 +1413,13 @@ class _CompassAppState extends State<CompassApp> {
                 onConnectSampleData: _handleConnectSampleData,
                 onTestConnection: (profile) async {
                   try {
-                    await RealMongoService.test(profile.uri);
+                    final fingerprint = await RealMongoService.test(
+                      profile.uri,
+                      sshTunnel: profile.sshTunnel,
+                    );
+                    if (fingerprint != null) {
+                      _pinSshHostKey(profile, fingerprint);
+                    }
                     return null;
                   } catch (err) {
                     return _formatConnectError(err);

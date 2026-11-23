@@ -12,10 +12,10 @@ class AppInfo {
   const AppInfo._();
 
   /// Semantic version — the part before `+` in pubspec's `version:`.
-  static const String version = '1.0.2';
+  static const String version = '1.1.0';
 
   /// Build number — the part after `+` in pubspec's `version:`.
-  static const String buildNumber = '4';
+  static const String buildNumber = '5';
 
   /// The complete `version:` string from `pubspec.yaml` (`<version>+<build>`).
   static const String fullVersion = '$version+$buildNumber';

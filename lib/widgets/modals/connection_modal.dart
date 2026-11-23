@@ -1,10 +1,15 @@
+import 'package:file_selector/file_selector.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import '../../theme/compass_colors.dart';
+import '../../theme/compass_density.dart';
 import '../../theme/compass_theme.dart';
 import '../../theme/compass_typography.dart';
 import '../../icons/compass_svg_icons.dart';
 import '../../models/mongo_models.dart';
+import '../../models/ssh_tunnel_config.dart';
+import '../../utils/mongo_uri.dart';
+import '../compass_hover.dart';
 import '../compass_icon_button.dart';
 import 'compass_modal.dart';
 
@@ -19,6 +24,9 @@ import 'compass_modal.dart';
 /// Beyond the React original this dialog also exposes:
 ///  * Advanced Connection Options (host / port / username / password) that
 ///    compose the URI as they are edited.
+///  * An optional SSH tunnel: the bastion host/port/username plus either a
+///    password or a private key file. Connecting forwards the URI's host:port
+///    through the bastion (see `lib/services/ssh_tunnel.dart`).
 ///  * Per-saved-connection deletion.
 ///  * Per-saved-connection editing: the form loads the saved profile and
 ///    "Update & Connect" saves the changes back onto the same profile.
@@ -71,6 +79,25 @@ class _ConnectionModalState extends State<ConnectionModal> {
   late final TextEditingController _usernameController;
   late final TextEditingController _passwordController;
 
+  /// Database the MongoDB credentials are defined in (`authSource`).
+  /// Defaults to `admin`, which is where `MONGO_INITDB_ROOT_USERNAME` users
+  /// live; clearing the field leaves authSource out of the URI.
+  late final TextEditingController _authSourceController;
+
+  late final TextEditingController _sshHostController;
+  late final TextEditingController _sshPortController;
+  late final TextEditingController _sshUserController;
+  late final TextEditingController _sshPasswordController;
+  late final TextEditingController _sshKeyPathController;
+  late final TextEditingController _sshPassphraseController;
+
+  bool _sshEnabled = false;
+  SshAuthMethod _sshAuthMethod = SshAuthMethod.password;
+
+  /// Host key pinned on the saved profile, if any. Shown read-only with a
+  /// Clear action so a rotated bastion key can be re-trusted.
+  String? _sshHostKeyFingerprint;
+
   bool _showAdvanced = false;
   bool _syncingUri = false;
   bool _isConnecting = false;
@@ -95,6 +122,13 @@ class _ConnectionModalState extends State<ConnectionModal> {
     _portController = TextEditingController();
     _usernameController = TextEditingController();
     _passwordController = TextEditingController();
+    _authSourceController = TextEditingController();
+    _sshHostController = TextEditingController();
+    _sshPortController = TextEditingController();
+    _sshUserController = TextEditingController();
+    _sshPasswordController = TextEditingController();
+    _sshKeyPathController = TextEditingController();
+    _sshPassphraseController = TextEditingController();
     _resetFields();
     _wireAdvancedSync();
   }
@@ -107,6 +141,16 @@ class _ConnectionModalState extends State<ConnectionModal> {
     _portController.text = '27017';
     _usernameController.text = '';
     _passwordController.text = '';
+    _authSourceController.text = 'admin';
+    _sshEnabled = false;
+    _sshAuthMethod = SshAuthMethod.password;
+    _sshHostController.text = '';
+    _sshPortController.text = '22';
+    _sshUserController.text = '';
+    _sshPasswordController.text = '';
+    _sshKeyPathController.text = '';
+    _sshPassphraseController.text = '';
+    _sshHostKeyFingerprint = null;
     _showAdvanced = false;
     _isConnecting = false;
     _isTesting = false;
@@ -136,6 +180,13 @@ class _ConnectionModalState extends State<ConnectionModal> {
     _portController.dispose();
     _usernameController.dispose();
     _passwordController.dispose();
+    _authSourceController.dispose();
+    _sshHostController.dispose();
+    _sshPortController.dispose();
+    _sshUserController.dispose();
+    _sshPasswordController.dispose();
+    _sshKeyPathController.dispose();
+    _sshPassphraseController.dispose();
     super.dispose();
   }
 
@@ -147,6 +198,7 @@ class _ConnectionModalState extends State<ConnectionModal> {
       _portController,
       _usernameController,
       _passwordController,
+      _authSourceController,
     ]) {
       controller.addListener(_syncUriFromAdvanced);
     }
@@ -175,12 +227,19 @@ class _ConnectionModalState extends State<ConnectionModal> {
     final pass = _passwordController.text;
     final credentials =
         user.isEmpty ? '' : '$user${pass.isEmpty ? '' : ':$pass'}@';
-    return 'mongodb://$credentials$host:$port';
+    return appendAuthSource(
+      'mongodb://$credentials$host:$port',
+      _authSourceController.text,
+    );
   }
 
   String _effectiveUri() {
     final typed = _uriController.text.trim();
-    return typed.isEmpty ? _composeUri() : typed;
+    final base = typed.isEmpty ? _composeUri() : typed;
+    // A typed URI may carry credentials without an authSource; scope it to the
+    // Authentication Database field (default `admin`) unless it already names
+    // one.
+    return appendAuthSource(base, _authSourceController.text);
   }
 
   ConnectionProfile? get _editingProfile {
@@ -205,6 +264,24 @@ class _ConnectionModalState extends State<ConnectionModal> {
       favorite: base?.favorite ?? false,
       lastConnected: base?.lastConnected ?? 'Just now',
       readOnly: base?.readOnly ?? false,
+      sshTunnel: _buildSshConfig(),
+    );
+  }
+
+  /// The SSH tunnel settings from the form, or `null` when the toggle is off.
+  SshTunnelConfig? _buildSshConfig() {
+    if (!_sshEnabled) return null;
+    final port = int.tryParse(_sshPortController.text.trim());
+    return SshTunnelConfig(
+      enabled: true,
+      host: _sshHostController.text.trim(),
+      port: (port == null || port < 1 || port > 65535) ? 22 : port,
+      username: _sshUserController.text.trim(),
+      authMethod: _sshAuthMethod,
+      password: _sshPasswordController.text,
+      privateKeyPath: _sshKeyPathController.text.trim(),
+      privateKeyPassphrase: _sshPassphraseController.text,
+      hostKeyFingerprint: _sshHostKeyFingerprint,
     );
   }
 
@@ -218,7 +295,20 @@ class _ConnectionModalState extends State<ConnectionModal> {
     _portController.text = parts.port;
     _usernameController.text = parts.user;
     _passwordController.text = parts.password;
+    _authSourceController.text = parts.authSource ?? 'admin';
     _syncingUri = false;
+
+    final ssh = profile.sshTunnel;
+    _sshEnabled = ssh?.enabled ?? false;
+    _sshAuthMethod = ssh?.authMethod ?? SshAuthMethod.password;
+    _sshHostController.text = ssh?.host ?? '';
+    _sshPortController.text = '${ssh?.port ?? 22}';
+    _sshUserController.text = ssh?.username ?? '';
+    _sshPasswordController.text = ssh?.password ?? '';
+    _sshKeyPathController.text = ssh?.privateKeyPath ?? '';
+    _sshPassphraseController.text = ssh?.privateKeyPassphrase ?? '';
+    _sshHostKeyFingerprint = ssh?.hostKeyFingerprint;
+
     setState(() {
       _editingId = profile.id;
       _editingName = profile.name;
@@ -232,8 +322,8 @@ class _ConnectionModalState extends State<ConnectionModal> {
   }
 
   /// Best-effort split of a connection URI into the advanced-form fields.
-  ({String host, String port, String user, String password}) _parseUri(
-      String uri) {
+  ({String host, String port, String user, String password, String? authSource})
+      _parseUri(String uri) {
     var rest = uri.trim();
     final scheme = rest.indexOf('://');
     if (scheme >= 0) rest = rest.substring(scheme + 3);
@@ -266,7 +356,22 @@ class _ConnectionModalState extends State<ConnectionModal> {
       host = hostPort.substring(0, colon);
       port = hostPort.substring(colon + 1);
     }
-    return (host: host, port: port, user: user, password: password);
+    return (
+      host: host,
+      port: port,
+      user: user,
+      password: password,
+      authSource: authSourceFromUri(uri),
+    );
+  }
+
+  /// How long to wait for a connection attempt. An SSH tunnel adds a bastion
+  /// handshake before the driver can even reach MongoDB, so it gets a longer
+  /// budget than a direct connection.
+  Duration _connectTimeout(ConnectionProfile profile) {
+    return (profile.sshTunnel?.enabled ?? false)
+        ? const Duration(seconds: 90)
+        : const Duration(seconds: 45);
   }
 
   Future<void> _connect() => _attemptConnect(_buildProfile());
@@ -290,7 +395,7 @@ class _ConnectionModalState extends State<ConnectionModal> {
       try {
         final error = await widget
             .onConnect(profile)
-            .timeout(const Duration(seconds: 45));
+            .timeout(_connectTimeout(profile));
         if (!mounted) return;
         setState(() {
           _isTesting = false;
@@ -319,7 +424,7 @@ class _ConnectionModalState extends State<ConnectionModal> {
       _connectError = null;
     });
     try {
-      final error = await tester(profile).timeout(const Duration(seconds: 45));
+      final error = await tester(profile).timeout(_connectTimeout(profile));
       if (!mounted) return;
       setState(() {
         _isTesting = false;
@@ -353,7 +458,7 @@ class _ConnectionModalState extends State<ConnectionModal> {
     });
     try {
       final error =
-          await widget.onConnect(profile).timeout(const Duration(seconds: 45));
+          await widget.onConnect(profile).timeout(_connectTimeout(profile));
       if (!mounted) return;
       if (error == null) {
         widget.onClose();
@@ -735,11 +840,304 @@ class _ConnectionModalState extends State<ConnectionModal> {
                     ),
                   ],
                 ),
+                const SizedBox(height: 12.0),
+                const CompassFieldLabel(
+                  label: 'Authentication Database',
+                  hint: 'Default: admin',
+                ),
+                CompassInput(
+                  controller: _authSourceController,
+                  placeholder: 'admin',
+                ),
+                const SizedBox(height: 14.0),
+                Container(height: 1.0, color: _theme.border),
+                const SizedBox(height: 10.0),
+                _buildSshSection(),
               ],
             ),
           ),
         ],
       ],
+    );
+  }
+
+  /// The "Connect through an SSH tunnel" toggle plus its fields. It lives
+  /// inside Advanced Connection Options because it describes how to reach the
+  /// MongoDB host rather than what to authenticate with once there.
+  Widget _buildSshSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _sshToggleRow(),
+        if (_sshEnabled) ...[
+          const SizedBox(height: 10.0),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                flex: 2,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    const CompassFieldLabel(label: 'SSH Host'),
+                    CompassInput(
+                      controller: _sshHostController,
+                      placeholder: 'bastion.example.com',
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 12.0),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    const CompassFieldLabel(label: 'SSH Port'),
+                    CompassInput(
+                      controller: _sshPortController,
+                      placeholder: '22',
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12.0),
+          const CompassFieldLabel(label: 'SSH Username'),
+          CompassInput(
+            controller: _sshUserController,
+            mono: false,
+            placeholder: 'deploy',
+          ),
+          const SizedBox(height: 12.0),
+          const CompassFieldLabel(label: 'SSH Authentication'),
+          _buildSshMethodChips(),
+          const SizedBox(height: 12.0),
+          if (_sshAuthMethod == SshAuthMethod.password)
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const CompassFieldLabel(label: 'SSH Password'),
+                CompassInput(
+                  controller: _sshPasswordController,
+                  mono: false,
+                  obscureText: true,
+                  placeholder: 'Bastion password',
+                ),
+              ],
+            )
+          else ...[
+            const CompassFieldLabel(label: 'Private Key File'),
+            CompassInput(
+              controller: _sshKeyPathController,
+              placeholder: '~/.ssh/id_ed25519',
+              suffix: CompassIconButton(
+                svgString: CompassSvgIcons.file,
+                onTap: _pickKeyFile,
+                size: 14.0,
+                padding: 4.0,
+                color: _theme.textMuted,
+                semanticLabel: 'Choose private key file',
+              ),
+            ),
+            const SizedBox(height: 12.0),
+            const CompassFieldLabel(
+              label: 'Key Passphrase',
+              hint: 'Optional',
+            ),
+            CompassInput(
+              controller: _sshPassphraseController,
+              mono: false,
+              obscureText: true,
+              placeholder: 'Only if the key is encrypted',
+            ),
+          ],
+          const SizedBox(height: 8.0),
+          if (_sshHostKeyFingerprint != null) ...[
+            _buildPinnedKeyRow(),
+            const SizedBox(height: 8.0),
+          ],
+          Text(
+            'The MongoDB host and port above are reached through the bastion. '
+            'Its host key is pinned on first use and a changed key is refused '
+            'until cleared. For a TLS server, add '
+            'tlsAllowInvalidCertificates=true to the URI: the tunnel terminates '
+            'on 127.0.0.1, so the certificate cannot match the server name.',
+            style: CompassTypography.caption(color: _theme.textMuted),
+          ),
+        ],
+      ],
+    );
+  }
+
+  /// Bordered checkbox row mirroring the onboarding acceptance control.
+  Widget _sshToggleRow() {
+    final density = CompassDensity.of(context);
+    return ConstrainedBox(
+      constraints: BoxConstraints(minHeight: density.minTapTarget),
+      child: CompassHover(
+        onTap: () => setState(() => _sshEnabled = !_sshEnabled),
+        semanticLabel: 'Connect through an SSH tunnel',
+        builder: (hovered) => Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10.0, vertical: 8.0),
+          decoration: BoxDecoration(
+            color: _sshEnabled ? _theme.greenBadgeBg : _theme.bgInput,
+            borderRadius: BorderRadius.circular(6.0),
+            border: Border.all(
+              color: _sshEnabled
+                  ? _theme.accent
+                  : (hovered ? _theme.borderHover : _theme.border),
+              width: 1.0,
+            ),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 16.0,
+                height: 16.0,
+                decoration: BoxDecoration(
+                  color: _sshEnabled ? _theme.accent : _theme.bgPanel,
+                  borderRadius: BorderRadius.circular(4.0),
+                  border: Border.all(
+                    color: _sshEnabled
+                        ? _theme.accent
+                        : (hovered ? _theme.borderHover : _theme.border),
+                  ),
+                ),
+                alignment: Alignment.center,
+                child: _sshEnabled
+                    ? CompassSvg(
+                        svgString: CompassSvgIcons.check,
+                        size: 11.0,
+                        color: _theme.onAccent,
+                      )
+                    : null,
+              ),
+              const SizedBox(width: 10.0),
+              Expanded(
+                child: Text(
+                  'Connect through an SSH tunnel',
+                  style:
+                      CompassTypography.bodyRegular(color: _theme.textPrimary),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Password / private-key segmented control for the tunnel.
+  Widget _buildSshMethodChips() {
+    Widget chip(String label, SshAuthMethod method) {
+      final selected = _sshAuthMethod == method;
+      return CompassHover(
+        onTap: () => setState(() => _sshAuthMethod = method),
+        semanticLabel: 'SSH authentication: $label',
+        builder: (hovered) => Container(
+          padding:
+              const EdgeInsets.symmetric(horizontal: 12.0, vertical: 7.0),
+          decoration: BoxDecoration(
+            color: selected ? _theme.accent : _theme.bgPanel,
+            borderRadius: BorderRadius.circular(4.0),
+            border: Border.all(
+              color: selected
+                  ? _theme.accent
+                  : (hovered ? _theme.borderHover : _theme.border),
+              width: 1.0,
+            ),
+          ),
+          child: Text(
+            label,
+            style: CompassTypography.caption(
+              color: selected ? _theme.onAccent : _theme.textSecondary,
+            ),
+          ),
+        ),
+      );
+    }
+
+    return Wrap(
+      spacing: 8.0,
+      runSpacing: 8.0,
+      children: [
+        chip('Password', SshAuthMethod.password),
+        chip('Private Key', SshAuthMethod.privateKey),
+      ],
+    );
+  }
+
+  Future<void> _pickKeyFile() async {
+    try {
+      const typeGroup = XTypeGroup(label: 'SSH private keys');
+      final file = await openFile(acceptedTypeGroups: [typeGroup]);
+      if (file == null || !mounted) return;
+      setState(() => _sshKeyPathController.text = file.path);
+    } catch (_) {
+      // Platform picker unavailable: the path can still be typed by hand.
+    }
+  }
+
+  /// Read-only fingerprint of the bastion key pinned on the saved profile,
+  /// with a Clear action for the "the bastion was rebuilt" case.
+  Widget _buildPinnedKeyRow() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10.0, vertical: 8.0),
+      decoration: BoxDecoration(
+        color: _theme.bgInput,
+        borderRadius: BorderRadius.circular(6.0),
+        border: Border.all(color: _theme.border, width: 1.0),
+      ),
+      child: Row(
+        children: [
+          CompassSvg(
+            svgString: CompassSvgIcons.shieldCheck,
+            size: 14.0,
+            color: _theme.accent,
+          ),
+          const SizedBox(width: 8.0),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Pinned host key',
+                  style: CompassTypography.caption(color: _theme.textMuted),
+                ),
+                const SizedBox(height: 2.0),
+                Text(
+                  _sshHostKeyFingerprint!,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: CompassTypography.monoSmall(color: _theme.textPrimary),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8.0),
+          CompassHover(
+            onTap: () => setState(() => _sshHostKeyFingerprint = null),
+            semanticLabel: 'Clear pinned SSH host key',
+            builder: (hovered) => Container(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 10.0, vertical: 5.0),
+              decoration: BoxDecoration(
+                color: _theme.bgPanel,
+                borderRadius: BorderRadius.circular(4.0),
+                border: Border.all(
+                  color: hovered ? _theme.borderHover : _theme.border,
+                  width: 1.0,
+                ),
+              ),
+              child: Text(
+                'Clear',
+                style: CompassTypography.caption(color: _theme.accent),
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -864,6 +1262,14 @@ class _ConnectionModalState extends State<ConnectionModal> {
                     profile.uri,
                     style: CompassTypography.monoSmall(color: _theme.textMuted),
                   ),
+                  if (profile.sshTunnel?.enabled ?? false) ...[
+                    const SizedBox(height: 2.0),
+                    Text(
+                      'via SSH ${profile.sshTunnel!.username}'
+                      '@${profile.sshTunnel!.host}:${profile.sshTunnel!.port}',
+                      style: CompassTypography.caption(color: _theme.accent),
+                    ),
+                  ],
                 ],
               ),
             ),

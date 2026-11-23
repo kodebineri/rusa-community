@@ -212,7 +212,8 @@ order; nested objects count as a single `Object` type (no flattening). Per field
 | `MongoIndex` | `final String name`, `final Map<String,dynamic> keys`, `final bool unique` (false), `final bool sparse` (false), `final int sizeKb` (16), `fromMap` |
 | `MongoCollection` | `final String name`; **mutable** `List<MongoDocument> documents`; `List<MongoIndex> indexes`; `Map? validator`; `validationLevel='moderate'`; `validationAction='error'`; `bool isView=false`; `String? viewOn`; `List? pipeline` |
 | `MongoDatabase` | `final String name`; mutable `Map<String, MongoCollection> collections` |
-| `ConnectionProfile` | `id, name, uri, color?, favorite, lastConnected?, readOnly`; `toJson`/`fromJson` for the encrypted `AppPreferences.savedConnections` entry |
+| `ConnectionProfile` | `id, name, uri, color?, favorite, lastConnected?, readOnly`, `sshTunnel?` (`SshTunnelConfig?`, see below); `toJson`/`fromJson` for the encrypted `AppPreferences.savedConnections` entry |
+| `SshTunnelConfig` | `enabled, host, port=22, username, authMethod (password\|privateKey), password, privateKeyPath, privateKeyPassphrase, hostKeyFingerprint?`; `isActive` (`enabled`), `isComplete`, `copyWith(…, clearHostKeyFingerprint)`, `toJson`/`fromJson` |
 | `QueryFilterOptions` | see above |
 | `QueryResult` | `final List<MongoDocument> documents`, `final int totalCount`, `final double executionTimeMs` |
 | `PipelineStage` | `final String id`, `String operator`, `String content`, `bool enabled=true`, `copyWith` |
@@ -233,11 +234,13 @@ the per-tab UI state restored on tab switch.
   list so `build()` can read synchronously. Mutations run `super.*` first (updates the
   mirror) then are **fire-and-forget replayed** to the server (`_fire*`; errors → `lastError`
   + `onError`; `onDataChanged` callback triggers background `setState`).
-- API: `static Future<void> test(String uri)` (quick open+ping, no mirroring),
-  `static Future<RealMongoService> connect(String uri)`, `Future<void> reloadFast()`,
+- API: `static Future<String?> test(String uri, {SshTunnelConfig? sshTunnel})` (quick
+  open+ping, no mirroring; returns the bastion fingerprint), `static Future<RealMongoService>
+  connect(String uri, {SshTunnelConfig? sshTunnel})`, `Future<void> reloadFast()`,
   `Future<void> _loadAllDataInBackground()`, `Future<void> loadCollectionData(db, coll)`,
   `Future<void> reload()`, `Future<void> dispose()`. Cap:
-  **`maxDocsPerCollection = 5000`** (was 20000).
+  **`maxDocsPerCollection = 5000`** (was 20000). `sshHostKeyFingerprint` exposes the tunnel's
+  observed key for pinning.
 - **Connect is two-phase:** `connect` does `Db.create → open (20 s) → reloadFast (20 s)`,
   throwing on bad URI/unreachable/auth. `reloadFast` lists databases and creates *empty*
   `MongoDatabase` entries immediately (UI tree appears fast), then `_loadAllDataInBackground`
@@ -258,3 +261,39 @@ the per-tab UI state restored on tab switch.
   hex`; plain update maps wrapped in `$set`. `_ensureDbPath` defaults empty path to `/test`.
 - Wired in `main.dart`: `_realService` field, `_handleConnectProfile` (connect + swap
   global), disconnect/reset handlers, read-only gating. **Not experimental.**
+
+### SSH tunneling (`lib/services/ssh_tunnel.dart`)
+
+- `SshTunnel.open(config, remoteHost, remotePort)` authenticates with `dartssh2`
+  (`SSHSocket.connect` + `SSHClient`; password via `onPasswordRequest`, a single
+  `keyboard-interactive` prompt answered with the same password for PAM-only servers, or
+  `SSHKeyPair.fromPem` from `privateKeyPath`, `~` expanded, optional passphrase), then binds
+  `ServerSocket` on `127.0.0.1:0` and one `forwardLocal(remoteHost, remotePort)` channel per
+  accepted socket (bidirectional `addStream`; both ends destroyed on close). A failed channel
+  open is recorded in `lastForwardError`; `connect`/`test` turn it into an
+  `SshTunnelException` explaining that the target is resolved from the bastion (the Docker
+  "port not published / wrong host" case).
+- `parseMongoUriTarget(uri)` → `(host, port)`; **rejects** `mongodb+srv://`, comma-separated
+  replica-set hosts and IPv6, because one local port cannot stand in for several targets.
+  `rewriteMongoUriForLocalPort(uri, port)` does string surgery on the authority, so
+  credentials, db path and query options survive byte-for-byte.
+- `RealMongoService` stores the original `uri` for display but drives the driver with
+  `_connectUri` (the rewritten one); `_openDb`'s fallback also uses `_connectUri` so
+  databases opened later go through the tunnel. `connect`/`test` close the tunnel on any
+  failure; `dispose()` closes it after the driver handles.
+- Failures surface as `SshTunnelException` with a user-facing `message`; `main.dart`'s
+  `_formatConnectError` prefixes it with `SSH tunnel: `.
+- **Host key pinning:** `SshTunnelConfig.hostKeyFingerprint` (`SHA256:<base64>`) is compared
+  by `SshTunnel.hostKeyMatches`; an empty pin accepts the key and `SshTunnel.open` records the
+  presented one in `hostKeyFingerprint`. A mismatch fails the handshake with an
+  `SshTunnelException` naming both fingerprints (dartssh2 surfaces it as
+  `SSHAuthAbortError`, so the check uses the locally captured value). `main._pinSshHostKey`
+  persists the first observed key on the saved profile after a successful
+  connect/test; the dialog shows it and a **Clear** action unpins it.
+- **TLS caveat:** the driver connects to `127.0.0.1`, and Dart's `SecureSocket` has no
+  host-name override, so a certificate issued for the real host fails validation. TLS
+  servers tunnelled this way need `tlsAllowInvalidCertificates=true` in the URI (mongo_dart
+  feeds that flag to `onBadCertificate`; `tlsAllowInvalidHostnames` is not an option it
+  understands). The dialog's hint says so.
+- Persistence: `ConnectionProfile.sshTunnel` serialises with the profile inside the
+  secure-storage entry (`password` / `privateKeyPassphrase` included).

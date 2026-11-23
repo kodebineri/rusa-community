@@ -272,21 +272,28 @@ squeezed into a sliver).
 Separately, the **first-run welcome tour** (`OnboardingModal`) is *conditionally* rendered as
 the last `Stack` child while `_isOnboardingOpen` (with a blank `ColoredBox` cover while the
 flags are still `null`). It is **not** one of the 16 permanently-installed modals: finishing it
-(`_finishOnboarding`) persists consent + the "don't show this again" choice and reveals the
-shell on the sample data (no connect popup).
+(`_finishOnboarding`) persists consent + the "don't show this again" choice and, when no
+connection is active, clears the workspace (`_clearWorkspace`) and opens the connect popup —
+the sample data is not shown as an implicit connected view. A replay while connected keeps
+the current workspace and does not reopen the popup.
 
 Payload-clearing asymmetry to remember: most `onClose` closures only flip the boolean;
 delete payload clears on confirm; insert payload (`_editingDoc`) clears on open/success.
 
 ## Connection flow (~L449–551)
 
-- `_handleConnectProfile(profile)` → `RealMongoService.connect(profile.uri)` (async),
-  `mongoEngine = connected`, `_resetTabsTo(firstDbWithCollections, firstColl)`,
-  `onDataChanged → setState`, `onError → debugPrint`. On failure: `_formatConnectError`.
+- `_handleConnectProfile(profile)` → `RealMongoService.connect(profile.uri, sshTunnel: profile.sshTunnel)`
+  (async), `mongoEngine = connected`, `_resetTabsTo(firstDbWithCollections, firstColl)`,
+  `onDataChanged → setState`, `onError → debugPrint`; pins the bastion host key on the saved
+  profile on first success (`_pinSshHostKey`). On failure: `_formatConnectError`.
 - `_handleConnectSampleData()` → load local sample datasets, back to
   `LocalMongoEngine.instance`, reset tabs to `library/books`.
 - `_handleDisconnect()` → dispose service, `mongoEngine = LocalMongoEngine.instance`,
-  reset tabs.
+  `_clearWorkspace()` (empty tab strip + selection), and `_isConnectModalOpen = true` so the
+  connection popup is what the user sees instead of the bundled sample data.
+- `_clearWorkspace()` → clears `_openTabs`, `_activeTabIndex = -1`, empties
+  `_selectedDbName`/`_selectedCollName`, resets section/view mode/query options. Callers
+  wrap it in `setState`. Also used by `_finishOnboarding`.
 - `_handleResetData()` → for `RealMongoService`: `engine.resetToDefaults()` (which *reloads
   from server*) and returns **without setState** (relies on `onDataChanged`); for local:
   re-seed + `_resetTabsTo('library','books')`.

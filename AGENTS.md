@@ -22,9 +22,10 @@ a **real MongoDB server** (via `mongo_dart`) swaps the global engine instance.
 - Saved connection profiles live in platform secure storage (`flutter_secure_storage`;
   Android `minSdk 24`, Linux needs `libsecret-1-dev` to build); EULA/theme flags stay in
   `SharedPreferences`.
-- Tests: seven files in `test/`, **139 tests** — widget tests in `test/widget_test.dart` plus
-  `compass_density`, `json_auto_indent_formatter`, `mongo_json_parser`, `mongosh_interpreter`,
-  `mongosh_completer`, `terminal`. Patterns live in `docs/testing.md`.
+- Tests: nine files in `test/`, **173 tests** — widget tests in `test/widget_test.dart`
+  plus `compass_density`, `json_auto_indent_formatter`, `mongo_json_parser`, `mongo_uri`,
+  `mongosh_interpreter`, `mongosh_completer`, `terminal`, `ssh_tunnel` (and the shared
+  `support/modal_harness.dart` helper). Patterns live in `docs/testing.md`.
 - Sample data sources of truth: `sample_library.json`, `sample_social_network.json` (repo root).
 - Legal text: `EULA.md` and `PRIVACY.md` (repo root) — bundled as Flutter assets
   (`pubspec.yaml`) and rendered by `EulaModal` / `OnboardingModal` (its last slide) /
@@ -58,13 +59,30 @@ a **real MongoDB server** (via `mongo_dart`) swaps the global engine instance.
 
 ## Current status — read before you change anything
 
-_Verified 2026-11-17 at HEAD `37ad480` (Flutter 3.50.0 / Dart 3.14.0): tests 139/139;
+_Verified 2026-11-17 at HEAD `37ad480` (Flutter 3.50.0 / Dart 3.14.0): tests 173/173;
 `flutter analyze` exits 1 with 3 pre-existing deprecation infos — see below._
 
-- **`flutter test` is 139/139 — keep it green.** The seven `mobile:` tests guard the phone
+- **`flutter test` is 173/173 — keep it green.** The eight `mobile:` tests guard the phone
   layouts (aggregations/schema/indexes at 320 px, the action sheet height cap, the
-  connection-modal footer, the export format cards, and the keyboard inset above the Shell
-  prompt).
+  connection-modal footer, the export format cards, the SSH tunnel form, and the keyboard
+  inset above the Shell prompt).
+- **Credentials are scoped to an Authentication Database.** The connect dialog's Advanced
+  section has an `Authentication Database` field (default `admin`); `appendAuthSource`
+  (`lib/utils/mongo_uri.dart`) adds `authSource=<db>` to the URI when it has credentials and
+  does not already name an `authSource`, so the URI field, saved profile and driver all
+  agree. Clearing the field leaves `authSource` out (MongoDB then falls back to the URI's
+  database path). This is what makes `MONGO_INITDB_ROOT_USERNAME` Docker users connect
+  without hand-editing the URI — note `RealMongoService._ensureDbPath` adds `/test` to a
+  path-less URI, which would otherwise become the default auth source.
+- **SSH tunneling is optional per connection profile.** `SshTunnelConfig`
+  (`lib/models/ssh_tunnel_config.dart`) rides along in `ConnectionProfile.sshTunnel`; the
+  connect popup's Advanced section toggles it and accepts password or private-key auth.
+  `SshTunnel` (`lib/services/ssh_tunnel.dart`, `dartssh2`) binds `127.0.0.1:0` and forwards
+  each accepted socket to the URI's host:port; `RealMongoService.connect(uri, sshTunnel: …)`
+  then drives the local port. Only direct `mongodb://host:port` URIs are supported (no SRV,
+  no multi-host). **The bastion host key is pinned on first use**: `main._pinSshHostKey`
+  stores the fingerprint on the saved profile, a changed key fails the connection, and the
+  dialog's "Pinned host key → Clear" action re-trusts it.
 - **`flutter analyze` is not clean on Flutter ≥3.47.** It reports 3 `deprecated_member_use`
   infos — `package:flutter/cupertino.dart` in `lib/utils/json_syntax_text_controller.dart` and
   `lib/widgets/compass_query_bar.dart`, plus `package:flutter/material.dart` in the latter —
@@ -92,9 +110,12 @@ _Verified 2026-11-17 at HEAD `37ad480` (Flutter 3.50.0 / Dart 3.14.0): tests 139
   `onboarding_done`; the theme slide persists `theme_variant`. All three go through
   `AppPreferences` (`lib/services/app_preferences.dart`). The tour is shown when
   `!eula_accepted || !onboarding_done` (an absent `onboarding_done` means *done*, so
-  upgrades never see it), and while it is shown the **connect popup does not auto-open** —
-  the user lands on the sample data and opens Connect from the header. Re-open the tour from
-  the header `⋮` menu / touch action sheet → **Show Welcome Screen** (above About).
+  upgrades never see it), and while it is shown the **connect popup does not auto-open**.
+  Finishing the tour with no active connection opens the **connect popup over an empty
+  workspace** (`_clearWorkspace`): the bundled sample data is never the implicit first view.
+  Replaying the tour while connected keeps the workspace and does not reopen the popup.
+  Re-open the tour from the header `⋮` menu / touch action sheet → **Show Welcome Screen**
+  (above About).
   **Design language:** mirrors the reference `mongodb-compass-web-client` `OnboardingPage.tsx`
   (minimal header + `n / N` counter + Skip, one centered 448 px column, 12 px-radius cards with
   an accent border/ring when selected, quiet bottom bar). Keep new slides in that vocabulary
@@ -115,7 +136,7 @@ _Verified 2026-11-17 at HEAD `37ad480` (Flutter 3.50.0 / Dart 3.14.0): tests 139
 | Task | Command |
 |---|---|
 | Static analysis | `flutter analyze` (3 pre-existing deprecation infos; see status) |
-| Tests (139/139 — keep green) | `flutter test` |
+| Tests (173/173 — keep green) | `flutter test` |
 | Run a single test file | `flutter test test/widget_test.dart` |
 | Run one test by name | `flutter test test/widget_test.dart --plain-name "exact test name"` |
 | Run desktop app (Windows) | `flutter run -d windows` |
@@ -245,6 +266,9 @@ in the repo — Flutter tooling only.
 | `mongoEngine` (global) | `lib/services/mongo_engine.dart` |
 | `LocalMongoEngine` (seed, find, CRUD, agg) | `lib/services/local_mongo_engine.dart` |
 | `RealMongoService` (live server) | `lib/services/real_mongo_service.dart` |
+| `SshTunnel` (bastion port forward), `parseMongoUriTarget`, `rewriteMongoUriForLocalPort` | `lib/services/ssh_tunnel.dart` |
+| `SshTunnelConfig` (per-profile SSH settings) | `lib/models/ssh_tunnel_config.dart` |
+| `appendAuthSource`, `authSourceFromUri` (Authentication Database → URI) | `lib/utils/mongo_uri.dart` |
 | All models (`MongoDocument`, `QueryFilterOptions`, …) | `lib/models/mongo_models.dart` |
 | `CollectionTab` | `lib/models/collection_tab.dart` |
 | Modal primitives (`CompassModalShell`, `CompassInput`, buttons) | `lib/widgets/modals/compass_modal.dart` |

@@ -41,6 +41,8 @@ import 'package:rusa/widgets/views/indexes_view.dart';
 import 'package:rusa/widgets/views/schema_view.dart';
 import 'package:rusa/widgets/views/show_ddl_view.dart';
 
+import 'support/modal_harness.dart';
+
 /// Parses the mongosh-flavoured text an editor shows and unwraps the Extended
 /// JSON constructors (`ObjectId("...")` / `ISODate("...")`) back to the plain
 /// values the engine stores, so tests can compare against `doc.data`.
@@ -1587,16 +1589,25 @@ void main() {
     await tester.pump();
     for (var i = 0; i < 50 && tester.takeException() != null; i++) {}
 
-    // The tour is gone, consent is stored, and the user lands in the shell on
-    // sample data (still no connect popup).
+    // The tour is gone, consent is stored, and the user gets the connect popup
+    // over an empty workspace: the bundled sample data must not look like an
+    // implicit connection.
     expect(find.text('Accept License Agreement'), findsNothing);
-    expect(find.text('Connect to MongoDB'), findsNothing);
+    expect(find.text('Connect to MongoDB'), findsOneWidget,
+        reason: 'finishing the tour must offer a connection');
+    expect(find.text('Select a collection to view data'), findsOneWidget,
+        reason: 'no sample-data collection may be open behind the popup');
     final prefs = await SharedPreferences.getInstance();
     expect(prefs.getBool('eula_accepted'), isTrue);
     expect(prefs.getBool('onboarding_done'), isTrue,
         reason: 'the "don\'t show this again" box is ticked by default');
     expect(prefs.getString('theme_variant'), 'sunnyRainForest',
         reason: 'the theme picked in the tour is persisted for next launch');
+
+    // Dismissing the popup leaves the empty workspace, not the sample data.
+    await closeConnectionPopup(tester);
+    expect(find.text('Connect to MongoDB'), findsNothing);
+    expect(find.text('Select a collection to view data'), findsOneWidget);
   });
 
   testWidgets('the welcome tour content is vertically centered',
@@ -1756,6 +1767,52 @@ void main() {
 
     await closeConnectionPopup(tester);
     expect(find.text('Connect to MongoDB'), findsNothing);
+  });
+
+  testWidgets('disconnecting returns to the connect popup with an empty workspace',
+      (WidgetTester tester) async {
+    tester.view.physicalSize = const Size(1920.0, 1080.0);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(const CompassApp());
+    await tester.pump();
+    for (var i = 0; i < 50 && tester.takeException() != null; i++) {}
+
+    // Connect to the bundled sample data from the popup's card (the only
+    // CompassPrimaryButton inside the "Local Sample Datasets" container).
+    final sampleCard = find
+        .ancestor(
+          of: find.text('Local Sample Datasets'),
+          matching: find.byType(Container),
+        )
+        .first;
+    final sampleConnect = find.descendant(
+      of: sampleCard,
+      matching: find.byType(CompassPrimaryButton),
+    );
+    expect(sampleConnect, findsOneWidget);
+    await tester.ensureVisible(sampleConnect);
+    await tester.pump();
+    await tester.tap(sampleConnect);
+    await tester.pump();
+    for (var i = 0; i < 50 && tester.takeException() != null; i++) {}
+
+    expect(find.text('Disconnect'), findsOneWidget);
+    expect(find.text('Select a collection to view data'), findsNothing);
+
+    await tester.tap(find.text('Disconnect'));
+    await tester.pump();
+    for (var i = 0; i < 50 && tester.takeException() != null; i++) {}
+
+    expect(find.text('Connect to MongoDB'), findsOneWidget,
+        reason: 'disconnecting must offer a connection');
+    expect(find.text('Select a collection to view data'), findsOneWidget,
+        reason: 'the local sample data must not be the post-disconnect view');
+
+    await closeConnectionPopup(tester);
+    expect(find.text('Select a collection to view data'), findsOneWidget);
   });
 
   testWidgets('the theme stored on the device is restored on the next launch',
@@ -1998,6 +2055,73 @@ void main() {
 
     // Let the 2-second reset timer fire so no timer is left pending.
     await tester.pump(const Duration(seconds: 2));
+  });
+
+  testWidgets(
+      'the authentication database defaults to admin and scopes a credential URI',
+      (WidgetTester tester) async {
+    const size = Size(1200.0, 1000.0);
+    tester.view.physicalSize = size;
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    ConnectionProfile? saved;
+    await tester.pumpWidget(
+      modalHarness(
+        size: size,
+        touch: false,
+        child: ConnectionModal(
+          isOpen: true,
+          onClose: () {},
+          savedConnections: const [],
+          onConnect: (_) async => 'stubbed failure',
+          onSaveConnection: (profile) => saved = profile,
+          onDeleteConnection: (_) {},
+          onConnectSampleData: () {},
+        ),
+      ),
+    );
+    await tester.pump();
+
+    final advanced = find.text('Advanced Connection Options');
+    await tester.ensureVisible(advanced);
+    await tester.pump();
+    await tester.tap(advanced);
+    await tester.pump();
+
+    // URI, Name, Host, Port, Auth Username, Auth Password, Auth Database.
+    final inputs =
+        tester.widgetList<CompassInput>(find.byType(CompassInput)).toList();
+    expect(inputs.length, greaterThanOrEqualTo(7));
+    expect(inputs[6].controller.text, 'admin');
+
+    final saveAndConnect = find.text('Save & Connect');
+    inputs[0].controller.text = 'mongodb://user:pass@db.example.com:27017/app';
+    await tester.pump();
+    await tester.ensureVisible(saveAndConnect);
+    await tester.pump();
+    await tester.tap(saveAndConnect);
+    await tester.pump();
+    await tester.pump();
+
+    expect(saved, isNotNull);
+    expect(
+      saved!.uri,
+      'mongodb://user:pass@db.example.com:27017/app?authSource=admin',
+    );
+
+    // An explicit authSource already present in a pasted URI wins.
+    inputs[0].controller.text =
+        'mongodb://user:pass@db.example.com:27017/app?authSource=users';
+    await tester.pump();
+    await tester.tap(saveAndConnect);
+    await tester.pump();
+    await tester.pump();
+    expect(
+      saved!.uri,
+      'mongodb://user:pass@db.example.com:27017/app?authSource=users',
+    );
   });
 
   testWidgets('sidebar lists databases and collections alphabetically',

@@ -2,6 +2,8 @@
 /// Equivalent to src/types/mongo.ts.
 library;
 
+import 'ssh_tunnel_config.dart';
+
 /// A BSON ObjectId held in the in-memory mirror.
 ///
 /// The bundled sample data stores ObjectIds as their 24-character hex strings,
@@ -141,6 +143,10 @@ class ConnectionProfile {
   final String? lastConnected;
   final bool readOnly;
 
+  /// Optional SSH bastion that forwards [uri]'s host through a local port.
+  /// `null` means the connection is made directly.
+  final SshTunnelConfig? sshTunnel;
+
   ConnectionProfile({
     required this.id,
     required this.name,
@@ -149,12 +155,37 @@ class ConnectionProfile {
     this.favorite = false,
     this.lastConnected,
     this.readOnly = false,
+    this.sshTunnel,
   });
+
+  /// Copy with selected fields replaced. [sshTunnel] keeps the current value
+  /// unless a new config is passed.
+  ConnectionProfile copyWith({
+    String? name,
+    String? uri,
+    String? color,
+    bool? favorite,
+    String? lastConnected,
+    bool? readOnly,
+    SshTunnelConfig? sshTunnel,
+  }) {
+    return ConnectionProfile(
+      id: id,
+      name: name ?? this.name,
+      uri: uri ?? this.uri,
+      color: color ?? this.color,
+      favorite: favorite ?? this.favorite,
+      lastConnected: lastConnected ?? this.lastConnected,
+      readOnly: readOnly ?? this.readOnly,
+      sshTunnel: sshTunnel ?? this.sshTunnel,
+    );
+  }
 
   /// Serialises a profile for local storage.
   ///
-  /// The URI can contain credentials; [AppPreferences] keeps the JSON in the
-  /// app-private preferences store on the device. It is never uploaded.
+  /// The URI and the SSH password / passphrase can contain credentials;
+  /// [AppPreferences] keeps the JSON in the app-private preferences store on
+  /// the device. It is never uploaded.
   Map<String, dynamic> toJson() => <String, dynamic>{
         'id': id,
         'name': name,
@@ -163,11 +194,13 @@ class ConnectionProfile {
         'favorite': favorite,
         'lastConnected': lastConnected,
         'readOnly': readOnly,
+        'sshTunnel': sshTunnel?.toJson(),
       };
 
   /// Restores a profile written by [toJson]. Tolerates missing fields so an
   /// older or partially-written preferences entry cannot break startup.
   factory ConnectionProfile.fromJson(Map<String, dynamic> json) {
+    final tunnel = json['sshTunnel'];
     return ConnectionProfile(
       id: json['id'] as String? ?? '',
       name: json['name'] as String? ?? 'MongoDB Cluster',
@@ -176,6 +209,9 @@ class ConnectionProfile {
       favorite: json['favorite'] as bool? ?? false,
       lastConnected: json['lastConnected'] as String?,
       readOnly: json['readOnly'] as bool? ?? false,
+      sshTunnel: tunnel is Map
+          ? SshTunnelConfig.fromJson(Map<String, dynamic>.from(tunnel))
+          : null,
     );
   }
 }
