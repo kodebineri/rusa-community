@@ -118,6 +118,12 @@ class _CompassAppState extends State<CompassApp> {
       _eulaAccepted = stored.eulaAccepted;
       _onboardingDone = stored.onboardingDone;
       _themeVariant = CompassThemeVariant.fromName(stored.themeVariantName);
+      final storedWidth = stored.sidebarWidth;
+      if (storedWidth != null) {
+        _sidebarWidth = storedWidth
+            .clamp(CompassSidebar.minWidth, CompassSidebar.maxWidth)
+            .toDouble();
+      }
       // Null means the device has no stored list yet: keep the built-in
       // sample profiles. An empty list is a real user choice (all deleted).
       if (stored.savedConnections != null) {
@@ -154,6 +160,17 @@ class _CompassAppState extends State<CompassApp> {
   void _showOnboarding() {
     setState(() => _isOnboardingOpen = true);
   }
+
+  /// Width of the docked desktop sidebar; dragged from its right-edge grip.
+  /// The touch drawer stays viewport-sized and is not resizable.
+  double _sidebarWidth = 256.0;
+
+  /// Live width update while the sidebar grip is dragged.
+  void _resizeSidebar(double width) => setState(() => _sidebarWidth = width);
+
+  /// Persist the width once the drag ends, not on every pointer move.
+  void _persistSidebarWidth(double width) =>
+      unawaited(appPreferences.setSidebarWidth(width));
 
   /// Applies a theme and remembers it for the next launch.
   void _selectTheme(CompassThemeVariant variant) {
@@ -1281,6 +1298,10 @@ class _CompassAppState extends State<CompassApp> {
                                       service.loadCollectionCounts(dbName));
                                 }
                               },
+                              width: isDesktop ? _sidebarWidth : null,
+                              onResize: isDesktop ? _resizeSidebar : null,
+                              onResizeEnd:
+                                  isDesktop ? _persistSidebarWidth : null,
                             ),
 
                           // Active Collection Main Pane

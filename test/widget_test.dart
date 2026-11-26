@@ -2506,4 +2506,78 @@ void main() {
     expect(find.text('Connect'), findsWidgets);
     expect(find.text('Save & Connect'), findsOneWidget);
   });
+
+  testWidgets('the desktop sidebar resizes by dragging its edge and persists the width',
+      (WidgetTester tester) async {
+    SharedPreferences.setMockInitialValues({'eula_accepted': true});
+    tester.view.physicalSize = const Size(1920.0, 1080.0);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(const CompassApp());
+    await tester.pump();
+    for (var i = 0; i < 50 && tester.takeException() != null; i++) {}
+    await closeConnectionPopup(tester);
+
+    final sidebar = find.byType(CompassSidebar);
+    final grip = find.byType(CompassSidebarResizeHandle);
+    expect(grip, findsOneWidget);
+    expect(tester.getSize(sidebar).width, 256.0);
+
+    await tester.drag(grip, const Offset(120.0, 0.0));
+    await tester.pump();
+    for (var i = 0; i < 50 && tester.takeException() != null; i++) {}
+    expect(tester.getSize(sidebar).width, 376.0);
+
+    // Widths outside the supported range are clamped, not accepted.
+    await tester.drag(grip, const Offset(1000.0, 0.0));
+    await tester.pump();
+    for (var i = 0; i < 50 && tester.takeException() != null; i++) {}
+    expect(tester.getSize(sidebar).width, CompassSidebar.maxWidth);
+
+    final prefs = await SharedPreferences.getInstance();
+    expect(prefs.getDouble(AppPreferences.sidebarWidthKey),
+        CompassSidebar.maxWidth);
+
+    // A fresh launch restores the dragged width instead of the 256 px default.
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pumpWidget(const CompassApp());
+    await tester.pump();
+    for (var i = 0; i < 50 && tester.takeException() != null; i++) {}
+    await closeConnectionPopup(tester);
+    expect(tester.getSize(find.byType(CompassSidebar)).width,
+        CompassSidebar.maxWidth);
+  });
+
+  testWidgets('mobile: the sidebar drawer has no resize grip',
+      (WidgetTester tester) async {
+    const size = Size(360.0, 640.0);
+    tester.view.physicalSize = size;
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(const CompassApp());
+    await tester.pump();
+    for (var i = 0; i < 50 && tester.takeException() != null; i++) {}
+    await closeConnectionPopup(tester);
+
+    expect(find.byType(CompassSidebarResizeHandle), findsNothing);
+    await tester.tap(
+      find.descendant(
+        of: find.byType(CompassHeader),
+        matching: find.byWidgetPredicate(
+          (w) => w is CompassSvg && w.svgString == CompassSvgIcons.menu,
+        ),
+      ),
+    );
+    await tester.pump();
+    for (var i = 0; i < 50 && tester.takeException() != null; i++) {}
+
+    expect(find.byType(CompassSidebar), findsOneWidget);
+    expect(find.byType(CompassSidebarResizeHandle), findsNothing);
+    expect(tester.getSize(find.byType(CompassSidebar)).width,
+        closeTo(size.width * 0.85, 0.01));
+  });
 }

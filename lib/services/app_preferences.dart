@@ -12,6 +12,7 @@ class StoredPreferences {
     required this.onboardingDone,
     this.themeVariantName,
     this.savedConnections,
+    this.sidebarWidth,
   });
 
   /// Whether the EULA has been accepted on this device.
@@ -35,6 +36,9 @@ class StoredPreferences {
   /// built-in sample profiles", while `[]` means the user deleted every saved
   /// connection and the defaults must not reappear.
   final List<ConnectionProfile>? savedConnections;
+
+  /// Last desktop sidebar width chosen by the user, or `null` for the default.
+  final double? sidebarWidth;
 
   /// Whether the welcome tour should cover the app on this launch.
   ///
@@ -75,6 +79,9 @@ class AppPreferences {
   /// that predate the keystore-backed store.
   static const String savedConnectionsKey = 'saved_connections';
 
+  /// Key under which the resized desktop sidebar width is stored.
+  static const String sidebarWidthKey = 'sidebar_width';
+
   /// Reads every startup flag in one go.
   Future<StoredPreferences> load() async {
     final prefs = await SharedPreferences.getInstance();
@@ -83,6 +90,7 @@ class AppPreferences {
       eulaAccepted: eulaAccepted,
       onboardingDone: prefs.getBool(onboardingDoneKey) ?? true,
       themeVariantName: prefs.getString(themeVariantKey),
+      sidebarWidth: prefs.getDouble(sidebarWidthKey),
       savedConnections: _decodeSavedConnections(
         await _readSavedConnections(prefs),
       ),
@@ -143,6 +151,12 @@ class AppPreferences {
     } else {
       await prefs.setString(themeVariantKey, variantName);
     }
+  }
+
+  /// Remembers the width the user dragged the desktop sidebar to.
+  Future<void> setSidebarWidth(double width) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setDouble(sidebarWidthKey, width);
   }
 
   /// Replaces the stored connection list.

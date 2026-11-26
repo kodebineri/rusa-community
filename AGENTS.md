@@ -22,7 +22,7 @@ a **real MongoDB server** (via `mongo_dart`) swaps the global engine instance.
 - Saved connection profiles live in platform secure storage (`flutter_secure_storage`;
   Android `minSdk 24`, Linux needs `libsecret-1-dev` to build); EULA/theme flags stay in
   `SharedPreferences`.
-- Tests: nine files in `test/`, **173 tests** — widget tests in `test/widget_test.dart`
+- Tests: nine files in `test/`, **175 tests** — widget tests in `test/widget_test.dart`
   plus `compass_density`, `json_auto_indent_formatter`, `mongo_json_parser`, `mongo_uri`,
   `mongosh_interpreter`, `mongosh_completer`, `terminal`, `ssh_tunnel` (and the shared
   `support/modal_harness.dart` helper). Patterns live in `docs/testing.md`.
@@ -62,10 +62,15 @@ a **real MongoDB server** (via `mongo_dart`) swaps the global engine instance.
 _Verified 2026-11-17 at HEAD `37ad480` (Flutter 3.50.0 / Dart 3.14.0): tests 173/173;
 `flutter analyze` exits 1 with 3 pre-existing deprecation infos — see below._
 
-- **`flutter test` is 173/173 — keep it green.** The eight `mobile:` tests guard the phone
+- **`flutter test` is 175/175 — keep it green.** The nine `mobile:` tests guard the phone
   layouts (aggregations/schema/indexes at 320 px, the action sheet height cap, the
   connection-modal footer, the export format cards, the SSH tunnel form, and the keyboard
   inset above the Shell prompt).
+- **The docked desktop sidebar is resizable.** `CompassSidebar.width` is controlled by
+  `main._sidebarWidth`; `CompassSidebarResizeHandle` is a 6 px grip on the sidebar's right
+  edge that reports clamped widths (180–480 px) via `onResize` / `onResizeEnd`. The final
+  width is stored under `sidebar_width` in `SharedPreferences` and restored on launch.
+  The touch drawer stays viewport-sized and has no grip.
 - **Credentials are scoped to an Authentication Database.** The connect dialog's Advanced
   section has an `Authentication Database` field (default `admin`); `appendAuthSource`
   (`lib/utils/mongo_uri.dart`) adds `authSource=<db>` to the URI when it has credentials and
@@ -136,7 +141,7 @@ _Verified 2026-11-17 at HEAD `37ad480` (Flutter 3.50.0 / Dart 3.14.0): tests 173
 | Task | Command |
 |---|---|
 | Static analysis | `flutter analyze` (3 pre-existing deprecation infos; see status) |
-| Tests (173/173 — keep green) | `flutter test` |
+| Tests (175/175 — keep green) | `flutter test` |
 | Run a single test file | `flutter test test/widget_test.dart` |
 | Run one test by name | `flutter test test/widget_test.dart --plain-name "exact test name"` |
 | Run desktop app (Windows) | `flutter run -d windows` |

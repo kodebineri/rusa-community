@@ -1,6 +1,6 @@
 # Testing — `test/`
 
-Companion to root `AGENTS.md`. Nine files, **173 tests**:
+Companion to root `AGENTS.md`. Nine files, **175 tests**:
 
 | File | What it covers |
 |---|---|
@@ -15,12 +15,12 @@ Companion to root `AGENTS.md`. Nine files, **173 tests**:
 | `test/mongo_uri_test.dart` | `appendAuthSource` / `authSourceFromUri` — the Authentication Database field's effect on connection URIs |
 | `test/support/modal_harness.dart` | not a test file: shared `Directionality`/`Overlay`/theme/density wrapper for tests that pump a bare modal |
 
-> **Status: 173 pass / 0 fail, `flutter analyze` clean.**
+> **Status: 175 pass / 0 fail, `flutter analyze` clean.**
 
 ## Commands
 
 ```bash
-flutter test                              # all — expect 173/173
+flutter test                              # all — expect 175/175
 flutter test test/widget_test.dart        # just the widget tests
 flutter test test/mongosh_interpreter_test.dart
 flutter analyze                           # expect "No issues found!"
@@ -86,6 +86,8 @@ misuse that would fail the test anyway.
 | 31 | `legacy plaintext connections migrate to secure storage` | A `saved_connections` value left in `SharedPreferences` is read, written to secure storage, removed from preferences, and survives a second load |
 | 32 | `mobile: soft keyboard keeps the Shell prompt visible` | 360 px phone, Shell opened from the header action sheet, `viewInsets.bottom = 300` → no overflow and the prompt sits above the keyboard; the body yields to the terminal while typing |
 | 33 | `mobile: export format cards fit a phone` | 360 px Export Collection modal: JSON/CSV cards stack below 360 px and their descriptions wrap; Cancel / Copy / Download stay on one footer row |
+| 34 | `the desktop sidebar resizes by dragging its edge and persists the width` | 1920 px app: grip drag +120 → 376 px, drag past the max → clamped to `CompassSidebar.maxWidth`, `sidebar_width` persisted and restored on a fresh launch |
+| 35 | `mobile: the sidebar drawer has no resize grip` | 360 px app: no grip before or after opening the drawer; drawer stays `85 %` of the viewport |
 
 ## Recurring techniques (copy these patterns)
 

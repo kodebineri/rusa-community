@@ -17,6 +17,11 @@ import 'compass_spinner.dart';
 /// 4. Platform Agnosticism (desktop docked sidebar, collapsible items)
 /// 5. Icons (CompassSvg instead of generic Icon)
 class CompassSidebar extends StatefulWidget {
+  /// Width limits for the docked, resizable desktop sidebar. The touch drawer
+  /// keeps its own viewport-relative width and is not resizable.
+  static const double minWidth = 180.0;
+  static const double maxWidth = 480.0;
+
   final List<MongoDatabase> databases;
   final String? selectedDb;
   final String? selectedColl;
@@ -34,6 +39,16 @@ class CompassSidebar extends StatefulWidget {
   /// database's collection counts (counts are not pre-fetched at connect).
   final Function(String dbName)? onExpandDb;
 
+  /// Controlled width of the docked desktop sidebar. When null the sidebar is
+  /// 256 px wide (or the touch drawer width on a phone).
+  final double? width;
+
+  /// Called during a resize drag with the new, already-clamped width.
+  final ValueChanged<double>? onResize;
+
+  /// Called once when a resize drag ends, so the host can persist the width.
+  final ValueChanged<double>? onResizeEnd;
+
   const CompassSidebar({
     super.key,
     required this.databases,
@@ -49,6 +64,9 @@ class CompassSidebar extends StatefulWidget {
     required this.onDropColl,
     required this.onRefresh,
     this.onExpandDb,
+    this.width,
+    this.onResize,
+    this.onResizeEnd,
   });
 
   @override
@@ -131,8 +149,13 @@ class _CompassSidebarState extends State<CompassSidebar> {
         ? (MediaQuery.maybeOf(context)?.size.width ?? 360.0) * 0.85
         : 256.0;
 
-    return Container(
-      width: drawerWidth.clamp(0.0, 320.0), // CSS w-64
+    final effectiveWidth = (widget.width ?? drawerWidth).clamp(
+      density.isTouch ? 0.0 : CompassSidebar.minWidth,
+      density.isTouch ? 320.0 : CompassSidebar.maxWidth,
+    );
+
+    final sidebar = Container(
+      width: effectiveWidth, // CSS w-64, resizable on desktop
       decoration: BoxDecoration(
         color: _theme.bgSidebar,
         border: Border(
@@ -291,6 +314,27 @@ class _CompassSidebarState extends State<CompassSidebar> {
           ),
         ],
       ),
+    );
+
+    // The touch drawer is temporary and sized from the viewport; only the
+    // docked desktop sidebar gets a drag handle on its right edge.
+    if (density.isTouch || widget.onResize == null) return sidebar;
+    return Stack(
+      children: [
+        sidebar,
+        Positioned(
+          right: 0,
+          top: 0,
+          bottom: 0,
+          child: CompassSidebarResizeHandle(
+            width: effectiveWidth,
+            minWidth: CompassSidebar.minWidth,
+            maxWidth: CompassSidebar.maxWidth,
+            onResize: widget.onResize!,
+            onResizeEnd: widget.onResizeEnd,
+          ),
+        ),
+      ],
     );
   }
 
@@ -552,6 +596,90 @@ class _CompassSidebarState extends State<CompassSidebar> {
               ],
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Thin grip on the right edge of the docked sidebar. Pointer drags resize the
+/// sidebar through the host's controlled [width]; [onResizeEnd] lets the host
+/// persist the final value without writing preferences on every drag frame.
+class CompassSidebarResizeHandle extends StatefulWidget {
+  const CompassSidebarResizeHandle({
+    super.key,
+    required this.width,
+    required this.minWidth,
+    required this.maxWidth,
+    required this.onResize,
+    this.onResizeEnd,
+  });
+
+  final double width;
+  final double minWidth;
+  final double maxWidth;
+  final ValueChanged<double> onResize;
+  final ValueChanged<double>? onResizeEnd;
+
+  @override
+  State<CompassSidebarResizeHandle> createState() =>
+      _CompassSidebarResizeHandleState();
+}
+
+class _CompassSidebarResizeHandleState
+    extends State<CompassSidebarResizeHandle> {
+  double _dragStartX = 0.0;
+  double _dragStartWidth = 0.0;
+  double _lastWidth = 0.0;
+  bool _hovered = false;
+  bool _resizing = false;
+
+  void _endDrag() {
+    if (!_resizing) return;
+    setState(() => _resizing = false);
+    // The final pointer move may not have produced a new build yet, so persist
+    // the width from the gesture rather than a possibly stale widget.width.
+    widget.onResizeEnd?.call(_lastWidth);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = CompassTheme.of(context);
+    final active = _hovered || _resizing;
+
+    return Semantics(
+      label: 'Resize sidebar',
+      child: MouseRegion(
+        cursor: SystemMouseCursors.resizeLeftRight,
+        onEnter: (_) => setState(() => _hovered = true),
+        onExit: (_) => setState(() => _hovered = false),
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onHorizontalDragStart: (details) {
+            _dragStartX = details.globalPosition.dx;
+            _dragStartWidth = widget.width;
+            _lastWidth = widget.width;
+            setState(() => _resizing = true);
+          },
+          onHorizontalDragUpdate: (details) {
+            final next = _dragStartWidth +
+                (details.globalPosition.dx - _dragStartX);
+            _lastWidth = next.clamp(widget.minWidth, widget.maxWidth);
+            widget.onResize(_lastWidth);
+          },
+          onHorizontalDragEnd: (_) => _endDrag(),
+          onHorizontalDragCancel: _endDrag,
+          child: SizedBox(
+            width: 6.0,
+            child: Center(
+              child: Container(
+                width: active ? 3.0 : 1.0,
+                color: _resizing
+                    ? theme.accent
+                    : (active ? theme.borderHover : const Color(0x00000000)),
+              ),
+            ),
+          ),
         ),
       ),
     );
