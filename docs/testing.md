@@ -1,6 +1,6 @@
 # Testing — `test/`
 
-Companion to root `AGENTS.md`. Nine files, **175 tests**:
+Companion to root `AGENTS.md`. Nine files, **179 tests**:
 
 | File | What it covers |
 |---|---|
@@ -15,15 +15,16 @@ Companion to root `AGENTS.md`. Nine files, **175 tests**:
 | `test/mongo_uri_test.dart` | `appendAuthSource` / `authSourceFromUri` — the Authentication Database field's effect on connection URIs |
 | `test/support/modal_harness.dart` | not a test file: shared `Directionality`/`Overlay`/theme/density wrapper for tests that pump a bare modal |
 
-> **Status: 175 pass / 0 fail, `flutter analyze` clean.**
+> **Status: 179 pass / 0 fail.** `flutter analyze` exits 1 with 3 pre-existing
+> `deprecated_member_use` infos (see `AGENTS.md`); introduce no new issues.
 
 ## Commands
 
 ```bash
-flutter test                              # all — expect 175/175
+flutter test                              # all — expect 179/179
 flutter test test/widget_test.dart        # just the widget tests
 flutter test test/mongosh_interpreter_test.dart
-flutter analyze                           # expect "No issues found!"
+flutter analyze                           # expect only the 3 known deprecation infos (exit 1)
 ```
 
 ## Three behaviors every full-app test must respect
@@ -72,7 +73,7 @@ misuse that would fail the test anyway.
 | 13 | `Create Index modal creates an index and reports duplicate names` | Indexes section → **Create Index** opens `CreateIndexModal`; empty field → `'Field name is required'`; `year` + `-1 (Descending)` + unique checkbox → create → modal closes, `year_-1` row + `{year: -1}` in the table, engine index `unique == true` / `keys['year'] == -1`; re-create the same name → `'An index with this name or key pattern already exists'` banner, engine count unchanged |
 | 14 | `Drop Index modal removes a non-protected index after confirmation` | trash count = `indexes.length - 1` (`_id_` row shows "Protected"); first trash (`isbn_1`, seed order) → `DropIndexModal` shows header title + danger button `'Drop Index'` (`findsNWidgets(2)`) and `isbn_1`; **Cancel** keeps the index; reopen → danger button → engine no longer has `isbn_1`, row + trash disappear, `_id_` untouched |
 | 15 | `tree view starts with data structures collapsed` | default `library.books` tree: zero `chevronDown`, two `chevronRight` (one `genre_ids` per doc), `[ ... 2 items ]` + `[ ... 1 items ]` summaries, no `0:` child rows; tap chevron → child rows `0:`/`1:` appear + summary gone; tap again → summary restored |
-| 16 | `json view edit button saves changes to the document` | switch to **JSON** mode → one pencil per card; tap pencil → body becomes an `EditableText` (pencil replaced by check/close on that card only); edit `copies_available`, **remove `rating`**, enterText, tap **check** → engine doc updated, `rating` gone (replacement semantics), `_id` preserved, editor closes, pencil returns. Uses `resetToDefaults` teardown |
+| 16 | `json view edit button saves changes to the document` | switch to **JSON** mode → one pencil per card; tap pencil → body becomes a **non-read-only** `EditableText` (pencil replaced by check/close on that card only); edit `copies_available`, **remove `rating`**, enterText, tap **check** → engine doc updated, `rating` gone (replacement semantics), `_id` preserved, editor closes, pencil returns. Finders scope to `!readOnly` because the read-only selectable bodies are also `EditableText`s. Uses `resetToDefaults` teardown |
 | 17 | `updateMany with a plain map replaces matched documents` | engine-level: `mongoEngine.updateMany(db, coll, {_id:…}, {title, copies_available})` → matched doc has only those fields (+`_id`), `author`/`rating` gone, the other doc untouched; a `$set` update then merges without removing fields. Uses `resetToDefaults` teardown |
 | 18 | `first-time user lands on the welcome tour and accepts the EULA` | overrides the prefs mock with `{}` → `OnboardingModal` slide 1 (`Step 1 of 4`), **no** connect popup; **Next** → sample data (`library`, `social_networks`) → theme (tap **Sunny Rain Forest**, root `CompassTheme` switches) → terms (`EULA.md` body + **I Accept**); `eula_accepted` still unset until the tap, then `eula_accepted`/`onboarding_done`/`theme_variant` persisted and the shell revealed |
 | 19 | `the welcome tour's Skip jumps to the licence slide` | `{}` → **Skip** lands on the terms slide (`I Accept` present, `Skip` gone) and nothing is persisted yet |
@@ -88,6 +89,23 @@ misuse that would fail the test anyway.
 | 33 | `mobile: export format cards fit a phone` | 360 px Export Collection modal: JSON/CSV cards stack below 360 px and their descriptions wrap; Cancel / Copy / Download stay on one footer row |
 | 34 | `the desktop sidebar resizes by dragging its edge and persists the width` | 1920 px app: grip drag +120 → 376 px, drag past the max → clamped to `CompassSidebar.maxWidth`, `sidebar_width` persisted and restored on a fresh launch |
 | 35 | `mobile: the sidebar drawer has no resize grip` | 360 px app: no grip before or after opening the drawer; drawer stays `85 %` of the viewport |
+| 36 | `document values are selectable in tree, JSON and table views` | full app: tree leaf, read-only JSON body (still syntax-coloured via `buildJsonSyntaxSpan`) and table cell are `EditableText`s with `readOnly == true` and a custom `contextMenuBuilder`; the JSON editor remains the only writable field |
+| 37 | `a selectable document value can be copied from the menu` | pumps a `CompassSelectableText` in an overlay, mocks `Clipboard.setData` on `SystemChannels.platform`, opens the toolbar, uses **Select all**, reopens it and taps **Copy** → clipboard equals the whole value |
+| 38 | `dragging across a selectable value highlights the text` | overrides `debugDefaultTargetPlatformOverride` to `TargetPlatform.windows`, pumps a `CompassSelectableText`, then drives a real mouse drag (`startGesture(kind: mouse)` → `moveTo` → `up`) → controller selection is non-collapsed and covers the whole value; guards the `TextSelectionGestureDetectorBuilder` that a bare `EditableText` lacks |
+| 39 | `the text context menu stays compact in the overlay` | pumps a **narrow, multi-line** selectable value in an overlay, opens the toolbar, asserts the `CompassTextContextMenu` rect is `< 250 × 160`, and checks the follower offset lands beside `contextMenuAnchors.primaryAnchor` rather than at the field's far-off bottom edge; guards both the overlay sizing and the JSON-view menu regression |
+
+Test 37 opens the custom toolbar with `EditableTextState.toggleToolbar()` rather than a gesture:
+long-press/right-click in widget tests does not reliably trigger a selection, and `showToolbar()`
+returns false without one. Select all first so **Copy** is enabled. Clipboard writes are mocked on
+`SystemChannels.platform` with method `Clipboard.setData` (Flutter 3.50 has no
+`SystemChannels.clipboard`). Test 38 covers the gesture path separately: a bare `EditableText`
+only supplies the I-beam cursor, so `CompassSelectableText` must wrap it in a
+`TextSelectionGestureDetectorBuilder` for drag/long-press to actually select. Widget tests default
+to `TargetPlatform.android`, where a mouse drag moves the caret instead of selecting, hence the
+Windows override. Test 39 guards the overlay sizing: the menu's `Column` must be wrapped in
+`IntrinsicWidth` + `UnconstrainedBox`, or the root overlay's viewport-sized constraints make the
+four rows fill the whole window. Its narrow field also guards the JSON-view regression: the menu
+is offset to `EditableTextState.contextMenuAnchors`, not to the bottom-left of a tall field.
 
 ## Recurring techniques (copy these patterns)
 

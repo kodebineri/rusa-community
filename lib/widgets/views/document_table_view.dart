@@ -6,6 +6,7 @@ import '../../icons/compass_svg_icons.dart';
 import '../../models/mongo_models.dart';
 import '../../theme/compass_density.dart';
 import '../compass_icon_button.dart';
+import '../compass_selectable_text.dart';
 
 /// Converted from src/components/DocumentTableView.tsx
 /// Adheres strictly to:
@@ -137,11 +138,15 @@ class _DocumentTableViewState extends State<DocumentTableView> {
                         padding: const EdgeInsets.symmetric(horizontal: 12.0),
                         child: Row(
                           children: [
-                            Text(
-                              key,
-                              style: key == '_id'
-                                  ? CompassTypography.monoBold(color: _theme.accent, size: 11.0)
-                                  : CompassTypography.monoBold(color: _theme.textPrimary, size: 11.0),
+                            Flexible(
+                              child: Text(
+                                key,
+                                overflow: TextOverflow.ellipsis,
+                                style: key == '_id'
+                                    ? CompassTypography.monoBold(color: _theme.accent, size: 11.0)
+                                    : CompassTypography.monoBold(
+                                        color: _theme.textPrimary, size: 11.0),
+                              ),
                             ),
                             const SizedBox(width: 4.0),
                             CompassSvg(
@@ -260,18 +265,20 @@ class _DocumentTableViewState extends State<DocumentTableView> {
           borderRadius: BorderRadius.circular(4.0),
           border: Border.all(color: _theme.greenBadgeBorder, width: 1.0),
         ),
-        child: Text(
+        child: CompassSelectableText(
           '$val',
           style: CompassTypography.monoBold(color: _theme.accent, size: 11.0),
-          overflow: TextOverflow.ellipsis,
         ),
       );
     }
     if (val == null) {
-      return Text('null', style: CompassTypography.monoSmall(color: _theme.bsonNull));
+      return CompassSelectableText(
+        'null',
+        style: CompassTypography.monoSmall(color: _theme.bsonNull),
+      );
     }
     if (val is bool) {
-      return Text(
+      return CompassSelectableText(
         val.toString(),
         style: CompassTypography.monoMedium(
           color: val ? _theme.accent : CompassColors.errorRed,
@@ -280,26 +287,25 @@ class _DocumentTableViewState extends State<DocumentTableView> {
       );
     }
     if (val is num) {
-      return Text(
+      return CompassSelectableText(
         val.toString(),
         style: CompassTypography.monoMedium(color: _theme.bsonNumber, size: 11.0),
       );
     }
     if (val is MongoObjectId) {
-      return Text(
+      return CompassSelectableText(
         'ObjectId("${val.hex}")',
         style: CompassTypography.monoBold(color: _theme.accent, size: 11.0),
-        overflow: TextOverflow.ellipsis,
       );
     }
     if (val is List) {
-      return Text(
+      return CompassSelectableText(
         '[${val.length} items]',
         style: CompassTypography.monoSmall(color: _theme.textMuted),
       );
     }
     if (val is Map) {
-      return Text(
+      return CompassSelectableText(
         '{ ... }',
         style: CompassTypography.monoSmall(color: _theme.textMuted),
       );
@@ -307,17 +313,15 @@ class _DocumentTableViewState extends State<DocumentTableView> {
     if (val is String) {
       // Check if it's a date
       if (RegExp(r'^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:?\d{2})?$').hasMatch(val)) {
-        return Text(
+        return CompassSelectableText(
           'ISODate("$val")',
           style: CompassTypography.monoMedium(color: _theme.bsonDate, size: 11.0),
-          overflow: TextOverflow.ellipsis,
         );
       }
     }
-    return Text(
+    return CompassSelectableText(
       val.toString(),
       style: CompassTypography.bodyRegular(color: _theme.textSecondary),
-      overflow: TextOverflow.ellipsis,
     );
   }
 }

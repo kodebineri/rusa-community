@@ -2,7 +2,11 @@
 
 import 'dart:convert';
 import 'dart:io';
+import 'dart:ui' show PointerDeviceKind;
 
+import 'package:flutter/foundation.dart'
+    show debugDefaultTargetPlatformOverride, TargetPlatform;
+import 'package:flutter/gestures.dart' show kPrimaryButton;
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
@@ -24,7 +28,9 @@ import 'package:rusa/widgets/compass_header.dart';
 import 'package:rusa/widgets/compass_icon_button.dart';
 import 'package:rusa/widgets/compass_query_bar.dart';
 import 'package:rusa/widgets/compass_terminal.dart';
+import 'package:rusa/widgets/compass_selectable_text.dart';
 import 'package:rusa/widgets/compass_sidebar.dart';
+import 'package:rusa/widgets/compass_text_menu.dart';
 import 'package:rusa/widgets/modals/about_modal.dart';
 import 'package:rusa/widgets/modals/compass_action_sheet.dart';
 import 'package:rusa/widgets/modals/compass_modal.dart';
@@ -36,6 +42,7 @@ import 'package:rusa/widgets/modals/onboarding_modal.dart';
 import 'package:rusa/widgets/modals/insert_document_modal.dart';
 import 'package:rusa/widgets/views/aggregations_view.dart';
 import 'package:rusa/widgets/views/document_json_view.dart';
+import 'package:rusa/widgets/views/document_table_view.dart';
 import 'package:rusa/widgets/views/document_tree_view.dart';
 import 'package:rusa/widgets/views/indexes_view.dart';
 import 'package:rusa/widgets/views/schema_view.dart';
@@ -1390,9 +1397,13 @@ void main() {
     await tester.pump();
     for (var i = 0; i < 50 && tester.takeException() != null; i++) {}
 
+    // Read-only JSON bodies are also selectable EditableTexts, so scope the
+    // finder to the one field that actually accepts input.
     final editor = find.descendant(
       of: jsonView,
-      matching: find.byType(EditableText),
+      matching: find.byWidgetPredicate(
+        (w) => w is EditableText && !w.readOnly,
+      ),
     );
     expect(editor, findsOneWidget, reason: 'the card body must become editable');
     // Only the edited card swaps its pencil for Save/Cancel.
@@ -1425,9 +1436,15 @@ void main() {
         reason: 'a field removed from the JSON must be removed persistently');
     expect(saved.id, firstId,
         reason: 'the document identity must be preserved');
-    // The editor closes and the pencil returns.
+    // The editor closes and the pencil returns; only the read-only selectable
+    // bodies remain.
     expect(
-      find.descendant(of: jsonView, matching: find.byType(EditableText)),
+      find.descendant(
+        of: jsonView,
+        matching: find.byWidgetPredicate(
+          (w) => w is EditableText && !w.readOnly,
+        ),
+      ),
       findsNothing,
     );
     expect(editIcon, findsNWidgets(originalCount));
@@ -2579,5 +2596,269 @@ void main() {
     expect(find.byType(CompassSidebarResizeHandle), findsNothing);
     expect(tester.getSize(find.byType(CompassSidebar)).width,
         closeTo(size.width * 0.85, 0.01));
+  });
+
+  testWidgets('document values are selectable in tree, JSON and table views',
+      (WidgetTester tester) async {
+    tester.view.physicalSize = const Size(1920.0, 1080.0);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(const CompassApp());
+    await tester.pump();
+    for (var i = 0; i < 50 && tester.takeException() != null; i++) {}
+    await closeConnectionPopup(tester);
+
+    // Tree leaf values are read-only fields, so drag/long-press selection and
+    // the custom copy menu work on them.
+    final treeValue = find.descendant(
+      of: find.byType(DocumentTreeView),
+      matching: find.byWidgetPredicate(
+        (w) =>
+            w is EditableText &&
+            w.readOnly &&
+            w.controller.text.contains('The Silent Horizon'),
+      ),
+    );
+    expect(treeValue, findsOneWidget);
+    expect(
+        tester.widget<EditableText>(treeValue).contextMenuBuilder, isNotNull);
+
+    // The read-only JSON body keeps its syntax colours and is selectable too.
+    await tester.tap(find.text('JSON'));
+    await tester.pump();
+    for (var i = 0; i < 50 && tester.takeException() != null; i++) {}
+    final jsonValue = find.descendant(
+      of: find.byType(DocumentJsonView),
+      matching: find.byWidgetPredicate(
+        (w) =>
+            w is EditableText &&
+            w.readOnly &&
+            w.controller.text.contains('"title": "The Silent Horizon"'),
+      ),
+    );
+    expect(jsonValue, findsOneWidget);
+    expect(
+        tester.widget<EditableText>(jsonValue).contextMenuBuilder, isNotNull);
+
+    // Table cells are no longer plain, unselectable Text widgets either.
+    await tester.tap(find.text('Table'));
+    await tester.pump();
+    for (var i = 0; i < 50 && tester.takeException() != null; i++) {}
+    final tableValue = find.descendant(
+      of: find.byType(DocumentTableView),
+      matching: find.byWidgetPredicate(
+        (w) =>
+            w is EditableText &&
+            w.readOnly &&
+            w.controller.text == 'The Silent Horizon',
+      ),
+    );
+    expect(tableValue, findsOneWidget);
+    expect(
+        tester.widget<EditableText>(tableValue).contextMenuBuilder, isNotNull);
+  });
+
+  testWidgets('a selectable document value can be copied from the menu',
+      (WidgetTester tester) async {
+    final messenger =
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+    String? copied;
+    messenger.setMockMethodCallHandler(SystemChannels.platform, (call) async {
+      if (call.method == 'Clipboard.setData') {
+        copied = (call.arguments as Map<String, dynamic>)['text'] as String?;
+      }
+      return null;
+    });
+    addTearDown(
+        () => messenger.setMockMethodCallHandler(SystemChannels.platform, null));
+
+    await tester.pumpWidget(
+      Directionality(
+        textDirection: TextDirection.ltr,
+        child: Overlay(
+          initialEntries: [
+            OverlayEntry(
+              builder: (context) => CompassDensity.forWidth(
+                width: 800.0,
+                child: const MediaQuery(
+                  data: MediaQueryData(size: Size(800.0, 600.0)),
+                  child: CompassTheme(
+                    variant: CompassThemeVariant.defaultVariant,
+                    child: DefaultTextEditingShortcuts(
+                      child: Center(
+                        child: SizedBox(
+                          width: 400.0,
+                          child: CompassSelectableText(
+                            'copy me',
+                            style: TextStyle(fontSize: 14.0),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+    await tester.pump();
+
+    // Open the custom menu on the read-only field. Select all first so Copy
+    // is enabled, then reopen the menu and copy the whole value.
+    tester.state<EditableTextState>(find.byType(EditableText)).toggleToolbar();
+    await tester.pump();
+    final selectAll = find.text('Select all');
+    expect(selectAll, findsOneWidget, reason: 'the custom menu must be shown');
+    await tester.tap(selectAll);
+    await tester.pump();
+
+    tester.state<EditableTextState>(find.byType(EditableText)).toggleToolbar();
+    await tester.pump();
+    final copy = find.text('Copy');
+    expect(copy, findsOneWidget, reason: 'the custom menu must offer Copy');
+    await tester.tap(copy);
+    await tester.pump();
+
+    expect(copied, isNotNull);
+    expect(copied, 'copy me');
+  });
+
+  testWidgets('dragging across a selectable value highlights the text',
+      (WidgetTester tester) async {
+    // Flutter's test platform defaults to Android, where a mouse drag moves the
+    // caret instead of selecting a range. Drive the desktop gesture path the
+    // app actually uses on Windows/Linux/macOS.
+    debugDefaultTargetPlatformOverride = TargetPlatform.windows;
+    addTearDown(() => debugDefaultTargetPlatformOverride = null);
+
+    await tester.pumpWidget(
+      Directionality(
+        textDirection: TextDirection.ltr,
+        child: Overlay(
+          initialEntries: [
+            OverlayEntry(
+              builder: (context) => CompassDensity.forWidth(
+                width: 800.0,
+                child: const MediaQuery(
+                  data: MediaQueryData(size: Size(800.0, 600.0)),
+                  child: CompassTheme(
+                    variant: CompassThemeVariant.defaultVariant,
+                    child: DefaultTextEditingShortcuts(
+                      child: Center(
+                        child: SizedBox(
+                          width: 400.0,
+                          child: CompassSelectableText(
+                            'copy me please',
+                            style: TextStyle(fontSize: 24.0),
+                            maxLines: null,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+    await tester.pump();
+
+    final editable = find.byType(EditableText);
+    final rect = tester.getRect(editable);
+    final TextEditingController controller =
+        tester.widget<EditableText>(editable).controller;
+
+    final gesture = await tester.startGesture(
+      Offset(rect.left + 4.0, rect.center.dy),
+      kind: PointerDeviceKind.mouse,
+      buttons: kPrimaryButton,
+    );
+    await tester.pump();
+    await gesture.moveTo(Offset(rect.right - 4.0, rect.center.dy));
+    await tester.pump();
+    await gesture.up();
+    await tester.pump();
+
+    expect(controller.selection.isCollapsed, isFalse,
+        reason: 'dragging with the mouse must select a range');
+    expect(controller.selection.textInside(controller.text), 'copy me please');
+  });
+
+  testWidgets('the text context menu stays compact in the overlay',
+      (WidgetTester tester) async {
+    await tester.pumpWidget(
+      Directionality(
+        textDirection: TextDirection.ltr,
+        child: Overlay(
+          initialEntries: [
+            OverlayEntry(
+              builder: (context) => CompassDensity.forWidth(
+                width: 800.0,
+                child: const MediaQuery(
+                  data: MediaQueryData(size: Size(800.0, 600.0)),
+                  child: CompassTheme(
+                    variant: CompassThemeVariant.defaultVariant,
+                    child: DefaultTextEditingShortcuts(
+                      child: Center(
+                        child: SizedBox(
+                          // Narrow on purpose: the JSON body is a multi-line
+                          // field, whose bottom edge is far from the selection.
+                          width: 90.0,
+                          child: CompassSelectableText(
+                            'copy me please',
+                            style: TextStyle(fontSize: 24.0),
+                            maxLines: null,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+    await tester.pump();
+
+    final editable = find.byType(EditableText);
+    tester.state<EditableTextState>(editable)
+        .selectAll(SelectionChangedCause.toolbar);
+    await tester.pump();
+    tester.state<EditableTextState>(editable).toggleToolbar();
+    await tester.pump();
+
+    final Rect menu = tester.getRect(find.byType(CompassTextContextMenu));
+    expect(menu.width, lessThan(250.0),
+        reason: 'four short rows must not stretch across the viewport');
+    expect(menu.height, lessThan(160.0),
+        reason: 'the menu must size to its rows, not the overlay');
+
+    // A multi-line field's bottom-left is far from the selected text (that is
+    // why the JSON view used to lose its menu). The menu must be offset to the
+    // selection anchor instead of to the field edge.
+    final anchors =
+        tester.state<EditableTextState>(editable).contextMenuAnchors;
+    final Offset fieldTopLeft = tester.getRect(editable).topLeft;
+    final Offset ownOffset = find
+        .ancestor(
+          of: find.byType(CompassTextContextMenu),
+          matching: find.byType(CompositedTransformFollower),
+        )
+        .evaluate()
+        .map((element) => (element.widget as CompositedTransformFollower).offset)
+        // Flutter's own wrapper cancels the field position with a negative
+        // offset; ours is the positive one.
+        .firstWhere((offset) => offset.dx >= 0.0 && offset.dy >= 0.0);
+    final Offset menuTopLeft = fieldTopLeft + ownOffset;
+    expect(menuTopLeft.dx, closeTo(anchors.primaryAnchor.dx - 8.0, 1.0));
+    expect(menuTopLeft.dy, closeTo(anchors.primaryAnchor.dy + 4.0, 1.0));
   });
 }

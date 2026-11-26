@@ -57,7 +57,11 @@ class CompassTextContextMenu extends StatelessWidget {
       behavior: HitTestBehavior.opaque,
       onTap: ContextMenuController.removeAny,
       child: Container(
-        constraints: const BoxConstraints(minWidth: 168.0),
+        // The context menu lives in the root Overlay, whose entries are laid
+        // out with tight, viewport-sized constraints. A stretching Column would
+        // therefore fill the whole screen for four short rows. Bound the panel
+        // and use top-left alignment so only the content determines its size.
+        constraints: const BoxConstraints(minWidth: 168.0, maxWidth: 208.0),
         padding: const EdgeInsets.symmetric(vertical: 4.0),
         decoration: BoxDecoration(
           color: theme.bgPanel,
@@ -71,40 +75,42 @@ class CompassTextContextMenu extends StatelessWidget {
             ),
           ],
         ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            _buildRow(
-              theme,
-              label: 'Cut',
-              svg: CompassSvgIcons.cut,
-              enabled: canCut,
-              onTap: onCut,
-            ),
-            _buildRow(
-              theme,
-              label: 'Copy',
-              svg: CompassSvgIcons.copy,
-              enabled: canCopy,
-              onTap: onCopy,
-            ),
-            _buildRow(
-              theme,
-              label: 'Paste',
-              svg: CompassSvgIcons.paste,
-              enabled: canPaste,
-              onTap: onPaste,
-            ),
-            Container(height: 1.0, color: theme.border),
-            _buildRow(
-              theme,
-              label: 'Select all',
-              svg: CompassSvgIcons.selectAll,
-              enabled: true,
-              onTap: onSelectAll,
-            ),
-          ],
+        child: IntrinsicWidth(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildRow(
+                theme,
+                label: 'Cut',
+                svg: CompassSvgIcons.cut,
+                enabled: canCut,
+                onTap: onCut,
+              ),
+              _buildRow(
+                theme,
+                label: 'Copy',
+                svg: CompassSvgIcons.copy,
+                enabled: canCopy,
+                onTap: onCopy,
+              ),
+              _buildRow(
+                theme,
+                label: 'Paste',
+                svg: CompassSvgIcons.paste,
+                enabled: canPaste,
+                onTap: onPaste,
+              ),
+              Container(height: 1.0, color: theme.border),
+              _buildRow(
+                theme,
+                label: 'Select all',
+                svg: CompassSvgIcons.selectAll,
+                enabled: true,
+                onTap: onSelectAll,
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -159,7 +165,10 @@ class CompassTextContextMenu extends StatelessWidget {
 /// The target is not optional cosmetics: Flutter inserts the menu into the
 /// root overlay and cancels out the field's own position, so an unanchored
 /// menu opens in the top-left corner of the window instead of next to the
-/// text the user is editing.
+/// text the user is editing. The offset is computed from Flutter's
+/// [EditableTextState.contextMenuAnchors], so a tall multi-line field (the JSON
+/// body) still gets its menu beside the selected text rather than at the
+/// far-away bottom edge of the whole field.
 ///
 /// The menu closes itself after every action, and the actions are disabled
 /// when they would do nothing (no selection → no cut/copy).
@@ -196,21 +205,48 @@ EditableTextContextMenuBuilder compassTextContextMenuBuilderFor(
       },
     );
 
-    // Open the menu under the field, or over it when the field sits close to
-    // the bottom of the window (the mongosh prompt always does).
+    // Anchor to the selected text, not to the field's box. In the tree and
+    // table views the field *is* the value, so the old bottom-left anchor was
+    // close enough; the JSON body is a tall multi-line field, whose bottom-left
+    // can be far below the visible area (or even outside the window).
+    final TextSelectionToolbarAnchors anchors =
+        editableTextState.contextMenuAnchors;
     final Rect field = _fieldRect(editableTextState.context);
-    final double screenHeight =
-        MediaQuery.maybeOf(context)?.size.height ?? double.infinity;
-    final bool below =
-        field.bottom + _estimatedMenuHeight(density) <= screenHeight;
+    final Size viewport =
+        MediaQuery.maybeOf(context)?.size ?? const Size(double.infinity, double.infinity);
+    const double menuWidth = 208.0;
+    final double menuHeight = _estimatedMenuHeight(density);
+
+    final Offset primary = anchors.primaryAnchor;
+    final Offset secondary = anchors.secondaryAnchor ?? primary;
+    final bool below = primary.dy + menuHeight <= viewport.height;
+    final Offset anchor = below ? primary : secondary;
+
+    // Keep the whole panel on screen, including when the selection sits at the
+    // right edge of the very wide JSON card or beside the docked Shell prompt.
+    final double maxLeft = viewport.width - menuWidth;
+    final double maxTop = viewport.height - menuHeight;
+    final Offset desired = Offset(
+      (anchor.dx - 8.0).clamp(0.0, maxLeft < 0.0 ? 0.0 : maxLeft).toDouble(),
+      (below ? anchor.dy + 4.0 : anchor.dy - menuHeight - 4.0)
+          .clamp(0.0, maxTop < 0.0 ? 0.0 : maxTop)
+          .toDouble(),
+    );
 
     return CompositedTransformFollower(
       link: anchorLink,
       showWhenUnlinked: false,
-      targetAnchor: below ? Alignment.bottomLeft : Alignment.topLeft,
-      followerAnchor: below ? Alignment.topLeft : Alignment.bottomLeft,
-      offset: below ? const Offset(0.0, 4.0) : const Offset(0.0, -4.0),
-      child: menu,
+      // The follower's target is the field's CompositedTransformTarget, so the
+      // offset is the selection anchor relative to that target's top-left.
+      targetAnchor: Alignment.topLeft,
+      followerAnchor: Alignment.topLeft,
+      offset: desired - field.topLeft,
+      // Overlay entries get tight viewport constraints; let the menu size
+      // itself to its four rows instead of stretching to the whole window.
+      child: UnconstrainedBox(
+        alignment: Alignment.topLeft,
+        child: menu,
+      ),
     );
   };
 }

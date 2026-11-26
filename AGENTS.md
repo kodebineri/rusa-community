@@ -22,7 +22,7 @@ a **real MongoDB server** (via `mongo_dart`) swaps the global engine instance.
 - Saved connection profiles live in platform secure storage (`flutter_secure_storage`;
   Android `minSdk 24`, Linux needs `libsecret-1-dev` to build); EULA/theme flags stay in
   `SharedPreferences`.
-- Tests: nine files in `test/`, **175 tests** — widget tests in `test/widget_test.dart`
+- Tests: nine files in `test/`, **179 tests** — widget tests in `test/widget_test.dart`
   plus `compass_density`, `json_auto_indent_formatter`, `mongo_json_parser`, `mongo_uri`,
   `mongosh_interpreter`, `mongosh_completer`, `terminal`, `ssh_tunnel` (and the shared
   `support/modal_harness.dart` helper). Patterns live in `docs/testing.md`.
@@ -59,10 +59,10 @@ a **real MongoDB server** (via `mongo_dart`) swaps the global engine instance.
 
 ## Current status — read before you change anything
 
-_Verified 2026-11-17 at HEAD `37ad480` (Flutter 3.50.0 / Dart 3.14.0): tests 173/173;
+_Verified 2026-11-26 (Flutter 3.50.1 / Dart 3.14.0): tests 179/179;
 `flutter analyze` exits 1 with 3 pre-existing deprecation infos — see below._
 
-- **`flutter test` is 175/175 — keep it green.** The nine `mobile:` tests guard the phone
+- **`flutter test` is 179/179 — keep it green.** The nine `mobile:` tests guard the phone
   layouts (aggregations/schema/indexes at 320 px, the action sheet height cap, the
   connection-modal footer, the export format cards, the SSH tunnel form, and the keyboard
   inset above the Shell prompt).
@@ -71,6 +71,14 @@ _Verified 2026-11-17 at HEAD `37ad480` (Flutter 3.50.0 / Dart 3.14.0): tests 173
   edge that reports clamped widths (180–480 px) via `onResize` / `onResizeEnd`. The final
   width is stored under `sidebar_width` in `SharedPreferences` and restored on launch.
   The touch drawer stays viewport-sized and has no grip.
+- **Document values are selectable/copyable.** `CompassSelectableText`
+  (`lib/widgets/compass_selectable_text.dart`) is a read-only `EditableText` wired to the custom
+  copy menu **and wrapped in a `TextSelectionGestureDetectorBuilder`** — the bare `EditableText`
+  gives the I-beam cursor but no drag/long-press handlers, so the builder (as in Flutter's
+  `SelectableText`) is what actually creates the highlight. The tree's `_id` badge and leaf
+  values, the read-only JSON body, and all table cells use it. The JSON body uses `.rich` with
+  `buildJsonSyntaxSpan` so syntax colours survive. Property keys, type labels and collapsed
+  summaries stay plain `Text` so their finders and dense layout are unchanged.
 - **Credentials are scoped to an Authentication Database.** The connect dialog's Advanced
   section has an `Authentication Database` field (default `admin`); `appendAuthSource`
   (`lib/utils/mongo_uri.dart`) adds `authSource=<db>` to the URI when it has credentials and
@@ -244,8 +252,9 @@ in the repo — Flutter tooling only.
     `contextMenuBuilder: compassTextContextMenuBuilderFor(link, density: …)` +
     `onTapOutside: compassHandleTapOutside`, and must be wrapped in a
     `CompositedTransformTarget(link: …)` carrying a matching `LayerLink` (otherwise the menu
-    opens in the window corner). Copy/paste do nothing at all without this. The query bar's
-    filter / project / sort fields additionally use `JsonSyntaxTextController`
+    opens in the window corner). Copy/paste do nothing at all without this. Every editable field
+    and the read-only document values (`CompassSelectableText`) follow this contract. The query
+    bar's filter / project / sort fields additionally use `JsonSyntaxTextController`
     (`lib/utils/json_syntax_text_controller.dart`) for JSON syntax colouring.
 
 ## Known dead-ends / no-op code (don't "fix" silently, don't rely on)
@@ -292,5 +301,6 @@ in the repo — Flutter tooling only.
 | `CompassTheme`, `CompassThemeVariant` / `CompassPalette`, `CompassColors`, `CompassTypography`, `CompassDensity` | `lib/theme/` |
 | `CompassSvg`, `CompassSvgIcons` | `lib/icons/compass_svg_icons.dart` |
 | `CompassTextContextMenu`, `compassTextContextMenuBuilderFor`, `compassHandleTapOutside` | `lib/widgets/compass_text_menu.dart` |
+| `CompassSelectableText` (read-only, copyable document values), `.rich`, `_SpanTextController` | `lib/widgets/compass_selectable_text.dart` |
 | `JsonSyntaxTextController` (JSON syntax colouring) | `lib/utils/json_syntax_text_controller.dart` |
 | Tests | `test/` (see `docs/testing.md`) |

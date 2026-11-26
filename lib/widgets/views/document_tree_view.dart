@@ -6,6 +6,7 @@ import '../../icons/compass_svg_icons.dart';
 import '../../models/mongo_models.dart';
 import '../../theme/compass_density.dart';
 import '../compass_icon_button.dart';
+import '../compass_selectable_text.dart';
 
 /// Converted from src/components/DocumentTreeView.tsx
 /// Adheres strictly to:
@@ -100,12 +101,10 @@ class DocumentTreeView extends StatelessWidget {
                             borderRadius: BorderRadius.circular(4.0),
                             border: Border.all(color: theme.greenBadgeBorder, width: 1.0),
                           ),
-                          child: Text(
+                          child: CompassSelectableText(
                             doc.data['_id'] is MongoObjectId
                                 ? 'ObjectId("${doc.id}")'
                                 : '"${doc.id}"',
-                            overflow: TextOverflow.ellipsis,
-                            maxLines: 1,
                             style: CompassTypography.monoBold(color: theme.accent, size: 11.0),
                           ),
                         ),
@@ -309,10 +308,8 @@ class _TreeNodeWidgetState extends State<_TreeNodeWidget> {
                 if (!isExpandable)
                   Expanded(
                     flex: 5,
-                    child: Text(
+                    child: CompassSelectableText(
                       _displayValue(type),
-                      overflow: TextOverflow.ellipsis,
-                      maxLines: 1,
                       style: CompassTypography.monoRegular(
                         color: _getTypeColor(type, _theme),
                         size: 12.0,
@@ -334,22 +331,30 @@ class _TreeNodeWidgetState extends State<_TreeNodeWidget> {
                     ),
                   ),
               ] else ...[
-                Text(
-                  '${widget.propKey}:',
-                  style: CompassTypography.monoBold(color: _theme.textPrimary, size: 12.0),
+                Flexible(
+                  child: Text(
+                    '${widget.propKey}:',
+                    overflow: TextOverflow.ellipsis,
+                    maxLines: 1,
+                    style: CompassTypography.monoBold(color: _theme.textPrimary, size: 12.0),
+                  ),
                 ),
                 const SizedBox(width: 6.0),
-                Text(
-                  type == 'Array'
-                      ? 'Array (${(widget.value as List).length})'
-                      : type,
-                  style: CompassTypography.caption(color: _theme.textMuted),
+                Flexible(
+                  child: Text(
+                    type == 'Array'
+                        ? 'Array (${(widget.value as List).length})'
+                        : type,
+                    overflow: TextOverflow.ellipsis,
+                    maxLines: 1,
+                    style: CompassTypography.caption(color: _theme.textMuted),
+                  ),
                 ),
                 const SizedBox(width: 6.0),
 
                 if (!isExpandable)
                   Expanded(
-                    child: Text(
+                    child: CompassSelectableText(
                       _displayValue(type),
                       style: CompassTypography.monoRegular(
                         color: _getTypeColor(type, _theme),

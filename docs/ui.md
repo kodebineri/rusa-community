@@ -136,27 +136,55 @@ The shell is dense and pixel-precise, so three OS-level inputs are normalised in
 
 ## Text selection context menu & syntax colouring
 
-Two small cross-cutting helpers make bare `EditableText`s usable (no Material
+Three small cross-cutting helpers make bare `EditableText`s usable (no Material
 `AdaptiveTextSelectionToolbar` is available).
 
 ### `lib/widgets/compass_text_menu.dart`
 
 - `CompassTextContextMenu` (`{density, onCut, onCopy, onPaste, onSelectAll, canCut/canCopy/canPaste}`) —
-  a themed panel with Cut / Copy / Paste / Select-all rows, `minWidth 168`, rows
-  `≥ density.minTapTarget`. Tapping the panel (not a row) closes it.
+  a themed panel with Cut / Copy / Paste / Select-all rows, content-sized via `IntrinsicWidth`
+  inside `minWidth 168 / maxWidth 208`, rows `≥ density.minTapTarget`. Tapping the panel
+  (not a row) closes it.
 - `compassTextContextMenuBuilderFor(LayerLink anchorLink, {required CompassDensity density})` —
-  the `EditableTextContextMenuBuilder`. It anchors the menu to the field (`below` when it fits,
-  `above` otherwise for the bottom-docked Shell prompt) via `CompositedTransformFollower`.
-  **The field must be wrapped in a `CompositedTransformTarget` with the same `LayerLink`**, or
-  the menu opens in the window corner. Every action closes the menu (`ContextMenuController.removeAny`).
+  the `EditableTextContextMenuBuilder`. It positions the menu from Flutter's
+  `EditableTextState.contextMenuAnchors` — **beside the selected text**, not at the field's edge
+  (the JSON body is a tall multi-line field whose bottom-left can be off-screen). It opens
+  `below` the primary anchor when that fits and `above` the secondary anchor otherwise, clamped
+  to the viewport. **The field must be wrapped in a `CompositedTransformTarget` with the same
+  `LayerLink`**, or the menu opens in the window corner. The follower wraps the panel in
+  `UnconstrainedBox` so the root overlay's tight, viewport-sized constraints do not stretch four
+  short rows across the whole window. Every action closes the menu
+  (`ContextMenuController.removeAny`).
 - `compassHandleTapOutside(event, focusNode)` — the `onTapOutside` handler; closes the menu and
   only unfocuses on non-touch pointers (so the soft keyboard stays open on a phone).
 - The menu lives in the root `Overlay`, hence `main.dart`'s `TapRegionSurface` + `Overlay`
   (see `docs/architecture.md` → Bootstrap) and its `CompassDensity` must be passed in
   (the overlay sits above the app's density provider).
 
-Wired in: `CompassInput`, `CompassQueryBar`'s fields, `CompassTerminal`'s prompt. The sidebar
-search field does **not** wire it (plain `EditableText`).
+Wired in: `CompassInput`, `CompassQueryBar`'s fields, `CompassTerminal`'s prompt, and every
+`CompassSelectableText`. The sidebar search field does **not** wire it (plain `EditableText`).
+
+### `lib/widgets/compass_selectable_text.dart`
+
+`CompassSelectableText` (and `.rich`) makes document values highlightable/copyable. It is a
+**read-only `EditableText`** rather than Material's `SelectableText` (which lives in
+`material.dart` and needs a `MaterialApp`/`Theme`). A bare `EditableText` only supplies the I-beam
+`MouseRegion` cursor — it does **not** install tap/drag/long-press selection handlers — so the state
+implements `TextSelectionGestureDetectorBuilderDelegate` and wraps the field in
+`TextSelectionGestureDetectorBuilder.buildGestureDetector(behavior: HitTestBehavior.translucent, …)`
+(the same builder `SelectableText` uses). `rendererIgnoresPointer: true` keeps the editable's own
+recognizers from competing for the pointer. It wraps the field in a
+`CompositedTransformTarget(link: …)`, uses `compassTextContextMenuBuilderFor` with the same link,
+and sets `onTapOutside: (event) => compassHandleTapOutside(event, _focusNode)`. Flutter 3.50 requires
+both `cursorColor` and `backgroundCursorColor`; `showCursor` stays false and the selection highlight
+is `theme.accent.withValues(alpha: 0.35)`.
+
+Single-line values default to `maxLines: 1`; the JSON card passes `maxLines: null` so it grows.
+`.rich` keeps a prebuilt `TextSpan` via `_SpanTextController.buildTextSpan` (so
+`buildJsonSyntaxSpan` colours survive) while the controller's plain value stays in sync for
+selection offsets and copying. Used by the tree's `_id` badge and leaf values, the read-only JSON
+body, and all table cells. Property keys, type labels and collapsed `{ ... }` / `[ ... n items ]`
+summaries remain plain `Text` so their finders and dense layout are unchanged.
 
 ### `lib/utils/json_syntax_text_controller.dart` — `JsonSyntaxTextController`
 
@@ -230,9 +258,9 @@ duplicate legal copy as Dart literals.
 
 | View | Props (callbacks) | Behavior |
 |---|---|---|
-| `DocumentTreeView` | `documents`, `onEditDocument(doc)`, `onCloneDocument(doc)`, `onDeleteDocument(docId, doc)` | Stateless. One card per doc: header `#<i+1>` + green `ObjectId("<id>")` badge + action strip — **copy → `onCloneDocument`**, pencil → edit, trash → delete. Body: recursive `_TreeNodeWidget`; chevron expandable for Object/Array, **collapsed by default at every depth** (deliberate deviation from the React reference, which expanded `depth < 2`); expanding a node starts its own children collapsed; BSON-colored type labels (`theme.bson*`); collapsed shows `{ ... }` / `[ ... n items ]`. Empty: "No documents match the current query". **On touch the badge ellipsizes and the tree row splits its width `3:2:5` between key / type / value** |
-| `DocumentJsonView` | `documents`, `onUpdateDocument(docId, fields)`, `onCloneDocument`, `onDeleteDocument` | Stateful. Card per doc: `#n` + `_id` + copy/pencil/trash; body = pretty JSON. **Inline edit works**: tapping the pencil swaps the body for a multi-line `CompassInput` (autofocus) and replaces the pencil with **Save** (check) / **Cancel** (close). Save parses the JSON, forces `_id` back to the original, calls `onUpdateDocument` and exits edit mode; invalid JSON shows a `CompassErrorBanner` and keeps the editor open. **A field removed from the JSON is removed persistently** (the engine's plain-map update is a full replace). Edit state is dropped if the document leaves the list (filter/delete/switch) |
-| `DocumentTableView` | `documents`, `onEditDocument`, `onDeleteDocument` | Horizontal-scroll table: `#` col (48px), dynamic columns from key union, `_id` first (220px, others 160px, header click client-side sorts), ACTIONS col (100px, **132px on touch**) pencil/trash. Rows 36px (**48px on touch**), BSON-styled cells. **No clone callback — no copy icon in table mode** |
+| `DocumentTreeView` | `documents`, `onEditDocument(doc)`, `onCloneDocument(doc)`, `onDeleteDocument(docId, doc)` | Stateless. One card per doc: header `#<i+1>` + green `ObjectId("<id>")` badge + action strip — **copy → `onCloneDocument`**, pencil → edit, trash → delete. Body: recursive `_TreeNodeWidget`; chevron expandable for Object/Array, **collapsed by default at every depth** (deliberate deviation from the React reference, which expanded `depth < 2`); expanding a node starts its own children collapsed; BSON-colored type labels (`theme.bson*`); collapsed shows `{ ... }` / `[ ... n items ]`. Empty: "No documents match the current query". **On touch the badge ellipsizes and the tree row splits its width `3:2:5` between key / type / value**. The `_id` badge and leaf values are `CompassSelectableText` (highlight/copy via the custom menu); keys, type labels and collapsed summaries stay plain `Text` |
+| `DocumentJsonView` | `documents`, `onUpdateDocument(docId, fields)`, `onCloneDocument`, `onDeleteDocument` | Stateful. Card per doc: `#n` + `_id` + copy/pencil/trash; body = pretty JSON. **Inline edit works**: tapping the pencil swaps the body for a multi-line `CompassInput` (autofocus) and replaces the pencil with **Save** (check) / **Cancel** (close). Save parses the JSON, forces `_id` back to the original, calls `onUpdateDocument` and exits edit mode; invalid JSON shows a `CompassErrorBanner` and keeps the editor open. **A field removed from the JSON is removed persistently** (the engine's plain-map update is a full replace). The read-only body is `CompassSelectableText.rich`, so it keeps `buildJsonSyntaxSpan` colours while being selectable/copyable; only the in-edit body is a writable `EditableText`. Edit state is dropped if the document leaves the list (filter/delete/switch) |
+| `DocumentTableView` | `documents`, `onEditDocument`, `onDeleteDocument` | Horizontal-scroll table: `#` col (48px), dynamic columns from key union, `_id` first (220px, others 160px, header click client-side sorts), ACTIONS col (100px, **132px on touch**) pencil/trash. Rows 36px (**48px on touch**), BSON-styled cells. All cell values are `CompassSelectableText`, so they can be highlighted/copied even though table mode has no clone icon; header keys ellipsize to protect the sort arrow |
 | `SchemaView` | `dbName, collName` | **StatefulWidget** owning `fields` + `isAnalyzing`: auto-runs analysis on open / db-coll change and on **Analyze Schema** (250 ms `Timer` mirrors the React `setTimeout(…, 250)`; while running the button is disabled `Opacity 0.5` with label **Analyzing...**); reads `analyzeSchema` from the global `mongoEngine`. Header "Schema Analysis" + `Analyzed N unique fields in <coll>`; per-field cards: type badges with %, 8px multi-color distribution bar (incl. red missing segment), first-3 samples, min/max |
 | `IndexesView` | `dbName, collName, indexes, onCreateIndex, onDropIndex(name)` | Header + **Create Index**; table `INDEX NAME / FIELDS & ORDER / PROPERTIES / SIZE / ACTIONS`; `_id_` row = shieldCheck "Protected" (no trash); `unique` → blue badge. Stateless — `onCreateIndex`/`onDropIndex` only open the root-Stack modals (`CreateIndexModal` / `DropIndexModal`), which mutate the engine; the table refreshes on the next `setState` because `indexes` is the live `activeColl.indexes` list |
 | `AggregationsView` | `dbName, collName, onSaveAsView?: fn(pipeline, json), initialPipeline?` | ~1300 lines / 47 KB. Classes: `AggregationPreset {id, name, description, stages}`; `_availableOperators = [$match,$group,$sort,$project,$limit,$skip,$unwind,$count,$lookup]`. State: `_activeMode ('visual'\|'raw')`, **starts with an empty pipeline** (like Compass — an empty pipeline returns the collection's documents; a view's "Copy to Aggregations" can seed it via `initialPipeline`), per-stage controllers, `_rawController`, 5 presets (Match & Group, Unwind & Count, Top 10 Rated, Lookup Publishers, Count Documents), results (`_results`, `_executionTimeMs`, `_errorMessage`, `_isRunning`, `_resultPage`, `_resultViewMode 'json'\|'table'`). Auto-runs once post-frame in `initState` and on db/coll change. Sections: mode switcher + action bar (**Run Pipeline** / Save as View; stacks below 620 dp so the buttons are never clipped, touch-sized targets), presets strip, visual builder (quick-add chips, Add Stage, stage cards with operator picker/enable/move/duplicate/delete; **content edits re-run the pipeline live**), raw editor (`CompassInput maxLines 14`; the action bar's **Run Pipeline** is the only run control), results panel (paged **preview** — only 20 documents per page with a prev/next pager, `n docs (x.x ms)` pill, JSON/Table switch, copy); pressing **Run Pipeline** scrolls the results panel into view |

@@ -9,6 +9,7 @@ import '../../services/mongo_engine.dart';
 import '../../utils/json_syntax_text_controller.dart';
 import '../../utils/mongo_json_encoder.dart';
 import '../compass_icon_button.dart';
+import '../compass_selectable_text.dart';
 import '../modals/compass_modal.dart';
 
 /// Converted from src/components/DocumentJsonView.tsx
@@ -261,7 +262,7 @@ class _DocumentJsonViewState extends State<DocumentJsonView> {
                       ],
                     ],
                   )
-                : Text.rich(
+                : CompassSelectableText.rich(
                     buildJsonSyntaxSpan(
                       formattedJson,
                       style: CompassTypography.monoRegular(
@@ -270,6 +271,11 @@ class _DocumentJsonViewState extends State<DocumentJsonView> {
                       ),
                       theme: _theme,
                     ),
+                    style: CompassTypography.monoRegular(
+                      color: _theme.textSecondary,
+                      size: 12.0,
+                    ),
+                    maxLines: null,
                   ),
           ),
         ],
