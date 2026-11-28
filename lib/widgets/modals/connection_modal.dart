@@ -91,6 +91,15 @@ class _ConnectionModalState extends State<ConnectionModal> {
   late final TextEditingController _sshKeyPathController;
   late final TextEditingController _sshPassphraseController;
 
+  /// PEM captured from the file picker and saved with the profile. Mobile
+  /// pickers return a path into an app-private cache, which may be gone on the
+  /// next launch, so the tunnel uses these bytes instead of that path.
+  String _sshKeyPem = '';
+
+  /// The path the picker reported for [_sshKeyPem]. Editing the field by hand
+  /// invalidates the cached PEM so a typed path is read from disk again.
+  String? _pickedKeyPath;
+
   bool _sshEnabled = false;
   SshAuthMethod _sshAuthMethod = SshAuthMethod.password;
 
@@ -150,6 +159,8 @@ class _ConnectionModalState extends State<ConnectionModal> {
     _sshPasswordController.text = '';
     _sshKeyPathController.text = '';
     _sshPassphraseController.text = '';
+    _sshKeyPem = '';
+    _pickedKeyPath = null;
     _sshHostKeyFingerprint = null;
     _showAdvanced = false;
     _isConnecting = false;
@@ -280,6 +291,7 @@ class _ConnectionModalState extends State<ConnectionModal> {
       authMethod: _sshAuthMethod,
       password: _sshPasswordController.text,
       privateKeyPath: _sshKeyPathController.text.trim(),
+      privateKeyPem: _sshKeyPem,
       privateKeyPassphrase: _sshPassphraseController.text,
       hostKeyFingerprint: _sshHostKeyFingerprint,
     );
@@ -306,6 +318,8 @@ class _ConnectionModalState extends State<ConnectionModal> {
     _sshUserController.text = ssh?.username ?? '';
     _sshPasswordController.text = ssh?.password ?? '';
     _sshKeyPathController.text = ssh?.privateKeyPath ?? '';
+    _sshKeyPem = ssh?.privateKeyPem ?? '';
+    _pickedKeyPath = _sshKeyPem.isEmpty ? null : (ssh?.privateKeyPath ?? '');
     _sshPassphraseController.text = ssh?.privateKeyPassphrase ?? '';
     _sshHostKeyFingerprint = ssh?.hostKeyFingerprint;
 
@@ -393,9 +407,8 @@ class _ConnectionModalState extends State<ConnectionModal> {
         _connectError = null;
       });
       try {
-        final error = await widget
-            .onConnect(profile)
-            .timeout(_connectTimeout(profile));
+        final error =
+            await widget.onConnect(profile).timeout(_connectTimeout(profile));
         if (!mounted) return;
         setState(() {
           _isTesting = false;
@@ -931,6 +944,12 @@ class _ConnectionModalState extends State<ConnectionModal> {
             CompassInput(
               controller: _sshKeyPathController,
               placeholder: '~/.ssh/id_ed25519',
+              onChanged: (value) {
+                if (value.trim() != (_pickedKeyPath ?? '')) {
+                  _sshKeyPem = '';
+                  _pickedKeyPath = null;
+                }
+              },
               suffix: CompassIconButton(
                 svgString: CompassSvgIcons.file,
                 onTap: _pickKeyFile,
@@ -1036,8 +1055,7 @@ class _ConnectionModalState extends State<ConnectionModal> {
         onTap: () => setState(() => _sshAuthMethod = method),
         semanticLabel: 'SSH authentication: $label',
         builder: (hovered) => Container(
-          padding:
-              const EdgeInsets.symmetric(horizontal: 12.0, vertical: 7.0),
+          padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 7.0),
           decoration: BoxDecoration(
             color: selected ? _theme.accent : _theme.bgPanel,
             borderRadius: BorderRadius.circular(4.0),
@@ -1073,7 +1091,21 @@ class _ConnectionModalState extends State<ConnectionModal> {
       const typeGroup = XTypeGroup(label: 'SSH private keys');
       final file = await openFile(acceptedTypeGroups: [typeGroup]);
       if (file == null || !mounted) return;
-      setState(() => _sshKeyPathController.text = file.path);
+
+      // Android/iOS hand back a path into a temporary cache. Read the bytes
+      // now so a saved profile keeps working after that cache is cleared.
+      String? pem;
+      try {
+        pem = await file.readAsString();
+      } catch (_) {
+        // Fall back to the path (handy when the file is still on disk).
+      }
+      if (!mounted) return;
+      setState(() {
+        _sshKeyPathController.text = file.path;
+        _sshKeyPem = pem ?? '';
+        _pickedKeyPath = pem == null ? null : file.path;
+      });
     } catch (_) {
       // Platform picker unavailable: the path can still be typed by hand.
     }

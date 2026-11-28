@@ -1,64 +1,1905 @@
 {
   "books": [
     {
-      "_id": { "$oid": "60c72b2f9b1d8b0015f8a001" },
+      "_id": {
+        "$oid": "60c72b2f9b1d8b0015f8a001"
+      },
       "title": "The Silent Horizon",
       "author": "Elena Rostova",
       "isbn": "978-3-16-148410-0",
       "published_year": 2019,
-      "publisher_id": { "$oid": "60c72b2f9b1d8b0015f8a010" },
+      "publisher_id": {
+        "$oid": "60c72b2f9b1d8b0015f8a010"
+      },
       "genre_ids": [
-        { "$oid": "60c72b2f9b1d8b0015f8a020" },
-        { "$oid": "60c72b2f9b1d8b0015f8a021" }
+        {
+          "$oid": "60c72b2f9b1d8b0015f8a020"
+        },
+        {
+          "$oid": "60c72b2f9b1d8b0015f8a021"
+        }
       ],
       "copies_available": 4,
       "rating": 4.5
     },
     {
-      "_id": { "$oid": "60c72b2f9b1d8b0015f8a002" },
+      "_id": {
+        "$oid": "60c72b2f9b1d8b0015f8a002"
+      },
       "title": "Algorithms of the Mind",
       "author": "Dr. Marcus Vance",
       "isbn": "978-1-23-456789-7",
       "published_year": 2022,
-      "publisher_id": { "$oid": "60c72b2f9b1d8b0015f8a011" },
+      "publisher_id": {
+        "$oid": "60c72b2f9b1d8b0015f8a011"
+      },
       "genre_ids": [
-        { "$oid": "60c72b2f9b1d8b0015f8a022" }
+        {
+          "$oid": "60c72b2f9b1d8b0015f8a022"
+        }
       ],
       "copies_available": 2,
       "rating": 4.8
+    },
+    {
+      "_id": {
+        "$oid": "60c72b2f9b1d8b0015f8a003"
+      },
+      "title": "Atlas of Quiet Stars",
+      "author": "Iris Bellamy",
+      "isbn": "978-1-10-100000-0",
+      "published_year": 2015,
+      "publisher_id": {
+        "$oid": "60c72b2f9b1d8b0015f8a010"
+      },
+      "genre_ids": [
+        {
+          "$oid": "60c72b2f9b1d8b0015f8a020"
+        },
+        {
+          "$oid": "60c72b2f9b1d8b0015f8a021"
+        }
+      ],
+      "copies_available": 1,
+      "rating": 3.5
+    },
+    {
+      "_id": {
+        "$oid": "60c72b2f9b1d8b0015f8a004"
+      },
+      "title": "The Cartographer's Debt",
+      "author": "Tomas Reyes",
+      "isbn": "978-1-11-100137-1",
+      "published_year": 2016,
+      "publisher_id": {
+        "$oid": "60c72b2f9b1d8b0015f8a011"
+      },
+      "genre_ids": [
+        {
+          "$oid": "60c72b2f9b1d8b0015f8a027"
+        },
+        {
+          "$oid": "60c72b2f9b1d8b0015f8a028"
+        }
+      ],
+      "copies_available": 2,
+      "rating": 3.6
+    },
+    {
+      "_id": {
+        "$oid": "60c72b2f9b1d8b0015f8a005"
+      },
+      "title": "Signals from the Deep",
+      "author": "Nadia Haddad",
+      "isbn": "978-1-12-100274-2",
+      "published_year": 2017,
+      "publisher_id": {
+        "$oid": "60c72b2f9b1d8b0015f8a012"
+      },
+      "genre_ids": [
+        {
+          "$oid": "60c72b2f9b1d8b0015f8a034"
+        },
+        {
+          "$oid": "60c72b2f9b1d8b0015f8a035"
+        }
+      ],
+      "copies_available": 3,
+      "rating": 3.7
+    },
+    {
+      "_id": {
+        "$oid": "60c72b2f9b1d8b0015f8a006"
+      },
+      "title": "A Field Guide to Static",
+      "author": "Owen Marsh",
+      "isbn": "978-1-13-100411-3",
+      "published_year": 2018,
+      "publisher_id": {
+        "$oid": "60c72b2f9b1d8b0015f8a013"
+      },
+      "genre_ids": [
+        {
+          "$oid": "60c72b2f9b1d8b0015f8a041"
+        },
+        {
+          "$oid": "60c72b2f9b1d8b0015f8a042"
+        }
+      ],
+      "copies_available": 4,
+      "rating": 3.8
+    },
+    {
+      "_id": {
+        "$oid": "60c72b2f9b1d8b0015f8a007"
+      },
+      "title": "The Last Analog Summer",
+      "author": "Priya Raman",
+      "isbn": "978-1-14-100548-4",
+      "published_year": 2020,
+      "publisher_id": {
+        "$oid": "60c72b2f9b1d8b0015f8a014"
+      },
+      "genre_ids": [
+        {
+          "$oid": "60c72b2f9b1d8b0015f8a048"
+        },
+        {
+          "$oid": "60c72b2f9b1d8b0015f8a049"
+        }
+      ],
+      "copies_available": 5,
+      "rating": 3.9
+    },
+    {
+      "_id": {
+        "$oid": "60c72b2f9b1d8b0015f8a008"
+      },
+      "title": "Northern Lights Protocol",
+      "author": "Jonas Keller",
+      "isbn": "978-1-15-100685-5",
+      "published_year": 2021,
+      "publisher_id": {
+        "$oid": "60c72b2f9b1d8b0015f8a015"
+      },
+      "genre_ids": [
+        {
+          "$oid": "60c72b2f9b1d8b0015f8a055"
+        },
+        {
+          "$oid": "60c72b2f9b1d8b0015f8a056"
+        }
+      ],
+      "copies_available": 6,
+      "rating": 4.0
+    },
+    {
+      "_id": {
+        "$oid": "60c72b2f9b1d8b0015f8a009"
+      },
+      "title": "Glass Orchards",
+      "author": "Amelia Frost",
+      "isbn": "978-1-16-100822-6",
+      "published_year": 2022,
+      "publisher_id": {
+        "$oid": "60c72b2f9b1d8b0015f8a016"
+      },
+      "genre_ids": [
+        {
+          "$oid": "60c72b2f9b1d8b0015f8a062"
+        },
+        {
+          "$oid": "60c72b2f9b1d8b0015f8a063"
+        }
+      ],
+      "copies_available": 7,
+      "rating": 4.1
+    },
+    {
+      "_id": {
+        "$oid": "60c72b2f9b1d8b0015f8a010"
+      },
+      "title": "Notes on Tiny Machines",
+      "author": "Rafael Costa",
+      "isbn": "978-1-17-100959-7",
+      "published_year": 2023,
+      "publisher_id": {
+        "$oid": "60c72b2f9b1d8b0015f8a017"
+      },
+      "genre_ids": [
+        {
+          "$oid": "60c72b2f9b1d8b0015f8a069"
+        },
+        {
+          "$oid": "60c72b2f9b1d8b0015f8a020"
+        }
+      ],
+      "copies_available": 8,
+      "rating": 4.2
+    },
+    {
+      "_id": {
+        "$oid": "60c72b2f9b1d8b0015f8a011"
+      },
+      "title": "The Weight of Paper Maps",
+      "author": "Lena Okafor",
+      "isbn": "978-1-18-101096-8",
+      "published_year": 2024,
+      "publisher_id": {
+        "$oid": "60c72b2f9b1d8b0015f8a018"
+      },
+      "genre_ids": [
+        {
+          "$oid": "60c72b2f9b1d8b0015f8a026"
+        },
+        {
+          "$oid": "60c72b2f9b1d8b0015f8a027"
+        }
+      ],
+      "copies_available": 9,
+      "rating": 4.3
+    },
+    {
+      "_id": {
+        "$oid": "60c72b2f9b1d8b0015f8a012"
+      },
+      "title": "Echoes in the Server Room",
+      "author": "Miles Harding",
+      "isbn": "978-1-19-101233-9",
+      "published_year": 2015,
+      "publisher_id": {
+        "$oid": "60c72b2f9b1d8b0015f8a019"
+      },
+      "genre_ids": [
+        {
+          "$oid": "60c72b2f9b1d8b0015f8a033"
+        },
+        {
+          "$oid": "60c72b2f9b1d8b0015f8a034"
+        }
+      ],
+      "copies_available": 10,
+      "rating": 4.4
+    },
+    {
+      "_id": {
+        "$oid": "60c72b2f9b1d8b0015f8a013"
+      },
+      "title": "Winter Algorithms",
+      "author": "Sofia Lindqvist",
+      "isbn": "978-1-20-101370-0",
+      "published_year": 2016,
+      "publisher_id": {
+        "$oid": "60c72b2f9b1d8b0015f8a020"
+      },
+      "genre_ids": [
+        {
+          "$oid": "60c72b2f9b1d8b0015f8a040"
+        },
+        {
+          "$oid": "60c72b2f9b1d8b0015f8a041"
+        }
+      ],
+      "copies_available": 11,
+      "rating": 4.5
+    },
+    {
+      "_id": {
+        "$oid": "60c72b2f9b1d8b0015f8a014"
+      },
+      "title": "The Ocean Between Us",
+      "author": "Ethan Park",
+      "isbn": "978-1-21-101507-1",
+      "published_year": 2017,
+      "publisher_id": {
+        "$oid": "60c72b2f9b1d8b0015f8a021"
+      },
+      "genre_ids": [
+        {
+          "$oid": "60c72b2f9b1d8b0015f8a047"
+        },
+        {
+          "$oid": "60c72b2f9b1d8b0015f8a048"
+        }
+      ],
+      "copies_available": 12,
+      "rating": 4.6
+    },
+    {
+      "_id": {
+        "$oid": "60c72b2f9b1d8b0015f8a015"
+      },
+      "title": "Small Gods of Silicon",
+      "author": "Clara Mensah",
+      "isbn": "978-1-22-101644-2",
+      "published_year": 2018,
+      "publisher_id": {
+        "$oid": "60c72b2f9b1d8b0015f8a022"
+      },
+      "genre_ids": [
+        {
+          "$oid": "60c72b2f9b1d8b0015f8a054"
+        },
+        {
+          "$oid": "60c72b2f9b1d8b0015f8a055"
+        }
+      ],
+      "copies_available": 1,
+      "rating": 4.7
+    },
+    {
+      "_id": {
+        "$oid": "60c72b2f9b1d8b0015f8a016"
+      },
+      "title": "A Theory of Soft Edges",
+      "author": "Hugo Ferreira",
+      "isbn": "978-1-23-101781-3",
+      "published_year": 2020,
+      "publisher_id": {
+        "$oid": "60c72b2f9b1d8b0015f8a023"
+      },
+      "genre_ids": [
+        {
+          "$oid": "60c72b2f9b1d8b0015f8a061"
+        },
+        {
+          "$oid": "60c72b2f9b1d8b0015f8a062"
+        }
+      ],
+      "copies_available": 2,
+      "rating": 4.8
+    },
+    {
+      "_id": {
+        "$oid": "60c72b2f9b1d8b0015f8a017"
+      },
+      "title": "Broken Compasses",
+      "author": "Yuki Tanaka",
+      "isbn": "978-1-24-101918-4",
+      "published_year": 2021,
+      "publisher_id": {
+        "$oid": "60c72b2f9b1d8b0015f8a024"
+      },
+      "genre_ids": [
+        {
+          "$oid": "60c72b2f9b1d8b0015f8a068"
+        },
+        {
+          "$oid": "60c72b2f9b1d8b0015f8a069"
+        }
+      ],
+      "copies_available": 3,
+      "rating": 4.9
+    },
+    {
+      "_id": {
+        "$oid": "60c72b2f9b1d8b0015f8a018"
+      },
+      "title": "The Hidden Ledger",
+      "author": "Miriam Doyle",
+      "isbn": "978-1-25-102055-5",
+      "published_year": 2022,
+      "publisher_id": {
+        "$oid": "60c72b2f9b1d8b0015f8a025"
+      },
+      "genre_ids": [
+        {
+          "$oid": "60c72b2f9b1d8b0015f8a025"
+        },
+        {
+          "$oid": "60c72b2f9b1d8b0015f8a026"
+        }
+      ],
+      "copies_available": 4,
+      "rating": 5.0
+    },
+    {
+      "_id": {
+        "$oid": "60c72b2f9b1d8b0015f8a019"
+      },
+      "title": "Rainfall in Redwood City",
+      "author": "Andrei Popescu",
+      "isbn": "978-1-26-102192-6",
+      "published_year": 2023,
+      "publisher_id": {
+        "$oid": "60c72b2f9b1d8b0015f8a026"
+      },
+      "genre_ids": [
+        {
+          "$oid": "60c72b2f9b1d8b0015f8a032"
+        },
+        {
+          "$oid": "60c72b2f9b1d8b0015f8a033"
+        }
+      ],
+      "copies_available": 5,
+      "rating": 3.5
+    },
+    {
+      "_id": {
+        "$oid": "60c72b2f9b1d8b0015f8a020"
+      },
+      "title": "Anatomy of a Search",
+      "author": "Zoe Bennett",
+      "isbn": "978-1-27-102329-7",
+      "published_year": 2024,
+      "publisher_id": {
+        "$oid": "60c72b2f9b1d8b0015f8a027"
+      },
+      "genre_ids": [
+        {
+          "$oid": "60c72b2f9b1d8b0015f8a039"
+        },
+        {
+          "$oid": "60c72b2f9b1d8b0015f8a040"
+        }
+      ],
+      "copies_available": 6,
+      "rating": 3.6
+    },
+    {
+      "_id": {
+        "$oid": "60c72b2f9b1d8b0015f8a021"
+      },
+      "title": "The Slow Network",
+      "author": "Samir Haddad",
+      "isbn": "978-1-28-102466-8",
+      "published_year": 2015,
+      "publisher_id": {
+        "$oid": "60c72b2f9b1d8b0015f8a028"
+      },
+      "genre_ids": [
+        {
+          "$oid": "60c72b2f9b1d8b0015f8a046"
+        },
+        {
+          "$oid": "60c72b2f9b1d8b0015f8a047"
+        }
+      ],
+      "copies_available": 7,
+      "rating": 3.7
+    },
+    {
+      "_id": {
+        "$oid": "60c72b2f9b1d8b0015f8a022"
+      },
+      "title": "Pages of Blue Smoke",
+      "author": "Grace Whitfield",
+      "isbn": "978-1-29-102603-9",
+      "published_year": 2016,
+      "publisher_id": {
+        "$oid": "60c72b2f9b1d8b0015f8a029"
+      },
+      "genre_ids": [
+        {
+          "$oid": "60c72b2f9b1d8b0015f8a053"
+        },
+        {
+          "$oid": "60c72b2f9b1d8b0015f8a054"
+        }
+      ],
+      "copies_available": 8,
+      "rating": 3.8
+    },
+    {
+      "_id": {
+        "$oid": "60c72b2f9b1d8b0015f8a023"
+      },
+      "title": "Machine Learning at Dawn",
+      "author": "Lucas Meyer",
+      "isbn": "978-1-30-102740-0",
+      "published_year": 2017,
+      "publisher_id": {
+        "$oid": "60c72b2f9b1d8b0015f8a030"
+      },
+      "genre_ids": [
+        {
+          "$oid": "60c72b2f9b1d8b0015f8a060"
+        },
+        {
+          "$oid": "60c72b2f9b1d8b0015f8a061"
+        }
+      ],
+      "copies_available": 9,
+      "rating": 3.9
+    },
+    {
+      "_id": {
+        "$oid": "60c72b2f9b1d8b0015f8a024"
+      },
+      "title": "The Quiet Index",
+      "author": "Aisha Rahman",
+      "isbn": "978-1-31-102877-1",
+      "published_year": 2018,
+      "publisher_id": {
+        "$oid": "60c72b2f9b1d8b0015f8a031"
+      },
+      "genre_ids": [
+        {
+          "$oid": "60c72b2f9b1d8b0015f8a067"
+        },
+        {
+          "$oid": "60c72b2f9b1d8b0015f8a068"
+        }
+      ],
+      "copies_available": 10,
+      "rating": 4.0
+    },
+    {
+      "_id": {
+        "$oid": "60c72b2f9b1d8b0015f8a025"
+      },
+      "title": "Lost in the Metadata",
+      "author": "Felix Novak",
+      "isbn": "978-1-32-103014-2",
+      "published_year": 2020,
+      "publisher_id": {
+        "$oid": "60c72b2f9b1d8b0015f8a032"
+      },
+      "genre_ids": [
+        {
+          "$oid": "60c72b2f9b1d8b0015f8a024"
+        },
+        {
+          "$oid": "60c72b2f9b1d8b0015f8a025"
+        }
+      ],
+      "copies_available": 11,
+      "rating": 4.1
+    },
+    {
+      "_id": {
+        "$oid": "60c72b2f9b1d8b0015f8a026"
+      },
+      "title": "Cities Without Clocks",
+      "author": "Colette Dubois",
+      "isbn": "978-1-33-103151-3",
+      "published_year": 2021,
+      "publisher_id": {
+        "$oid": "60c72b2f9b1d8b0015f8a033"
+      },
+      "genre_ids": [
+        {
+          "$oid": "60c72b2f9b1d8b0015f8a031"
+        },
+        {
+          "$oid": "60c72b2f9b1d8b0015f8a032"
+        }
+      ],
+      "copies_available": 12,
+      "rating": 4.2
+    },
+    {
+      "_id": {
+        "$oid": "60c72b2f9b1d8b0015f8a027"
+      },
+      "title": "The Grammar of Trees",
+      "author": "Ravi Menon",
+      "isbn": "978-1-34-103288-4",
+      "published_year": 2022,
+      "publisher_id": {
+        "$oid": "60c72b2f9b1d8b0015f8a034"
+      },
+      "genre_ids": [
+        {
+          "$oid": "60c72b2f9b1d8b0015f8a038"
+        },
+        {
+          "$oid": "60c72b2f9b1d8b0015f8a039"
+        }
+      ],
+      "copies_available": 1,
+      "rating": 4.3
+    },
+    {
+      "_id": {
+        "$oid": "60c72b2f9b1d8b0015f8a028"
+      },
+      "title": "After the Last Backup",
+      "author": "Hannah Wolfe",
+      "isbn": "978-1-35-103425-5",
+      "published_year": 2023,
+      "publisher_id": {
+        "$oid": "60c72b2f9b1d8b0015f8a035"
+      },
+      "genre_ids": [
+        {
+          "$oid": "60c72b2f9b1d8b0015f8a045"
+        },
+        {
+          "$oid": "60c72b2f9b1d8b0015f8a046"
+        }
+      ],
+      "copies_available": 2,
+      "rating": 4.4
+    },
+    {
+      "_id": {
+        "$oid": "60c72b2f9b1d8b0015f8a029"
+      },
+      "title": "Satellites of Mercury",
+      "author": "Pedro Alvarez",
+      "isbn": "978-1-36-103562-6",
+      "published_year": 2024,
+      "publisher_id": {
+        "$oid": "60c72b2f9b1d8b0015f8a036"
+      },
+      "genre_ids": [
+        {
+          "$oid": "60c72b2f9b1d8b0015f8a052"
+        },
+        {
+          "$oid": "60c72b2f9b1d8b0015f8a053"
+        }
+      ],
+      "copies_available": 3,
+      "rating": 4.5
+    },
+    {
+      "_id": {
+        "$oid": "60c72b2f9b1d8b0015f8a030"
+      },
+      "title": "A Pocketful of Frequencies",
+      "author": "Ingrid Sorensen",
+      "isbn": "978-1-37-103699-7",
+      "published_year": 2015,
+      "publisher_id": {
+        "$oid": "60c72b2f9b1d8b0015f8a037"
+      },
+      "genre_ids": [
+        {
+          "$oid": "60c72b2f9b1d8b0015f8a059"
+        },
+        {
+          "$oid": "60c72b2f9b1d8b0015f8a060"
+        }
+      ],
+      "copies_available": 4,
+      "rating": 4.6
+    },
+    {
+      "_id": {
+        "$oid": "60c72b2f9b1d8b0015f8a031"
+      },
+      "title": "The Wooden Terminal",
+      "author": "Malik Johnson",
+      "isbn": "978-1-38-103836-8",
+      "published_year": 2016,
+      "publisher_id": {
+        "$oid": "60c72b2f9b1d8b0015f8a038"
+      },
+      "genre_ids": [
+        {
+          "$oid": "60c72b2f9b1d8b0015f8a066"
+        },
+        {
+          "$oid": "60c72b2f9b1d8b0015f8a067"
+        }
+      ],
+      "copies_available": 5,
+      "rating": 4.7
+    },
+    {
+      "_id": {
+        "$oid": "60c72b2f9b1d8b0015f8a032"
+      },
+      "title": "Charting the Unseen",
+      "author": "Elena Vargas",
+      "isbn": "978-1-39-103973-9",
+      "published_year": 2017,
+      "publisher_id": {
+        "$oid": "60c72b2f9b1d8b0015f8a039"
+      },
+      "genre_ids": [
+        {
+          "$oid": "60c72b2f9b1d8b0015f8a023"
+        },
+        {
+          "$oid": "60c72b2f9b1d8b0015f8a024"
+        }
+      ],
+      "copies_available": 6,
+      "rating": 4.8
+    },
+    {
+      "_id": {
+        "$oid": "60c72b2f9b1d8b0015f8a033"
+      },
+      "title": "Every Circuit Has a Coast",
+      "author": "Theo Ashford",
+      "isbn": "978-1-40-104110-0",
+      "published_year": 2018,
+      "publisher_id": {
+        "$oid": "60c72b2f9b1d8b0015f8a040"
+      },
+      "genre_ids": [
+        {
+          "$oid": "60c72b2f9b1d8b0015f8a030"
+        },
+        {
+          "$oid": "60c72b2f9b1d8b0015f8a031"
+        }
+      ],
+      "copies_available": 7,
+      "rating": 4.9
+    },
+    {
+      "_id": {
+        "$oid": "60c72b2f9b1d8b0015f8a034"
+      },
+      "title": "Memoirs of a Middle Node",
+      "author": "Camille Laurent",
+      "isbn": "978-1-41-104247-1",
+      "published_year": 2020,
+      "publisher_id": {
+        "$oid": "60c72b2f9b1d8b0015f8a041"
+      },
+      "genre_ids": [
+        {
+          "$oid": "60c72b2f9b1d8b0015f8a037"
+        },
+        {
+          "$oid": "60c72b2f9b1d8b0015f8a038"
+        }
+      ],
+      "copies_available": 8,
+      "rating": 5.0
+    },
+    {
+      "_id": {
+        "$oid": "60c72b2f9b1d8b0015f8a035"
+      },
+      "title": "The Shape of Cache",
+      "author": "Dmitri Volkov",
+      "isbn": "978-1-42-104384-2",
+      "published_year": 2021,
+      "publisher_id": {
+        "$oid": "60c72b2f9b1d8b0015f8a042"
+      },
+      "genre_ids": [
+        {
+          "$oid": "60c72b2f9b1d8b0015f8a044"
+        },
+        {
+          "$oid": "60c72b2f9b1d8b0015f8a045"
+        }
+      ],
+      "copies_available": 9,
+      "rating": 3.5
+    },
+    {
+      "_id": {
+        "$oid": "60c72b2f9b1d8b0015f8a036"
+      },
+      "title": "Windward",
+      "author": "Nora Fields",
+      "isbn": "978-1-43-104521-3",
+      "published_year": 2022,
+      "publisher_id": {
+        "$oid": "60c72b2f9b1d8b0015f8a043"
+      },
+      "genre_ids": [
+        {
+          "$oid": "60c72b2f9b1d8b0015f8a051"
+        },
+        {
+          "$oid": "60c72b2f9b1d8b0015f8a052"
+        }
+      ],
+      "copies_available": 10,
+      "rating": 3.6
+    },
+    {
+      "_id": {
+        "$oid": "60c72b2f9b1d8b0015f8a037"
+      },
+      "title": "In Praise of Narrow Streets",
+      "author": "Kwame Asante",
+      "isbn": "978-1-44-104658-4",
+      "published_year": 2023,
+      "publisher_id": {
+        "$oid": "60c72b2f9b1d8b0015f8a044"
+      },
+      "genre_ids": [
+        {
+          "$oid": "60c72b2f9b1d8b0015f8a058"
+        },
+        {
+          "$oid": "60c72b2f9b1d8b0015f8a059"
+        }
+      ],
+      "copies_available": 11,
+      "rating": 3.7
+    },
+    {
+      "_id": {
+        "$oid": "60c72b2f9b1d8b0015f8a038"
+      },
+      "title": "The Decimal Garden",
+      "author": "Julia Rossi",
+      "isbn": "978-1-45-104795-5",
+      "published_year": 2024,
+      "publisher_id": {
+        "$oid": "60c72b2f9b1d8b0015f8a045"
+      },
+      "genre_ids": [
+        {
+          "$oid": "60c72b2f9b1d8b0015f8a065"
+        },
+        {
+          "$oid": "60c72b2f9b1d8b0015f8a066"
+        }
+      ],
+      "copies_available": 12,
+      "rating": 3.8
+    },
+    {
+      "_id": {
+        "$oid": "60c72b2f9b1d8b0015f8a039"
+      },
+      "title": "Night Shift at the Archive",
+      "author": "Omar Farouk",
+      "isbn": "978-1-46-104932-6",
+      "published_year": 2015,
+      "publisher_id": {
+        "$oid": "60c72b2f9b1d8b0015f8a046"
+      },
+      "genre_ids": [
+        {
+          "$oid": "60c72b2f9b1d8b0015f8a022"
+        },
+        {
+          "$oid": "60c72b2f9b1d8b0015f8a023"
+        }
+      ],
+      "copies_available": 1,
+      "rating": 3.9
+    },
+    {
+      "_id": {
+        "$oid": "60c72b2f9b1d8b0015f8a040"
+      },
+      "title": "Threadbare Universes",
+      "author": "Beatrice Clarke",
+      "isbn": "978-1-47-105069-7",
+      "published_year": 2016,
+      "publisher_id": {
+        "$oid": "60c72b2f9b1d8b0015f8a047"
+      },
+      "genre_ids": [
+        {
+          "$oid": "60c72b2f9b1d8b0015f8a029"
+        },
+        {
+          "$oid": "60c72b2f9b1d8b0015f8a030"
+        }
+      ],
+      "copies_available": 2,
+      "rating": 4.0
+    },
+    {
+      "_id": {
+        "$oid": "60c72b2f9b1d8b0015f8a041"
+      },
+      "title": "Terraforming the Page",
+      "author": "Arjun Desai",
+      "isbn": "978-1-48-105206-8",
+      "published_year": 2017,
+      "publisher_id": {
+        "$oid": "60c72b2f9b1d8b0015f8a048"
+      },
+      "genre_ids": [
+        {
+          "$oid": "60c72b2f9b1d8b0015f8a036"
+        },
+        {
+          "$oid": "60c72b2f9b1d8b0015f8a037"
+        }
+      ],
+      "copies_available": 3,
+      "rating": 4.1
+    },
+    {
+      "_id": {
+        "$oid": "60c72b2f9b1d8b0015f8a042"
+      },
+      "title": "Constellations for Beginners",
+      "author": "Freya Nilsson",
+      "isbn": "978-1-49-105343-9",
+      "published_year": 2018,
+      "publisher_id": {
+        "$oid": "60c72b2f9b1d8b0015f8a049"
+      },
+      "genre_ids": [
+        {
+          "$oid": "60c72b2f9b1d8b0015f8a043"
+        },
+        {
+          "$oid": "60c72b2f9b1d8b0015f8a044"
+        }
+      ],
+      "copies_available": 4,
+      "rating": 4.2
+    },
+    {
+      "_id": {
+        "$oid": "60c72b2f9b1d8b0015f8a043"
+      },
+      "title": "The Paper Telescope",
+      "author": "Gabriel Santos",
+      "isbn": "978-1-50-105480-0",
+      "published_year": 2020,
+      "publisher_id": {
+        "$oid": "60c72b2f9b1d8b0015f8a050"
+      },
+      "genre_ids": [
+        {
+          "$oid": "60c72b2f9b1d8b0015f8a050"
+        },
+        {
+          "$oid": "60c72b2f9b1d8b0015f8a051"
+        }
+      ],
+      "copies_available": 5,
+      "rating": 4.3
+    },
+    {
+      "_id": {
+        "$oid": "60c72b2f9b1d8b0015f8a044"
+      },
+      "title": "Salt and Static",
+      "author": "Leila Karim",
+      "isbn": "978-1-51-105617-1",
+      "published_year": 2021,
+      "publisher_id": {
+        "$oid": "60c72b2f9b1d8b0015f8a051"
+      },
+      "genre_ids": [
+        {
+          "$oid": "60c72b2f9b1d8b0015f8a057"
+        },
+        {
+          "$oid": "60c72b2f9b1d8b0015f8a058"
+        }
+      ],
+      "copies_available": 6,
+      "rating": 4.4
+    },
+    {
+      "_id": {
+        "$oid": "60c72b2f9b1d8b0015f8a045"
+      },
+      "title": "A History of Small Screens",
+      "author": "Victor Chen",
+      "isbn": "978-1-52-105754-2",
+      "published_year": 2022,
+      "publisher_id": {
+        "$oid": "60c72b2f9b1d8b0015f8a052"
+      },
+      "genre_ids": [
+        {
+          "$oid": "60c72b2f9b1d8b0015f8a064"
+        },
+        {
+          "$oid": "60c72b2f9b1d8b0015f8a065"
+        }
+      ],
+      "copies_available": 7,
+      "rating": 4.5
+    },
+    {
+      "_id": {
+        "$oid": "60c72b2f9b1d8b0015f8a046"
+      },
+      "title": "The Glasshouse Cipher",
+      "author": "Rosa Iglesias",
+      "isbn": "978-1-53-105891-3",
+      "published_year": 2023,
+      "publisher_id": {
+        "$oid": "60c72b2f9b1d8b0015f8a053"
+      },
+      "genre_ids": [
+        {
+          "$oid": "60c72b2f9b1d8b0015f8a021"
+        },
+        {
+          "$oid": "60c72b2f9b1d8b0015f8a022"
+        }
+      ],
+      "copies_available": 8,
+      "rating": 4.6
+    },
+    {
+      "_id": {
+        "$oid": "60c72b2f9b1d8b0015f8a047"
+      },
+      "title": "Between Two Packets",
+      "author": "Emil Berg",
+      "isbn": "978-1-54-106028-4",
+      "published_year": 2024,
+      "publisher_id": {
+        "$oid": "60c72b2f9b1d8b0015f8a054"
+      },
+      "genre_ids": [
+        {
+          "$oid": "60c72b2f9b1d8b0015f8a028"
+        },
+        {
+          "$oid": "60c72b2f9b1d8b0015f8a029"
+        }
+      ],
+      "copies_available": 9,
+      "rating": 4.7
+    },
+    {
+      "_id": {
+        "$oid": "60c72b2f9b1d8b0015f8a048"
+      },
+      "title": "Moons of the Inner World",
+      "author": "Talia Cohen",
+      "isbn": "978-1-55-106165-5",
+      "published_year": 2015,
+      "publisher_id": {
+        "$oid": "60c72b2f9b1d8b0015f8a055"
+      },
+      "genre_ids": [
+        {
+          "$oid": "60c72b2f9b1d8b0015f8a035"
+        },
+        {
+          "$oid": "60c72b2f9b1d8b0015f8a036"
+        }
+      ],
+      "copies_available": 10,
+      "rating": 4.8
+    },
+    {
+      "_id": {
+        "$oid": "60c72b2f9b1d8b0015f8a049"
+      },
+      "title": "The Lantern Index",
+      "author": "Nikhil Rao",
+      "isbn": "978-1-56-106302-6",
+      "published_year": 2016,
+      "publisher_id": {
+        "$oid": "60c72b2f9b1d8b0015f8a056"
+      },
+      "genre_ids": [
+        {
+          "$oid": "60c72b2f9b1d8b0015f8a042"
+        },
+        {
+          "$oid": "60c72b2f9b1d8b0015f8a043"
+        }
+      ],
+      "copies_available": 11,
+      "rating": 4.9
+    },
+    {
+      "_id": {
+        "$oid": "60c72b2f9b1d8b0015f8a050"
+      },
+      "title": "Where the Data Ends",
+      "author": "Ada Svensson",
+      "isbn": "978-1-57-106439-7",
+      "published_year": 2017,
+      "publisher_id": {
+        "$oid": "60c72b2f9b1d8b0015f8a057"
+      },
+      "genre_ids": [
+        {
+          "$oid": "60c72b2f9b1d8b0015f8a049"
+        },
+        {
+          "$oid": "60c72b2f9b1d8b0015f8a050"
+        }
+      ],
+      "copies_available": 12,
+      "rating": 5.0
     }
   ],
   "publishers": [
     {
-      "_id": { "$oid": "60c72b2f9b1d8b0015f8a010" },
+      "_id": {
+        "$oid": "60c72b2f9b1d8b0015f8a010"
+      },
       "name": "Apex Academic Press",
       "city": "Boston",
       "country": "USA",
       "founded_year": 1985
     },
     {
-      "_id": { "$oid": "60c72b2f9b1d8b0015f8a011" },
+      "_id": {
+        "$oid": "60c72b2f9b1d8b0015f8a011"
+      },
       "name": "Vanguard Publishing House",
       "city": "London",
       "country": "UK",
       "founded_year": 2001
+    },
+    {
+      "_id": {
+        "$oid": "60c72b2f9b1d8b0015f8a012"
+      },
+      "name": "Northwind House",
+      "city": "Lisbon",
+      "country": "Portugal",
+      "founded_year": 1900
+    },
+    {
+      "_id": {
+        "$oid": "60c72b2f9b1d8b0015f8a013"
+      },
+      "name": "Beacon & Slate",
+      "city": "Kyoto",
+      "country": "Japan",
+      "founded_year": 1913
+    },
+    {
+      "_id": {
+        "$oid": "60c72b2f9b1d8b0015f8a014"
+      },
+      "name": "Meridian Press",
+      "city": "Portland",
+      "country": "USA",
+      "founded_year": 1926
+    },
+    {
+      "_id": {
+        "$oid": "60c72b2f9b1d8b0015f8a015"
+      },
+      "name": "Hollow Oak Books",
+      "city": "Berlin",
+      "country": "Germany",
+      "founded_year": 1939
+    },
+    {
+      "_id": {
+        "$oid": "60c72b2f9b1d8b0015f8a016"
+      },
+      "name": "Cobalt Publishing",
+      "city": "Toronto",
+      "country": "Canada",
+      "founded_year": 1952
+    },
+    {
+      "_id": {
+        "$oid": "60c72b2f9b1d8b0015f8a017"
+      },
+      "name": "Lantern Hill",
+      "city": "Melbourne",
+      "country": "Australia",
+      "founded_year": 1965
+    },
+    {
+      "_id": {
+        "$oid": "60c72b2f9b1d8b0015f8a018"
+      },
+      "name": "Verity Editions",
+      "city": "Lisbon",
+      "country": "Portugal",
+      "founded_year": 1978
+    },
+    {
+      "_id": {
+        "$oid": "60c72b2f9b1d8b0015f8a019"
+      },
+      "name": "Aster Publishing",
+      "city": "Kyoto",
+      "country": "Japan",
+      "founded_year": 1991
+    },
+    {
+      "_id": {
+        "$oid": "60c72b2f9b1d8b0015f8a020"
+      },
+      "name": "Copperline Press",
+      "city": "Portland",
+      "country": "USA",
+      "founded_year": 2004
+    },
+    {
+      "_id": {
+        "$oid": "60c72b2f9b1d8b0015f8a021"
+      },
+      "name": "Orchard House",
+      "city": "Berlin",
+      "country": "Germany",
+      "founded_year": 2017
+    },
+    {
+      "_id": {
+        "$oid": "60c72b2f9b1d8b0015f8a022"
+      },
+      "name": "Bluepeak Media",
+      "city": "Toronto",
+      "country": "Canada",
+      "founded_year": 1905
+    },
+    {
+      "_id": {
+        "$oid": "60c72b2f9b1d8b0015f8a023"
+      },
+      "name": "Tessellate Books",
+      "city": "Melbourne",
+      "country": "Australia",
+      "founded_year": 1918
+    },
+    {
+      "_id": {
+        "$oid": "60c72b2f9b1d8b0015f8a024"
+      },
+      "name": "Redwood Academic",
+      "city": "Lisbon",
+      "country": "Portugal",
+      "founded_year": 1931
+    },
+    {
+      "_id": {
+        "$oid": "60c72b2f9b1d8b0015f8a025"
+      },
+      "name": "Halcyon Press",
+      "city": "Kyoto",
+      "country": "Japan",
+      "founded_year": 1944
+    },
+    {
+      "_id": {
+        "$oid": "60c72b2f9b1d8b0015f8a026"
+      },
+      "name": "Ironbark Publishing",
+      "city": "Portland",
+      "country": "USA",
+      "founded_year": 1957
+    },
+    {
+      "_id": {
+        "$oid": "60c72b2f9b1d8b0015f8a027"
+      },
+      "name": "Summit Editions",
+      "city": "Berlin",
+      "country": "Germany",
+      "founded_year": 1970
+    },
+    {
+      "_id": {
+        "$oid": "60c72b2f9b1d8b0015f8a028"
+      },
+      "name": "Willow & Wren",
+      "city": "Toronto",
+      "country": "Canada",
+      "founded_year": 1983
+    },
+    {
+      "_id": {
+        "$oid": "60c72b2f9b1d8b0015f8a029"
+      },
+      "name": "Atlas Grove",
+      "city": "Melbourne",
+      "country": "Australia",
+      "founded_year": 1996
+    },
+    {
+      "_id": {
+        "$oid": "60c72b2f9b1d8b0015f8a030"
+      },
+      "name": "Pilgrim Press",
+      "city": "Lisbon",
+      "country": "Portugal",
+      "founded_year": 2009
+    },
+    {
+      "_id": {
+        "$oid": "60c72b2f9b1d8b0015f8a031"
+      },
+      "name": "Cinder Publishing",
+      "city": "Kyoto",
+      "country": "Japan",
+      "founded_year": 2022
+    },
+    {
+      "_id": {
+        "$oid": "60c72b2f9b1d8b0015f8a032"
+      },
+      "name": "Brightwater Books",
+      "city": "Portland",
+      "country": "USA",
+      "founded_year": 1910
+    },
+    {
+      "_id": {
+        "$oid": "60c72b2f9b1d8b0015f8a033"
+      },
+      "name": "Quarterly House",
+      "city": "Berlin",
+      "country": "Germany",
+      "founded_year": 1923
+    },
+    {
+      "_id": {
+        "$oid": "60c72b2f9b1d8b0015f8a034"
+      },
+      "name": "Mosaic Press",
+      "city": "Toronto",
+      "country": "Canada",
+      "founded_year": 1936
+    },
+    {
+      "_id": {
+        "$oid": "60c72b2f9b1d8b0015f8a035"
+      },
+      "name": "Fieldstone Media",
+      "city": "Melbourne",
+      "country": "Australia",
+      "founded_year": 1949
+    },
+    {
+      "_id": {
+        "$oid": "60c72b2f9b1d8b0015f8a036"
+      },
+      "name": "Paper Lantern Books",
+      "city": "Lisbon",
+      "country": "Portugal",
+      "founded_year": 1962
+    },
+    {
+      "_id": {
+        "$oid": "60c72b2f9b1d8b0015f8a037"
+      },
+      "name": "Granite Editions",
+      "city": "Kyoto",
+      "country": "Japan",
+      "founded_year": 1975
+    },
+    {
+      "_id": {
+        "$oid": "60c72b2f9b1d8b0015f8a038"
+      },
+      "name": "Southgate Publishing",
+      "city": "Portland",
+      "country": "USA",
+      "founded_year": 1988
+    },
+    {
+      "_id": {
+        "$oid": "60c72b2f9b1d8b0015f8a039"
+      },
+      "name": "Ember House",
+      "city": "Berlin",
+      "country": "Germany",
+      "founded_year": 2001
+    },
+    {
+      "_id": {
+        "$oid": "60c72b2f9b1d8b0015f8a040"
+      },
+      "name": "Harborlight Press",
+      "city": "Toronto",
+      "country": "Canada",
+      "founded_year": 2014
+    },
+    {
+      "_id": {
+        "$oid": "60c72b2f9b1d8b0015f8a041"
+      },
+      "name": "Vellum & Co",
+      "city": "Melbourne",
+      "country": "Australia",
+      "founded_year": 1902
+    },
+    {
+      "_id": {
+        "$oid": "60c72b2f9b1d8b0015f8a042"
+      },
+      "name": "Juniper Books",
+      "city": "Lisbon",
+      "country": "Portugal",
+      "founded_year": 1915
+    },
+    {
+      "_id": {
+        "$oid": "60c72b2f9b1d8b0015f8a043"
+      },
+      "name": "Keystone Media",
+      "city": "Kyoto",
+      "country": "Japan",
+      "founded_year": 1928
+    },
+    {
+      "_id": {
+        "$oid": "60c72b2f9b1d8b0015f8a044"
+      },
+      "name": "Silverfern Press",
+      "city": "Portland",
+      "country": "USA",
+      "founded_year": 1941
+    },
+    {
+      "_id": {
+        "$oid": "60c72b2f9b1d8b0015f8a045"
+      },
+      "name": "Canopy Editions",
+      "city": "Berlin",
+      "country": "Germany",
+      "founded_year": 1954
+    },
+    {
+      "_id": {
+        "$oid": "60c72b2f9b1d8b0015f8a046"
+      },
+      "name": "Northstar Books",
+      "city": "Toronto",
+      "country": "Canada",
+      "founded_year": 1967
+    },
+    {
+      "_id": {
+        "$oid": "60c72b2f9b1d8b0015f8a047"
+      },
+      "name": "Meadowlark Press",
+      "city": "Melbourne",
+      "country": "Australia",
+      "founded_year": 1980
+    },
+    {
+      "_id": {
+        "$oid": "60c72b2f9b1d8b0015f8a048"
+      },
+      "name": "Solstice Publishing",
+      "city": "Lisbon",
+      "country": "Portugal",
+      "founded_year": 1993
+    },
+    {
+      "_id": {
+        "$oid": "60c72b2f9b1d8b0015f8a049"
+      },
+      "name": "Bramble House",
+      "city": "Kyoto",
+      "country": "Japan",
+      "founded_year": 2006
+    },
+    {
+      "_id": {
+        "$oid": "60c72b2f9b1d8b0015f8a050"
+      },
+      "name": "Cardinal Press",
+      "city": "Portland",
+      "country": "USA",
+      "founded_year": 2019
+    },
+    {
+      "_id": {
+        "$oid": "60c72b2f9b1d8b0015f8a051"
+      },
+      "name": "Driftwood Media",
+      "city": "Berlin",
+      "country": "Germany",
+      "founded_year": 1907
+    },
+    {
+      "_id": {
+        "$oid": "60c72b2f9b1d8b0015f8a052"
+      },
+      "name": "Foundry Books",
+      "city": "Toronto",
+      "country": "Canada",
+      "founded_year": 1920
+    },
+    {
+      "_id": {
+        "$oid": "60c72b2f9b1d8b0015f8a053"
+      },
+      "name": "Larkspur Editions",
+      "city": "Melbourne",
+      "country": "Australia",
+      "founded_year": 1933
+    },
+    {
+      "_id": {
+        "$oid": "60c72b2f9b1d8b0015f8a054"
+      },
+      "name": "Palisade Press",
+      "city": "Lisbon",
+      "country": "Portugal",
+      "founded_year": 1946
+    },
+    {
+      "_id": {
+        "$oid": "60c72b2f9b1d8b0015f8a055"
+      },
+      "name": "Tidepool Publishing",
+      "city": "Kyoto",
+      "country": "Japan",
+      "founded_year": 1959
+    },
+    {
+      "_id": {
+        "$oid": "60c72b2f9b1d8b0015f8a056"
+      },
+      "name": "Westwind House",
+      "city": "Portland",
+      "country": "USA",
+      "founded_year": 1972
+    },
+    {
+      "_id": {
+        "$oid": "60c72b2f9b1d8b0015f8a057"
+      },
+      "name": "Arrowhead Books",
+      "city": "Berlin",
+      "country": "Germany",
+      "founded_year": 1985
+    },
+    {
+      "_id": {
+        "$oid": "60c72b2f9b1d8b0015f8a058"
+      },
+      "name": "Quill & Compass",
+      "city": "Toronto",
+      "country": "Canada",
+      "founded_year": 1998
+    },
+    {
+      "_id": {
+        "$oid": "60c72b2f9b1d8b0015f8a059"
+      },
+      "name": "Morrowfield Press",
+      "city": "Melbourne",
+      "country": "Australia",
+      "founded_year": 2011
     }
   ],
   "genres": [
     {
-      "_id": { "$oid": "60c72b2f9b1d8b0015f8a020" },
+      "_id": {
+        "$oid": "60c72b2f9b1d8b0015f8a020"
+      },
       "name": "Science Fiction",
       "description": "Speculative fiction dealing with imaginative and futuristic concepts."
     },
     {
-      "_id": { "$oid": "60c72b2f9b1d8b0015f8a021" },
+      "_id": {
+        "$oid": "60c72b2f9b1d8b0015f8a021"
+      },
       "name": "Mystery",
       "description": "Fiction revolving around the solution of a crime or secrets."
     },
     {
-      "_id": { "$oid": "60c72b2f9b1d8b0015f8a022" },
+      "_id": {
+        "$oid": "60c72b2f9b1d8b0015f8a022"
+      },
       "name": "Technology",
       "description": "Non-fiction works discussing computing, artificial intelligence, and software."
+    },
+    {
+      "_id": {
+        "$oid": "60c72b2f9b1d8b0015f8a023"
+      },
+      "name": "Adventure",
+      "description": "Journeys, exploration, and challenges in unfamiliar settings."
+    },
+    {
+      "_id": {
+        "$oid": "60c72b2f9b1d8b0015f8a024"
+      },
+      "name": "Biography",
+      "description": "Accounts of real lives, told in narrative form."
+    },
+    {
+      "_id": {
+        "$oid": "60c72b2f9b1d8b0015f8a025"
+      },
+      "name": "Contemporary Fiction",
+      "description": "Modern stories grounded in everyday life."
+    },
+    {
+      "_id": {
+        "$oid": "60c72b2f9b1d8b0015f8a026"
+      },
+      "name": "Cryptography",
+      "description": "The study of hidden messages and secure communication."
+    },
+    {
+      "_id": {
+        "$oid": "60c72b2f9b1d8b0015f8a027"
+      },
+      "name": "Data Visualization",
+      "description": "Communicating information through charts and maps."
+    },
+    {
+      "_id": {
+        "$oid": "60c72b2f9b1d8b0015f8a028"
+      },
+      "name": "Design",
+      "description": "The practice of shaping products, spaces, and experiences."
+    },
+    {
+      "_id": {
+        "$oid": "60c72b2f9b1d8b0015f8a029"
+      },
+      "name": "Distributed Systems",
+      "description": "Software that runs across many coordinated machines."
+    },
+    {
+      "_id": {
+        "$oid": "60c72b2f9b1d8b0015f8a030"
+      },
+      "name": "Economics",
+      "description": "How people and societies allocate scarce resources."
+    },
+    {
+      "_id": {
+        "$oid": "60c72b2f9b1d8b0015f8a031"
+      },
+      "name": "Essays",
+      "description": "Short reflections on ideas, culture, and experience."
+    },
+    {
+      "_id": {
+        "$oid": "60c72b2f9b1d8b0015f8a032"
+      },
+      "name": "Fantasy",
+      "description": "Speculative worlds built on magic and myth."
+    },
+    {
+      "_id": {
+        "$oid": "60c72b2f9b1d8b0015f8a033"
+      },
+      "name": "Graphic Novels",
+      "description": "Narrative told through sequential illustrations."
+    },
+    {
+      "_id": {
+        "$oid": "60c72b2f9b1d8b0015f8a034"
+      },
+      "name": "History",
+      "description": "Interpretations of events and people from the past."
+    },
+    {
+      "_id": {
+        "$oid": "60c72b2f9b1d8b0015f8a035"
+      },
+      "name": "Human Computer Interaction",
+      "description": "How people understand and use technology."
+    },
+    {
+      "_id": {
+        "$oid": "60c72b2f9b1d8b0015f8a036"
+      },
+      "name": "Illustration",
+      "description": "Images created to explain, decorate, or tell a story."
+    },
+    {
+      "_id": {
+        "$oid": "60c72b2f9b1d8b0015f8a037"
+      },
+      "name": "Journalism",
+      "description": "Reporting and analysis of current events."
+    },
+    {
+      "_id": {
+        "$oid": "60c72b2f9b1d8b0015f8a038"
+      },
+      "name": "Linguistics",
+      "description": "The scientific study of language and its structure."
+    },
+    {
+      "_id": {
+        "$oid": "60c72b2f9b1d8b0015f8a039"
+      },
+      "name": "Literary Fiction",
+      "description": "Character-driven fiction with an emphasis on craft."
+    },
+    {
+      "_id": {
+        "$oid": "60c72b2f9b1d8b0015f8a040"
+      },
+      "name": "Mathematics",
+      "description": "Patterns, quantities, and structures, proved rigorously."
+    },
+    {
+      "_id": {
+        "$oid": "60c72b2f9b1d8b0015f8a041"
+      },
+      "name": "Memoir",
+      "description": "Personal recollections of a life or a period of it."
+    },
+    {
+      "_id": {
+        "$oid": "60c72b2f9b1d8b0015f8a042"
+      },
+      "name": "Music",
+      "description": "Sounds, instruments, composition, and the culture around them."
+    },
+    {
+      "_id": {
+        "$oid": "60c72b2f9b1d8b0015f8a043"
+      },
+      "name": "Nature Writing",
+      "description": "Observations of the natural world and our place in it."
+    },
+    {
+      "_id": {
+        "$oid": "60c72b2f9b1d8b0015f8a044"
+      },
+      "name": "Networks",
+      "description": "How systems connect and exchange information."
+    },
+    {
+      "_id": {
+        "$oid": "60c72b2f9b1d8b0015f8a045"
+      },
+      "name": "Philosophy",
+      "description": "Fundamental questions about knowledge, being, and value."
+    },
+    {
+      "_id": {
+        "$oid": "60c72b2f9b1d8b0015f8a046"
+      },
+      "name": "Photography",
+      "description": "The art and technique of capturing images."
+    },
+    {
+      "_id": {
+        "$oid": "60c72b2f9b1d8b0015f8a047"
+      },
+      "name": "Poetry",
+      "description": "Concentrated language shaped by rhythm and image."
+    },
+    {
+      "_id": {
+        "$oid": "60c72b2f9b1d8b0015f8a048"
+      },
+      "name": "Programming Languages",
+      "description": "Tools and ideas for expressing computation."
+    },
+    {
+      "_id": {
+        "$oid": "60c72b2f9b1d8b0015f8a049"
+      },
+      "name": "Psychology",
+      "description": "The study of mind and behavior."
+    },
+    {
+      "_id": {
+        "$oid": "60c72b2f9b1d8b0015f8a050"
+      },
+      "name": "Science",
+      "description": "Systematic knowledge of the physical and natural world."
+    },
+    {
+      "_id": {
+        "$oid": "60c72b2f9b1d8b0015f8a051"
+      },
+      "name": "Science Fiction",
+      "description": "Speculative fiction dealing with imaginative and futuristic concepts."
+    },
+    {
+      "_id": {
+        "$oid": "60c72b2f9b1d8b0015f8a052"
+      },
+      "name": "Mystery",
+      "description": "Fiction revolving around the solution of a crime or secrets."
+    },
+    {
+      "_id": {
+        "$oid": "60c72b2f9b1d8b0015f8a053"
+      },
+      "name": "Technology",
+      "description": "Non-fiction works discussing computing, artificial intelligence, and software."
+    },
+    {
+      "_id": {
+        "$oid": "60c72b2f9b1d8b0015f8a054"
+      },
+      "name": "Short Stories",
+      "description": "Compact fictional narratives with a single effect."
+    },
+    {
+      "_id": {
+        "$oid": "60c72b2f9b1d8b0015f8a055"
+      },
+      "name": "Sociology",
+      "description": "The study of society, institutions, and social relations."
+    },
+    {
+      "_id": {
+        "$oid": "60c72b2f9b1d8b0015f8a056"
+      },
+      "name": "Space Exploration",
+      "description": "The practice of exploring beyond Earth."
+    },
+    {
+      "_id": {
+        "$oid": "60c72b2f9b1d8b0015f8a057"
+      },
+      "name": "Statistics",
+      "description": "Collecting, analyzing, and interpreting data."
+    },
+    {
+      "_id": {
+        "$oid": "60c72b2f9b1d8b0015f8a058"
+      },
+      "name": "Sustainability",
+      "description": "Meeting present needs without compromising the future."
+    },
+    {
+      "_id": {
+        "$oid": "60c72b2f9b1d8b0015f8a059"
+      },
+      "name": "Thriller",
+      "description": "Fast-paced stories built around suspense and danger."
+    },
+    {
+      "_id": {
+        "$oid": "60c72b2f9b1d8b0015f8a060"
+      },
+      "name": "Travel",
+      "description": "Writing about places, journeys, and displacement."
+    },
+    {
+      "_id": {
+        "$oid": "60c72b2f9b1d8b0015f8a061"
+      },
+      "name": "Urban Studies",
+      "description": "How cities grow, function, and are experienced."
+    },
+    {
+      "_id": {
+        "$oid": "60c72b2f9b1d8b0015f8a062"
+      },
+      "name": "Visual Culture",
+      "description": "Meaning made through images and objects."
+    },
+    {
+      "_id": {
+        "$oid": "60c72b2f9b1d8b0015f8a063"
+      },
+      "name": "Web Design",
+      "description": "Designing sites and interfaces for the open web."
+    },
+    {
+      "_id": {
+        "$oid": "60c72b2f9b1d8b0015f8a064"
+      },
+      "name": "Writing",
+      "description": "Craft, process, and practice of composition."
+    },
+    {
+      "_id": {
+        "$oid": "60c72b2f9b1d8b0015f8a065"
+      },
+      "name": "Young Adult",
+      "description": "Stories written for teenage readers."
+    },
+    {
+      "_id": {
+        "$oid": "60c72b2f9b1d8b0015f8a066"
+      },
+      "name": "Zoology",
+      "description": "The scientific study of animals."
+    },
+    {
+      "_id": {
+        "$oid": "60c72b2f9b1d8b0015f8a067"
+      },
+      "name": "Architecture",
+      "description": "The design and construction of buildings and spaces."
+    },
+    {
+      "_id": {
+        "$oid": "60c72b2f9b1d8b0015f8a068"
+      },
+      "name": "Astronomy",
+      "description": "The study of celestial objects and the universe."
+    },
+    {
+      "_id": {
+        "$oid": "60c72b2f9b1d8b0015f8a069"
+      },
+      "name": "Botany",
+      "description": "The scientific study of plants."
     }
   ]
 }

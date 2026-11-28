@@ -5,6 +5,7 @@ import '../theme/compass_theme.dart';
 import '../theme/compass_typography.dart';
 import '../icons/compass_svg_icons.dart';
 import '../models/mongo_models.dart';
+import 'compass_editable_text.dart';
 import 'compass_hover.dart';
 import 'compass_icon_button.dart';
 import 'compass_spinner.dart';
@@ -85,6 +86,10 @@ class _CompassSidebarState extends State<CompassSidebar> {
 
   String _searchQuery = '';
   final TextEditingController _searchController = TextEditingController();
+  final FocusNode _searchFocus = FocusNode();
+
+  /// Anchors the search field's custom copy/paste menu to its box.
+  final LayerLink _searchMenuAnchor = LayerLink();
 
   CompassTheme get _theme => CompassTheme.of(context);
 
@@ -129,6 +134,7 @@ class _CompassSidebarState extends State<CompassSidebar> {
   @override
   void dispose() {
     _searchController.dispose();
+    _searchFocus.dispose();
     super.dispose();
   }
 
@@ -239,19 +245,23 @@ class _CompassSidebarState extends State<CompassSidebar> {
                       ),
                       const SizedBox(width: 8.0),
                       Expanded(
-                        child: EditableText(
-                          controller: _searchController,
-                          focusNode: FocusNode(),
-                          style: CompassTypography.bodyRegular(
-                            color: _theme.textPrimary,
+                        child: CompositedTransformTarget(
+                          link: _searchMenuAnchor,
+                          child: CompassEditableText(
+                            controller: _searchController,
+                            focusNode: _searchFocus,
+                            anchorLink: _searchMenuAnchor,
+                            style: CompassTypography.bodyRegular(
+                              color: _theme.textPrimary,
+                            ),
+                            cursorColor: _theme.accent,
+                            backgroundCursorColor: _theme.bgInput,
+                            onChanged: (value) {
+                              setState(() {
+                                _searchQuery = value;
+                              });
+                            },
                           ),
-                          cursorColor: _theme.accent,
-                          backgroundCursorColor: _theme.bgInput,
-                          onChanged: (value) {
-                            setState(() {
-                              _searchQuery = value;
-                            });
-                          },
                         ),
                       ),
                     ],

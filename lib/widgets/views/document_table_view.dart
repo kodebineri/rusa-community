@@ -98,9 +98,13 @@ class _DocumentTableViewState extends State<DocumentTableView> {
       ),
       child: SingleChildScrollView(
         scrollDirection: Axis.horizontal,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
+        // The seeded collections have 50 rows now, so the table must scroll in
+        // both directions. The outer view handles the wide columns; this inner
+        // one gives the Column unbounded height instead of overflowing.
+        child: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
             // Table Header Row
             Container(
               height: density.isTouch ? 44.0 : 38.0,
@@ -176,6 +180,7 @@ class _DocumentTableViewState extends State<DocumentTableView> {
             for (int i = 0; i < docs.length; i++)
               _buildTableRow(docs[i], i, allKeys),
           ],
+          ),
         ),
       ),
     );

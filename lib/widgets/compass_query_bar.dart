@@ -10,9 +10,9 @@ import '../theme/compass_theme.dart';
 import '../theme/compass_typography.dart';
 import '../icons/compass_svg_icons.dart';
 import '../models/mongo_models.dart';
+import 'compass_editable_text.dart';
 import 'compass_hover.dart';
 import 'compass_icon_button.dart';
-import 'compass_text_menu.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
@@ -554,17 +554,24 @@ class _CompassQueryBarState extends State<CompassQueryBar> {
     );
   }
 
+  /// Handle-only selection controls for the platform.
+  ///
+  /// Flutter ignores `contextMenuBuilder` when `selectionControls` is a legacy
+  /// `TextSelectionControls` (see the `EditableText.selectionControls` docs),
+  /// which left the query bar with no menu in this Material-free app. The
+  /// `TextSelectionHandleControls` variants still draw the platform handles but
+  /// let the custom copy/paste menu own the toolbar.
   TextSelectionControls getPlatformSelectionControls() {
     switch (defaultTargetPlatform) {
       case TargetPlatform.iOS:
       case TargetPlatform.macOS:
-        return cupertinoTextSelectionControls;
+        return cupertinoTextSelectionHandleControls;
       case TargetPlatform.windows:
       case TargetPlatform.linux:
-        return desktopTextSelectionControls;
+        return desktopTextSelectionHandleControls;
       case TargetPlatform.android:
       case TargetPlatform.fuchsia:
-        return materialTextSelectionControls;
+        return materialTextSelectionHandleControls;
     }
   }
 
@@ -588,8 +595,6 @@ class _CompassQueryBarState extends State<CompassQueryBar> {
     final style =
         CompassTypography.monoRegular(color: theme.textPrimary, size: fontSize)
             .copyWith(fontFamily: 'JetBrains Mono');
-    final CompassDensity density = CompassDensity.of(context);
-
     return ValueListenableBuilder<TextEditingValue>(
       valueListenable: controller,
       builder: (context, value, _) {
@@ -620,15 +625,15 @@ class _CompassQueryBarState extends State<CompassQueryBar> {
                 }
                 return KeyEventResult.ignored;
               },
-              child: EditableText(
+              child: CompassEditableText(
                 controller: controller,
                 focusNode: focusNode,
+                anchorLink: anchorLink,
                 style: style,
                 cursorColor: theme.accent,
-                selectionColor: theme.accent.withValues(alpha: 0.4),
                 selectionControls: getPlatformSelectionControls(),
                 backgroundCursorColor: theme.bgInput,
-                keyboardType: TextInputType.multiline,
+                keyboardType: keyboardType,
                 maxLines: null,
                 minLines: 1,
                 onChanged: (text) {
@@ -636,13 +641,6 @@ class _CompassQueryBarState extends State<CompassQueryBar> {
                   onChanged(controller.text);
                 },
                 onSubmitted: onSubmitted,
-                onTapOutside: (event) =>
-                    compassHandleTapOutside(event, focusNode),
-                contextMenuBuilder: (BuildContext context,
-                    EditableTextState editableTextState) {
-                  return compassTextContextMenuBuilderFor(anchorLink,
-                      density: density)(context, editableTextState);
-                },
               ),
             ),
           ],

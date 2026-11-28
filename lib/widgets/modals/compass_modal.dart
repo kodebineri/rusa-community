@@ -5,9 +5,9 @@ import '../../theme/compass_density.dart';
 import '../../theme/compass_theme.dart';
 import '../../theme/compass_typography.dart';
 import '../../utils/json_auto_indent_formatter.dart';
+import '../../widgets/compass_editable_text.dart';
 import '../../widgets/compass_hover.dart';
 import '../../widgets/compass_icon_button.dart';
-import '../../widgets/compass_text_menu.dart';
 
 /// Shared modal primitives for the Rusa client.
 ///
@@ -287,8 +287,6 @@ class _CompassInputState extends State<CompassInput> {
     final int resolvedMinLines =
         widget.minLines ?? (widget.minLinesAuto && widget.maxLines > 1 ? widget.maxLines : 1);
 
-    final CompassDensity density = CompassDensity.of(context);
-
     return CompositedTransformTarget(
       link: _menuAnchor,
       child: Container(
@@ -312,28 +310,22 @@ class _CompassInputState extends State<CompassInput> {
                       style: style.copyWith(color: _theme.textMuted),
                     ),
                   ),
-                EditableText(
+                CompassEditableText(
                   controller: widget.controller,
                   focusNode: _focusNode,
-                  autofocus: widget.autofocus,
+                  anchorLink: _menuAnchor,
                   style: style,
                   cursorColor: _theme.accent,
                   backgroundCursorColor: _theme.bgInput,
-                  selectionColor: _theme.greenBadgeBg,
                   maxLines: widget.maxLines,
                   minLines: resolvedMinLines,
                   obscureText: widget.obscureText,
+                  autofocus: widget.autofocus,
                   inputFormatters: widget.autoIndent
                       ? const [JsonAutoIndentFormatter()]
                       : null,
                   onChanged: widget.onChanged,
                   onSubmitted: widget.onSubmitted,
-                  onTapOutside: (event) =>
-                      compassHandleTapOutside(event, _focusNode),
-                  contextMenuBuilder: compassTextContextMenuBuilderFor(
-                    _menuAnchor,
-                    density: density,
-                  ),
                 ),
               ],
             );

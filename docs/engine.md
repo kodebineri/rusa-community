@@ -89,34 +89,39 @@ inside `setState`). Every view/modal imports this file. Reads must stay **synchr
 
 | Lines | Section |
 |---|---|
-| 13–26 | class, singleton, ctors |
-| **35–224** | `seedSampleData()` (books 36–59, publishers 61–76, genres 78–94, users 96–121, posts 123–140, comments 142–157, assembly 159–223) |
-| 226–239 | getters |
-| 241–297 | `findDocuments` |
-| 299–358 | `analyzeSchema` |
-| 361–369 | `_jsonTypeOf` |
-| 371–383 | `resetToDefaults`, `generateObjectId` |
-| 385–526 | create/drop/rename db & coll, `createView` |
-| 528–558 | `insertDocument` (view check, `_id`, unique checks 538–553, insert(0) 556) |
-| 560–650 | `updateDocument`, deletes, `updateMany` |
-| 652–689 | indexes, validator |
-| 691–707 | `tolerantParse` |
-| 709–744 | `runAggregation`, `parseAggregationScript` |
-| 746–848 | `_runPipeline`, `_applyStage` |
-| 850–920 | `_applyGroup` |
-| 922–1018 | `_matchesFilter` |
-| 1020–1061 | `_applyProjection`, `_sortDocs` |
-| 1063–1123 | `_asNum`, `_compare`, `_resolvePath`, `_setPath`, `_unsetPath` |
+| 14–59 | class, singleton, ctors, `_typedSeedDocs` |
+| **61–2672** | `seedSampleData()` (books 62–614, publishers 615–967, genres 968–1233, users 1234–1836, posts 1837–2248, comments 2249–2601, assembly 2603–2671) |
+| 2674–2689 | getters |
+| 2692–2797 | `findDocuments` |
+| 2799–2863 | `analyzeSchema` |
+| 2865–2878 | `_jsonTypeOf` |
+| 2880–2892 | `resetToDefaults`, `generateObjectId` |
+| 2894–3101 | create/drop/rename db & coll, views |
+| 3103–3146 | `insertDocument` (view check, `_id`, unique checks, insert(0)) |
+| 3148–3289 | `updateDocument`, deletes |
+| 3291–3305 | `updateMany` |
+| 3307–3347 | indexes, validator |
+| 3349–3407 | `tolerantParse`, `_normalizeExtendedJson` |
+| 3409–3454 | `runAggregation`, `parseAggregationScript` |
+| 3456–3666 | `_runPipeline`, `_applyStage`, `_applyGroup` |
+| 3668–3784 | `_matchesFilter` |
+| 3786–3858 | `_applyProjection`, `_sortDocs`, `_asNum`, `_compare` |
+| 3860–3912 | `_sameValue`, `_anySameValue`, `_resolvePath`, `_setPath`, `_unsetPath` |
 
-## Seed data (2 databases, 6 collections, 13 documents)
+## Seed data (2 databases, 6 collections, 300 documents)
+
+Every collection has **50 documents**: the two/three original hand-written records
+plus generated records that reuse the same field shapes and cross-reference IDs
+within the range (`publisher_id` `…a010`–`…a059`, `genre_ids` `…a020`–`…a069`,
+`author_id` `…a030`–`…a079`, `post_id` `…a040`–`…a089`).
 
 **DB `library`**
 
 | Coll | Docs | Indexes |
 |---|---|---|
-| `books` | 2 — *The Silent Horizon* (`60c72b2f9b1d8b0015f8a001`, isbn `978-3-16-148410-0`), *Algorithms of the Mind* (`…a002`, isbn `978-1-23-456789-7`) | `_id_` unique, **`isbn_1` unique**, `title_text` (text), `publisher_id_1` |
-| `publishers` | 2 — Apex Academic Press, Vanguard Publishing House (`…a010`, `…a011`) | `_id_` unique, `name_1` (not unique) |
-| `genres` | 3 — Science Fiction, Mystery, Technology (`…a020`–`…a022`) | `_id_` unique, `name_1` |
+| `books` | 50 — *The Silent Horizon* (`60c72b2f9b1d8b0015f8a001`, isbn `978-3-16-148410-0`), *Algorithms of the Mind* (`…a002`, isbn `978-1-23-456789-7`), plus 48 generated titles | `_id_` unique, **`isbn_1` unique**, `title_text` (text), `publisher_id_1` |
+| `publishers` | 50 — Apex Academic Press, Vanguard Publishing House (`…a010`, `…a011`), plus 48 generated publishers | `_id_` unique, `name_1` (not unique) |
+| `genres` | 50 — Science Fiction, Mystery, Technology (`…a020`–`…a022`), plus 47 generated genres | `_id_` unique, `name_1` |
 
 books fields: `_id, title, author, isbn, published_year, publisher_id, genre_ids[],
 copies_available, rating`; publishers: `_id, name, city, country, founded_year`;
@@ -127,9 +132,9 @@ genres: `_id, name, description`. Cross-references: `publisher_id` → publisher
 
 | Coll | Docs | Indexes |
 |---|---|---|
-| `users` | 2 — `coder_sam`, `design_maya` (`…a030`, `…a031`) | `_id_` unique, **`username_1` unique**, **`email_1` unique** |
-| `posts` | 2 (`…a040`, `…a041`) | `_id_` unique, `author_id_1`, `tags_1` |
-| `comments` | 2 (`…a050`, `…a051`) | `_id_` unique, `post_id_1`, `author_id_1` |
+| `users` | 50 — `coder_sam`, `design_maya` (`…a030`, `…a031`), plus 48 generated users | `_id_` unique, **`username_1` unique**, **`email_1` unique** |
+| `posts` | 50 (`…a040`, `…a041`, plus 48 generated posts) | `_id_` unique, `author_id_1`, `tags_1` |
+| `comments` | 50 (`…a050`, `…a051`, plus 48 generated comments) | `_id_` unique, `post_id_1`, `author_id_1` |
 
 users fields: `_id, username, email, profile{display_name,bio,location}, followers_count,
 created_at`; posts: `_id, author_id, content, tags[], likes_count, created_at`;
@@ -213,7 +218,7 @@ order; nested objects count as a single `Object` type (no flattening). Per field
 | `MongoCollection` | `final String name`; **mutable** `List<MongoDocument> documents`; `List<MongoIndex> indexes`; `Map? validator`; `validationLevel='moderate'`; `validationAction='error'`; `bool isView=false`; `String? viewOn`; `List? pipeline` |
 | `MongoDatabase` | `final String name`; mutable `Map<String, MongoCollection> collections` |
 | `ConnectionProfile` | `id, name, uri, color?, favorite, lastConnected?, readOnly`, `sshTunnel?` (`SshTunnelConfig?`, see below); `toJson`/`fromJson` for the encrypted `AppPreferences.savedConnections` entry |
-| `SshTunnelConfig` | `enabled, host, port=22, username, authMethod (password\|privateKey), password, privateKeyPath, privateKeyPassphrase, hostKeyFingerprint?`; `isActive` (`enabled`), `isComplete`, `copyWith(…, clearHostKeyFingerprint)`, `toJson`/`fromJson` |
+| `SshTunnelConfig` | `enabled, host, port=22, username, authMethod (password\|privateKey), password, privateKeyPath, privateKeyPem, privateKeyPassphrase, hostKeyFingerprint?`; `isActive` (`enabled`), `isComplete`, `copyWith(…, clearHostKeyFingerprint)`, `toJson`/`fromJson` (the PEM is stored with the profile in encrypted secure storage) |
 | `QueryFilterOptions` | see above |
 | `QueryResult` | `final List<MongoDocument> documents`, `final int totalCount`, `final double executionTimeMs` |
 | `PipelineStage` | `final String id`, `String operator`, `String content`, `bool enabled=true`, `copyWith` |
@@ -267,7 +272,7 @@ the per-tab UI state restored on tab switch.
 - `SshTunnel.open(config, remoteHost, remotePort)` authenticates with `dartssh2`
   (`SSHSocket.connect` + `SSHClient`; password via `onPasswordRequest`, a single
   `keyboard-interactive` prompt answered with the same password for PAM-only servers, or
-  `SSHKeyPair.fromPem` from `privateKeyPath`, `~` expanded, optional passphrase), then binds
+  `SSHKeyPair.fromPem` from `privateKeyPem` when present (captured at pick time so mobile cache paths cannot go stale), otherwise from `privateKeyPath` with `~` expanded; optional passphrase), then binds
   `ServerSocket` on `127.0.0.1:0` and one `forwardLocal(remoteHost, remotePort)` channel per
   accepted socket (bidirectional `addStream`; both ends destroyed on close). A failed channel
   open is recorded in `lastForwardError`; `connect`/`test` turn it into an

@@ -73,6 +73,7 @@ void main() {
         username: 'deploy',
         authMethod: SshAuthMethod.privateKey,
         privateKeyPath: '~/.ssh/id_ed25519',
+        privateKeyPem: '-----BEGIN OPENSSH PRIVATE KEY-----\nabc\n',
         privateKeyPassphrase: 'open sesame',
         hostKeyFingerprint: 'SHA256:abc123',
       );
@@ -84,6 +85,8 @@ void main() {
       expect(restored.username, 'deploy');
       expect(restored.authMethod, SshAuthMethod.privateKey);
       expect(restored.privateKeyPath, '~/.ssh/id_ed25519');
+      expect(
+          restored.privateKeyPem, '-----BEGIN OPENSSH PRIVATE KEY-----\nabc\n');
       expect(restored.privateKeyPassphrase, 'open sesame');
       expect(restored.hostKeyFingerprint, 'SHA256:abc123');
     });
@@ -202,6 +205,30 @@ void main() {
           remotePort: 27017,
         ),
         throwsA(isA<SshTunnelException>()),
+      );
+    });
+
+    test('uses a picker-captured PEM instead of a stale cache path', () async {
+      const stalePath = '/cache/no-longer-there/id_ed25519';
+      await expectLater(
+        SshTunnel.open(
+          config: const SshTunnelConfig(
+            host: 'bastion',
+            username: 'deploy',
+            authMethod: SshAuthMethod.privateKey,
+            privateKeyPath: stalePath,
+            privateKeyPem: 'not a valid PEM',
+          ),
+          remoteHost: 'db.internal',
+          remotePort: 27017,
+        ),
+        throwsA(
+          isA<SshTunnelException>().having(
+            (error) => error.message,
+            'message',
+            contains('Could not read the private key at "$stalePath"'),
+          ),
+        ),
       );
     });
   });

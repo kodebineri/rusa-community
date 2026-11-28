@@ -1,10 +1,15 @@
+import 'dart:ui' show PointerDeviceKind;
+
+import 'package:flutter/gestures.dart' show kSecondaryButton;
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:rusa/services/local_mongo_engine.dart';
 import 'package:rusa/services/mongo_engine.dart';
+import 'package:rusa/widgets/compass_selectable_text.dart';
 import 'package:rusa/widgets/compass_terminal.dart';
+import 'package:rusa/widgets/compass_text_menu.dart';
 import 'package:rusa/widgets/modals/mongosh_confirmation_modal.dart';
 
 /// Pumps the docked shell on its own (no app shell, no connection popup).
@@ -36,6 +41,22 @@ Widget shellHarness({
   );
 }
 
+/// The writable prompt, not the read-only selectable log rows.
+Finder shellInput() => find.byWidgetPredicate(
+      (widget) => widget is EditableText && !widget.readOnly,
+    );
+
+/// Opens a text field's context menu through Flutter's gesture arena.
+Future<void> rightClickOn(WidgetTester tester, Finder finder) async {
+  final gesture = await tester.startGesture(
+    tester.getCenter(finder),
+    kind: PointerDeviceKind.mouse,
+    buttons: kSecondaryButton,
+  );
+  await gesture.up();
+  await tester.pump();
+}
+
 void main() {
   setUp(() {
     mongoEngine = LocalMongoEngine.instance;
@@ -47,11 +68,11 @@ void main() {
   });
 
   String inputText(WidgetTester tester) =>
-      tester.widget<EditableText>(find.byType(EditableText)).controller.text;
+      tester.widget<EditableText>(shellInput()).controller.text;
 
   testWidgets('Enter runs the command and logs its output', (tester) async {
     await tester.pumpWidget(shellHarness());
-    await tester.enterText(find.byType(EditableText), 'show dbs');
+    await tester.enterText(shellInput(), 'show dbs');
     await tester.sendKeyEvent(LogicalKeyboardKey.enter);
     await tester.pump();
 
@@ -59,9 +80,44 @@ void main() {
     expect(inputText(tester), isEmpty);
   });
 
+  testWidgets('shell log text is selectable and opens the context menu',
+      (tester) async {
+    await tester.pumpWidget(shellHarness());
+    await tester.enterText(shellInput(), 'show dbs');
+    await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+    await tester.pump();
+
+    final command = find.ancestor(
+      of: find.textContaining('show dbs'),
+      matching: find.byType(CompassSelectableText),
+    );
+    final output = find.ancestor(
+      of: find.textContaining('social_networks'),
+      matching: find.byType(CompassSelectableText),
+    );
+    expect(command, findsOneWidget, reason: 'the command line must be selectable');
+    expect(output, findsOneWidget, reason: 'the command output must be selectable');
+
+    for (final row in <Finder>[command, output]) {
+      final editable =
+          find.descendant(of: row, matching: find.byType(EditableText));
+      expect(editable, findsOneWidget);
+      final field = tester.widget<EditableText>(editable);
+      expect(field.readOnly, isTrue);
+      expect(field.selectionColor!.a, greaterThanOrEqualTo(0.3),
+          reason: 'selected shell text must be visibly highlighted');
+    }
+
+    await rightClickOn(
+      tester,
+      find.descendant(of: output, matching: find.byType(EditableText)),
+    );
+    expect(find.byType(CompassTextContextMenu), findsOneWidget);
+  });
+
   testWidgets('arrow up recalls the previous command', (tester) async {
     await tester.pumpWidget(shellHarness());
-    await tester.enterText(find.byType(EditableText), 'show dbs');
+    await tester.enterText(shellInput(), 'show dbs');
     await tester.sendKeyEvent(LogicalKeyboardKey.enter);
     await tester.pump();
 
@@ -77,7 +133,7 @@ void main() {
 
   testWidgets('Tab completes a database name', (tester) async {
     await tester.pumpWidget(shellHarness());
-    await tester.enterText(find.byType(EditableText), 'use lib');
+    await tester.enterText(shellInput(), 'use lib');
     await tester.sendKeyEvent(LogicalKeyboardKey.tab);
     await tester.pump();
 
@@ -87,7 +143,7 @@ void main() {
   testWidgets('Enter continues on a new line while brackets are open',
       (tester) async {
     await tester.pumpWidget(shellHarness());
-    await tester.enterText(find.byType(EditableText), 'db.books.find({');
+    await tester.enterText(shellInput(), 'db.books.find({');
     await tester.sendKeyEvent(LogicalKeyboardKey.enter);
     await tester.pump();
 
@@ -101,7 +157,7 @@ void main() {
     expect(find.textContaining('Connecting to:'), findsOneWidget);
 
     // The prompt only receives keys while it has focus.
-    await tester.tap(find.byType(EditableText));
+    await tester.tap(shellInput());
     await tester.pump();
 
     await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
@@ -114,7 +170,7 @@ void main() {
 
   testWidgets('find renders ObjectId(...) and a doc count', (tester) async {
     await tester.pumpWidget(shellHarness());
-    await tester.enterText(find.byType(EditableText), 'db.books.find({})');
+    await tester.enterText(shellInput(), 'db.books.find({})');
     await tester.sendKeyEvent(LogicalKeyboardKey.enter);
     await tester.pump();
 
@@ -132,7 +188,7 @@ void main() {
     ));
 
     await tester.enterText(
-        find.byType(EditableText), 'db.books.deleteMany({})');
+        shellInput(), 'db.books.deleteMany({})');
     await tester.sendKeyEvent(LogicalKeyboardKey.enter);
     await tester.pump();
 
@@ -154,7 +210,7 @@ void main() {
     ));
 
     await tester.enterText(
-        find.byType(EditableText), 'db.books.replaceOne({}, { title: "x" })');
+        shellInput(), 'db.books.replaceOne({}, { title: "x" })');
     await tester.sendKeyEvent(LogicalKeyboardKey.enter);
     await tester.pump();
 

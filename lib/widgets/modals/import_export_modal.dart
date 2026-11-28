@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:file_picker/file_picker.dart';
 import 'package:file_selector/file_selector.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
@@ -18,9 +19,10 @@ enum ImportExportMode { export, import }
 ///
 /// The React version triggers a browser file download. Here export can either
 /// write the serialized collection to the system clipboard (and preview it) or
-/// save it to disk via the native "Save As" dialog, while import accepts either
-/// pasted JSON or a `.json` file chosen from disk via the `file_selector`
-/// plugin.
+/// save it to disk. `file_selector` provides the desktop "Save As" dialog; on
+/// Android/iOS `file_selector.getSaveLocation()` is unimplemented, so
+/// `file_picker` hands the bytes to the OS document picker instead. Import
+/// accepts either pasted JSON or a `.json` file chosen via `file_selector`.
 class ImportExportModal extends StatefulWidget {
   final bool isOpen;
   final VoidCallback onClose;
@@ -114,8 +116,10 @@ class _ImportExportModalState extends State<ImportExportModal> {
     });
   }
 
-  /// Opens the native "Save As" dialog and writes the serialized collection to
-  /// the chosen file (the port of React's browser download).
+  /// Opens a native save dialog and writes the serialized collection to the
+  /// chosen file (the port of React's browser download). Desktop uses
+  /// `file_selector`'s "Save As"; mobile uses `file_picker`, which writes the
+  /// bytes through Android's Storage Access Framework / iOS document picker.
   Future<void> _handleDownload() async {
     final content = _buildExportContent();
     final isJson = _format == 'json';
@@ -123,25 +127,39 @@ class _ImportExportModalState extends State<ImportExportModal> {
     final suggestedName = '${widget.collName}.$extension';
 
     try {
-      final location = await getSaveLocation(
-        suggestedName: suggestedName,
-        acceptedTypeGroups: [
-          XTypeGroup(
-            label: isJson ? 'JSON files' : 'CSV files',
-            extensions: [extension],
-          ),
-        ],
-      );
+      String? savedPath;
+      if (Platform.isAndroid || Platform.isIOS) {
+        final savedUri = await FilePicker.saveFile(
+          dialogTitle: 'Save $suggestedName',
+          fileName: suggestedName,
+          mimeType: isJson ? 'application/json' : 'text/csv',
+          bytes: Uint8List.fromList(utf8.encode(content)),
+        );
+        // On Android this is a content:// URI for the document the user chose;
+        // it has no filesystem path, so keep the URI for the status banner.
+        savedPath = savedUri?.toString();
+      } else {
+        final location = await getSaveLocation(
+          suggestedName: suggestedName,
+          acceptedTypeGroups: [
+            XTypeGroup(
+              label: isJson ? 'JSON files' : 'CSV files',
+              extensions: [extension],
+            ),
+          ],
+        );
+        if (location == null) return;
+        await File(location.path).writeAsString(content);
+        savedPath = location.path;
+      }
       if (!mounted) return;
       // User cancelled the dialog.
-      if (location == null) return;
+      if (savedPath == null) return;
 
-      await File(location.path).writeAsString(content);
-      if (!mounted) return;
       setState(() {
         _exportPreview = content;
         _statusText =
-            'Saved ${widget.documents.length} documents to ${location.path}';
+            'Saved ${widget.documents.length} documents to $savedPath';
         _statusIsError = false;
       });
     } catch (err) {
@@ -159,7 +177,13 @@ class _ImportExportModalState extends State<ImportExportModal> {
     if (_isPickingFile) return;
     setState(() => _isPickingFile = true);
     try {
-      const typeGroup = XTypeGroup(label: 'JSON files', extensions: ['json']);
+      // iOS ignores `extensions` and rejects a group without UTIs, so declare
+      // public.json as well; Android/desktop keep using the extension filter.
+      const typeGroup = XTypeGroup(
+        label: 'JSON files',
+        extensions: ['json'],
+        uniformTypeIdentifiers: ['public.json'],
+      );
       final file = await openFile(acceptedTypeGroups: [typeGroup]);
       if (!mounted) return;
       if (file == null) {
@@ -274,11 +298,13 @@ class _ImportExportModalState extends State<ImportExportModal> {
             id: 'json',
             title: 'JSON',
             description: 'Full BSON / nested structures',
+            iconSvg: CompassSvgIcons.code,
           );
           final csvCard = _formatCard(
             id: 'csv',
             title: 'CSV',
             description: 'Spreadsheet comma-separated',
+            iconSvg: CompassSvgIcons.table,
           );
           // Two side-by-side cards leave ~100 px for the description on a
           // phone; stack them instead so the text can wrap.
@@ -482,6 +508,7 @@ class _ImportExportModalState extends State<ImportExportModal> {
     required String id,
     required String title,
     required String description,
+    required String iconSvg,
   }) {
     final selected = _format == id;
     return GestureDetector(
@@ -503,7 +530,7 @@ class _ImportExportModalState extends State<ImportExportModal> {
         child: Row(
           children: [
             CompassSvg(
-                svgString: CompassSvgIcons.code,
+                svgString: iconSvg,
                 size: 15.0,
                 color: _theme.accent),
             const SizedBox(width: 8.0),

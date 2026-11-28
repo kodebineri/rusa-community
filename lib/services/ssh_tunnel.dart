@@ -46,7 +46,8 @@ class SshTunnelException implements Exception {
   final at = authority.lastIndexOf('@');
   final hostPort = at >= 0 ? authority.substring(at + 1) : authority;
   if (hostPort.isEmpty) {
-    throw const SshTunnelException('The connection string is missing its host.');
+    throw const SshTunnelException(
+        'The connection string is missing its host.');
   }
   if (hostPort.contains('[')) {
     throw const SshTunnelException(
@@ -206,8 +207,7 @@ class SshTunnel {
       socket,
       username: username,
       identities: identities.isEmpty ? null : identities,
-      onPasswordRequest:
-          config.password.isEmpty ? null : () => config.password,
+      onPasswordRequest: config.password.isEmpty ? null : () => config.password,
       // Some servers disable RFC 4252 "password" auth and only offer
       // "keyboard-interactive" (PAM). Answer a single password prompt with the
       // same secret; multi-prompt challenges (OTP) are left to key auth.
@@ -335,17 +335,27 @@ class SshTunnel {
     SshTunnelConfig config,
   ) async {
     final path = config.privateKeyPath.trim();
-    if (path.isEmpty) return const <SSHKeyPair>[];
-
-    final resolved = _expandHome(path);
+    final cachedPem = config.privateKeyPem.trim();
     final String pem;
-    try {
-      pem = await File(resolved).readAsString();
-    } on FileSystemException catch (error) {
-      throw SshTunnelException(
-        'Could not read the SSH private key at "$resolved": '
-        '${error.osError?.message ?? error.message}',
-      );
+    final String label;
+
+    if (cachedPem.isNotEmpty) {
+      // Captured by the picker. On mobile the displayed path points into an
+      // app-private cache that may no longer exist, so trust the saved bytes.
+      pem = cachedPem;
+      label = path.isEmpty ? 'the selected private key' : path;
+    } else {
+      if (path.isEmpty) return const <SSHKeyPair>[];
+      final resolved = _expandHome(path);
+      try {
+        pem = await File(resolved).readAsString();
+      } on FileSystemException catch (error) {
+        throw SshTunnelException(
+          'Could not read the SSH private key at "$resolved": '
+          '${error.osError?.message ?? error.message}',
+        );
+      }
+      label = resolved;
     }
 
     try {
@@ -357,7 +367,7 @@ class SshTunnel {
       );
     } catch (_) {
       throw SshTunnelException(
-        'Could not read the private key at "$resolved". '
+        'Could not read the private key at "$label". '
         'Check that it is an unencrypted or correctly-passphrased PEM / OpenSSH key.',
       );
     }

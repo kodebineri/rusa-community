@@ -1,11 +1,13 @@
 name: rusa
 description: "Rusa — an independent MongoDB database client built with Flutter. Not affiliated with MongoDB, Inc."
 publish_to: "none"
-version: 1.1.1+6
+version: 1.1.2+7
 
 environment:
-  sdk: ^3.5.0
-  flutter: ">=3.24.0"
+  # Current plugin releases (url_launcher / shared_preferences 3.41+,
+  # file_picker 3.38+, file_selector 3.35+) set the real minimum SDK.
+  sdk: ^3.11.0
+  flutter: ">=3.41.0"
 
 dependencies:
   flutter:
@@ -13,6 +15,9 @@ dependencies:
   flutter_svg: ^2.0.10+1
   google_fonts: ^6.2.1
   file_selector: ^1.1.0
+  # file_selector has no Android/iOS save dialog; file_picker writes export
+  # bytes through the Android Storage Access Framework / iOS document picker.
+  file_picker: ^13.4.1
   mongo_dart: ^0.10.10
   url_launcher: ^6.3.0
   shared_preferences: ^2.5.6

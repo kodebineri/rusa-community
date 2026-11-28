@@ -1,13 +1,13 @@
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import '../theme/compass_colors.dart';
-import '../theme/compass_density.dart';
 import '../theme/compass_typography.dart';
 import '../icons/compass_svg_icons.dart';
 import '../services/mongosh_completer.dart';
 import '../services/mongosh_interpreter.dart';
+import 'compass_editable_text.dart';
 import 'compass_icon_button.dart';
-import 'compass_text_menu.dart';
+import 'compass_selectable_text.dart';
 import 'modals/mongosh_confirmation_modal.dart';
 
 /// One line of the terminal log: the prompt + command that was typed, and the
@@ -384,8 +384,6 @@ class _CompassTerminalState extends State<CompassTerminal> {
   Widget build(BuildContext context) {
     if (!widget.isOpen) return const SizedBox.shrink();
 
-    final CompassDensity density = CompassDensity.of(context);
-
     return Container(
       height: _isExpanded ? 380.0 : 220.0,
       decoration: const BoxDecoration(
@@ -509,26 +507,36 @@ class _CompassTerminalState extends State<CompassTerminal> {
                 children: [
                   for (final item in _history) ...[
                     if (item.command.isNotEmpty)
-                      Row(
-                        children: [
-                          Text(
-                            '${item.prompt}> ',
+                      // The prompt and command are one selectable run so a
+                      // user can copy the whole line, not just the command.
+                      CompassSelectableText.rich(
+                        TextSpan(children: [
+                          TextSpan(
+                            text: '${item.prompt}> ',
                             style: CompassTypography.monoBold(
                                 color: CompassColors.greenAccent, size: 12.0),
                           ),
-                          Text(
-                            item.command,
+                          TextSpan(
+                            text: item.command,
                             style: CompassTypography.monoMedium(
                                 color: const Color(0xFFF1F5F9), size: 12.0),
                           ),
-                        ],
+                        ]),
+                        style: CompassTypography.monoMedium(
+                            color: const Color(0xFFF1F5F9), size: 12.0),
+                        maxLines: null,
+                        selectionColor: CompassColors.greenAccent
+                            .withValues(alpha: 0.35),
                       ),
-                    Text(
+                    CompassSelectableText(
                       item.output,
                       style: item.isError
                           ? CompassTypography.terminal(
                               color: CompassColors.errorRed)
                           : CompassTypography.terminal(),
+                      maxLines: null,
+                      selectionColor: CompassColors.greenAccent
+                          .withValues(alpha: 0.35),
                     ),
                     const SizedBox(height: 6.0),
                   ],
@@ -565,9 +573,10 @@ class _CompassTerminalState extends State<CompassTerminal> {
                     ),
                   ),
                   Expanded(
-                    child: EditableText(
+                    child: CompassEditableText(
                       controller: _inputController,
                       focusNode: _inputFocus,
+                      anchorLink: _menuAnchor,
                       // Multi-line: Enter inserts a newline while brackets are
                       // open (see `_handleKeyEvent`).
                       maxLines: null,
@@ -576,14 +585,7 @@ class _CompassTerminalState extends State<CompassTerminal> {
                           color: const Color(0xFFF1F5F9), size: 12.0),
                       cursorColor: CompassColors.greenAccent,
                       backgroundCursorColor: const Color(0xFF080B0E),
-                      selectionColor: CompassColors.greenBadgeBg,
                       onSubmitted: (_) => _submitInput(),
-                      onTapOutside: (event) =>
-                          compassHandleTapOutside(event, _inputFocus),
-                      contextMenuBuilder: compassTextContextMenuBuilderFor(
-                        _menuAnchor,
-                        density: density,
-                      ),
                     ),
                   ),
                   CompassIconButton(

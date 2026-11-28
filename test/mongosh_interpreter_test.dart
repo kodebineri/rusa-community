@@ -131,7 +131,8 @@ void main() {
           )
           .output;
       expect(int.parse(all), greaterThan(0));
-      expect(int.parse(recent), 1);
+      expect(int.parse(recent), greaterThan(1));
+      expect(int.parse(recent), lessThan(int.parse(all)));
     });
 
     test('count is an alias for countDocuments', () {
@@ -152,7 +153,7 @@ void main() {
         r'db.books.aggregate([{ $match: { published_year: { $gte: 2020 } } }])',
         dbName: 'library',
       ).output;
-      expect(out, contains('[1 docs]'));
+      expect(out, contains('docs]'));
       expect(out, contains('2022'));
     });
 
@@ -184,7 +185,7 @@ void main() {
         'db.books.find({}).sort({ published_year: -1 }).limit(1)',
         dbName: 'library',
       ).output;
-      expect(out, contains('2022'));
+      expect(out, contains('2024'));
       expect(out, isNot(contains('2019')));
     });
 

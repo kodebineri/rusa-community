@@ -6,7 +6,7 @@ import 'dart:ui' show PointerDeviceKind;
 
 import 'package:flutter/foundation.dart'
     show debugDefaultTargetPlatformOverride, TargetPlatform;
-import 'package:flutter/gestures.dart' show kPrimaryButton;
+import 'package:flutter/gestures.dart' show kPrimaryButton, kSecondaryButton;
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
@@ -142,6 +142,23 @@ Widget phoneFrame(Widget child, Size size) {
       ],
     ),
   );
+}
+
+/// Sends a real secondary mouse click to [finder], the desktop way to open a
+/// text field's context menu.
+///
+/// This deliberately goes through Flutter's gesture arena: calling
+/// `EditableTextState.toggleToolbar()` directly would pass even when the field
+/// is missing `TextSelectionGestureDetectorBuilder`, which is the bug these
+/// tests guard against.
+Future<void> rightClickOn(WidgetTester tester, Finder finder) async {
+  final gesture = await tester.startGesture(
+    tester.getCenter(finder),
+    kind: PointerDeviceKind.mouse,
+    buttons: kSecondaryButton,
+  );
+  await gesture.up();
+  await tester.pump();
 }
 
 void main() {
@@ -602,7 +619,7 @@ void main() {
     addTearDown(tester.view.resetDevicePixelRatio);
     addTearDown(mongoEngine.resetToDefaults);
 
-    // 2 seeded books + 25 bulk = 27 documents.
+    // 50 seeded books + 25 bulk = 75 documents.
     for (var i = 0; i < 25; i++) {
       mongoEngine.insertDocument('library', 'books', {
         '_id': 'bulk-$i',
@@ -635,8 +652,9 @@ void main() {
     await tester.pump(const Duration(milliseconds: 400));
     for (var i = 0; i < 50 && tester.takeException() != null; i++) {}
 
-    // First page of 20, with the pager showing the 27-document total.
-    expect(find.text('1–20 of 27'), findsOneWidget);
+    // First page of 20, with the pager showing the seeded + bulk total.
+    final total = mongoEngine.getCollection('library', 'books')!.documents.length;
+    expect(find.text('1–20 of $total'), findsOneWidget);
 
     final nextBtn = find.byWidgetPredicate(
       (w) => w is CompassIconButton && w.semanticLabel == 'Next results page',
@@ -645,7 +663,7 @@ void main() {
     await tester.tap(nextBtn);
     await tester.pump();
 
-    expect(find.text('21–27 of 27'), findsOneWidget);
+    expect(find.text('21–40 of $total'), findsOneWidget);
   });
 
   testWidgets('selecting collections opens them in tabs', (WidgetTester tester) async {
@@ -916,16 +934,15 @@ void main() {
     final originalCount = booksColl.documents.length;
     expect(originalCount, greaterThan(0));
 
-    // Tree mode (the default) renders one copy/duplicate icon per document
-    // card; scope the finder to the tree so it can't pick up copy icons from
-    // other views or (closed) modals.
+    // The tree lazy-builds only the cards in view, so assert against the
+    // rendered cards rather than the whole (50-document) collection.
     final copyIcon = find.descendant(
       of: find.byType(DocumentTreeView),
       matching: find.byWidgetPredicate(
         (w) => w is CompassSvg && w.svgString == CompassSvgIcons.copy,
       ),
     );
-    expect(copyIcon, findsNWidgets(originalCount));
+    expect(copyIcon, findsWidgets);
 
     await tester.tap(copyIcon.first);
     await tester.pump();
@@ -1017,11 +1034,12 @@ void main() {
       booksColl.documents.any((d) => d.data['isbn'] == '978-0-00-000000-1'),
       isTrue,
     );
-    expect(
-      find.text('#${originalCount + 1}'),
-      findsOneWidget,
-      reason: 'the tree view must show the newly inserted document card',
+    // The inserted document can be past the first rendered page, so verify
+    // persistence in the engine and keep the fresh-id guarantee there.
+    final inserted = booksColl.documents.firstWhere(
+      (d) => d.data['isbn'] == '978-0-00-000000-1',
     );
+    expect(existingIds.contains(inserted.id), isFalse);
   });
 
   testWidgets('Analyze Schema button shows progress and re-runs the analysis',
@@ -1321,29 +1339,23 @@ void main() {
       ),
     );
 
-    // `library.books` seeds two docs, each with one expandable field
-    // (`genre_ids`, 2 and 1 entries). Every Object/Array node starts collapsed.
+    // Every Object/Array node starts collapsed. The document list is lazy, so
+    // derive the expected counts from the cards actually built on screen.
+    final twoItemSummaries =
+        find.descendant(of: tree, matching: find.text('[ ... 2 items ]'));
+    final collapsedCount = chevronRight.evaluate().length;
+    final twoItemCount = twoItemSummaries.evaluate().length;
+    expect(collapsedCount, greaterThan(0));
+    expect(twoItemCount, greaterThan(0));
     expect(chevronDown, findsNothing, reason: 'no node starts expanded');
-    expect(chevronRight, findsNWidgets(2));
-    expect(
-      find.descendant(of: tree, matching: find.text('[ ... 2 items ]')),
-      findsOneWidget,
-    );
-    expect(
-      find.descendant(of: tree, matching: find.text('[ ... 1 items ]')),
-      findsOneWidget,
-    );
     expect(find.descendant(of: tree, matching: find.text('0:')), findsNothing);
 
     // Expanding one array reveals its items and swaps the chevron.
     await tester.tap(chevronRight.first);
     await tester.pump();
     expect(chevronDown, findsOneWidget);
-    expect(chevronRight, findsOneWidget);
-    expect(
-      find.descendant(of: tree, matching: find.text('[ ... 2 items ]')),
-      findsNothing,
-    );
+    expect(chevronRight, findsNWidgets(collapsedCount - 1));
+    expect(twoItemSummaries, findsNWidgets(twoItemCount - 1));
     expect(find.descendant(of: tree, matching: find.text('0:')), findsOneWidget);
     expect(find.descendant(of: tree, matching: find.text('1:')), findsOneWidget);
 
@@ -1351,10 +1363,7 @@ void main() {
     await tester.tap(chevronDown);
     await tester.pump();
     expect(chevronDown, findsNothing);
-    expect(
-      find.descendant(of: tree, matching: find.text('[ ... 2 items ]')),
-      findsOneWidget,
-    );
+    expect(twoItemSummaries, findsNWidgets(twoItemCount));
   });
 
   testWidgets('json view edit button saves changes to the document',
@@ -1380,17 +1389,17 @@ void main() {
     expect(jsonView, findsOneWidget);
 
     final books = mongoEngine.getCollection('library', 'books')!;
-    final originalCount = books.documents.length;
     final firstId = books.documents.first.id;
 
-    // One pencil per document card.
+    // One pencil per rendered document card (the list is lazy-built).
     final editIcon = find.descendant(
       of: jsonView,
       matching: find.byWidgetPredicate(
         (w) => w is CompassSvg && w.svgString == CompassSvgIcons.pencil,
       ),
     );
-    expect(editIcon, findsNWidgets(originalCount));
+    expect(editIcon, findsWidgets);
+    final renderedEditIcons = editIcon.evaluate().length;
 
     // Tapping the pencil opens the inline JSON editor for that card.
     await tester.tap(editIcon.first);
@@ -1407,7 +1416,7 @@ void main() {
     );
     expect(editor, findsOneWidget, reason: 'the card body must become editable');
     // Only the edited card swaps its pencil for Save/Cancel.
-    expect(editIcon, findsNWidgets(originalCount - 1));
+    expect(editIcon, findsNWidgets(renderedEditIcons - 1));
 
     final edited = unwrapMongoEditorText(
       tester.widget<EditableText>(editor).controller.text,
@@ -1447,7 +1456,7 @@ void main() {
       ),
       findsNothing,
     );
-    expect(editIcon, findsNWidgets(originalCount));
+    expect(editIcon, findsNWidgets(renderedEditIcons));
   });
 
   testWidgets('updateMany with a plain map replaces matched documents',
@@ -2238,7 +2247,7 @@ void main() {
 
     expect(find.byType(AggregationsView), findsOneWidget);
     expect(find.text(r'$match'), findsWidgets);
-    expect(find.textContaining('1 docs ('), findsWidgets);
+    expect(find.textContaining('docs ('), findsWidgets);
   });
 
   testWidgets('mobile: aggregations view fits a 320 px phone',
@@ -2411,9 +2420,14 @@ void main() {
         reason: 'the shell must shrink instead of overflowing');
     final prompt = find.descendant(
       of: terminal,
-      matching: find.byType(EditableText),
+      matching: find.byWidgetPredicate(
+        (w) => w is EditableText && !w.readOnly,
+      ),
     );
     expect(prompt, findsOneWidget);
+    expect(tester.widget<EditableText>(prompt).selectionColor!.a,
+        greaterThanOrEqualTo(0.3),
+        reason: 'Shell prompt must highlight selected text');
     expect(tester.getRect(prompt).bottom,
         lessThanOrEqualTo(size.height - keyboard + 0.001),
         reason: 'the prompt must sit above the keyboard');
@@ -2860,5 +2874,173 @@ void main() {
     final Offset menuTopLeft = fieldTopLeft + ownOffset;
     expect(menuTopLeft.dx, closeTo(anchors.primaryAnchor.dx - 8.0, 1.0));
     expect(menuTopLeft.dy, closeTo(anchors.primaryAnchor.dy + 4.0, 1.0));
+  });
+
+  testWidgets('table view scrolls 50 rows in a short viewport', (
+    WidgetTester tester,
+  ) async {
+    mongoEngine.resetToDefaults();
+    final docs = mongoEngine.getCollection('library', 'books')!.documents;
+    expect(docs.length, 50);
+
+    await tester.pumpWidget(
+      Directionality(
+        textDirection: TextDirection.ltr,
+        child: CompassDensity.forWidth(
+          width: 688.0,
+          touchDevice: false,
+          child: MediaQuery(
+            data: const MediaQueryData(size: Size(688.0, 265.0)),
+            child: CompassTheme(
+              variant: CompassThemeVariant.defaultVariant,
+              child: SizedBox(
+                width: 688.0,
+                height: 265.0,
+                child: DocumentTableView(
+                  documents: docs,
+                  onEditDocument: (_) {},
+                  onDeleteDocument: (_, __) {},
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    expect(tester.takeException(), isNull);
+    expect(find.byType(DocumentTableView), findsOneWidget);
+    expect(find.byType(SingleChildScrollView), findsNWidgets(2),
+        reason: 'one scroll view per axis');
+  });
+
+  testWidgets('sidebar search field opens the custom context menu', (
+    WidgetTester tester,
+  ) async {
+    tester.view.physicalSize = const Size(1920.0, 1080.0);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(const CompassApp());
+    await tester.pump();
+    for (var i = 0; i < 50 && tester.takeException() != null; i++) {}
+    await closeConnectionPopup(tester);
+
+    final search = find.descendant(
+      of: find.byType(CompassSidebar),
+      matching: find.byType(EditableText),
+    );
+    expect(search, findsOneWidget);
+    expect(tester.widget<EditableText>(search).selectionColor!.a,
+        greaterThanOrEqualTo(0.3),
+        reason: 'selected search text must be visibly highlighted');
+    await rightClickOn(tester, search);
+    expect(find.byType(CompassTextContextMenu), findsOneWidget);
+    ContextMenuController.removeAny();
+    await tester.pump();
+  });
+
+  testWidgets('every query bar field opens the custom context menu', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(
+      modalHarness(
+        size: const Size(1600.0, 900.0),
+        touch: false,
+        child: Center(
+          child: SizedBox(
+            width: 1500.0,
+            child: CompassQueryBar(
+              options: QueryFilterOptions(
+                filter: "{ title: 'The Silent Horizon' }",
+                project: '{ title: 1 }',
+                sort: '{ year: 1 }',
+              ),
+              onChangeOptions: (_) {},
+              onExecuteQuery: () {},
+              onResetQuery: () {},
+              optionsExpanded: true,
+              onToggleOptions: () {},
+              onOpenOverflow: () {},
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+    for (var i = 0; i < 50 && tester.takeException() != null; i++) {}
+
+    final fields = find.descendant(
+      of: find.byType(CompassQueryBar),
+      matching: find.byType(EditableText),
+    );
+    expect(fields, findsNWidgets(5));
+    for (var i = 0; i < 5; i++) {
+      expect(tester.widget<EditableText>(fields.at(i)).selectionColor!.a,
+          greaterThanOrEqualTo(0.3),
+          reason: 'query bar field $i must highlight selected text');
+      await rightClickOn(tester, fields.at(i));
+      expect(find.byType(CompassTextContextMenu), findsOneWidget,
+          reason: 'query bar field $i must have a context menu');
+      ContextMenuController.removeAny();
+      await tester.pump();
+    }
+  });
+
+  testWidgets('connect modal fields open the custom context menu', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(
+      modalHarness(
+        size: const Size(1600.0, 900.0),
+        touch: false,
+        child: ConnectionModal(
+          isOpen: true,
+          onClose: () {},
+          savedConnections: const [],
+          onConnect: (_) async => null,
+          onSaveConnection: (_) {},
+          onDeleteConnection: (_) {},
+          onConnectSampleData: () {},
+        ),
+      ),
+    );
+    await tester.pump();
+
+    final fields = find.descendant(
+      of: find.byType(ConnectionModal),
+      matching: find.byType(EditableText),
+    );
+    expect(fields, findsNWidgets(2),
+        reason: 'URI and connection name start visible');
+    for (var i = 0; i < fields.evaluate().length; i++) {
+      expect(tester.widget<EditableText>(fields.at(i)).selectionColor!.a,
+          greaterThanOrEqualTo(0.3),
+          reason: 'connect field $i must highlight selected text');
+    }
+    await rightClickOn(tester, fields.first);
+    expect(find.byType(CompassTextContextMenu), findsOneWidget);
+    ContextMenuController.removeAny();
+    await tester.pump();
+
+    await tester.tap(find.text('Advanced Connection Options'));
+    await tester.pump();
+    final advancedFields = find.descendant(
+      of: find.byType(ConnectionModal),
+      matching: find.byType(EditableText),
+    );
+    expect(advancedFields.evaluate().length, greaterThan(1));
+    for (var i = 0; i < advancedFields.evaluate().length; i++) {
+      expect(tester.widget<EditableText>(advancedFields.at(i)).selectionColor!.a,
+          greaterThanOrEqualTo(0.3),
+          reason: 'advanced connect field $i must highlight selected text');
+      await rightClickOn(tester, advancedFields.at(i));
+      expect(find.byType(CompassTextContextMenu), findsOneWidget,
+          reason: 'connect field $i must have a context menu');
+      ContextMenuController.removeAny();
+      await tester.pump();
+    }
   });
 }

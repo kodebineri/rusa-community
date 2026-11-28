@@ -36,10 +36,20 @@ class SshTunnelConfig {
   /// Password for [SshAuthMethod.password].
   final String password;
 
-  /// Path to the private key file for [SshAuthMethod.privateKey].
+  /// Path shown in the form for [SshAuthMethod.privateKey].
+  ///
+  /// When [privateKeyPem] is set this is only a label: mobile file pickers hand
+  /// back a path into a temporary cache that may not survive a restart.
   final String privateKeyPath;
 
-  /// Passphrase protecting [privateKeyPath], if it is encrypted.
+  /// Key contents captured when the user picked a file.
+  ///
+  /// Stored in the same encrypted [AppPreferences.savedConnections] entry as
+  /// the password / passphrase. Empty for hand-typed paths, which the tunnel
+  /// still reads from disk.
+  final String privateKeyPem;
+
+  /// Passphrase protecting the private key, if it is encrypted.
   final String privateKeyPassphrase;
 
   /// SHA-256 fingerprint of the bastion's host key, as reported by the SSH
@@ -58,13 +68,14 @@ class SshTunnelConfig {
     this.authMethod = SshAuthMethod.password,
     this.password = '',
     this.privateKeyPath = '',
+    this.privateKeyPem = '',
     this.privateKeyPassphrase = '',
     this.hostKeyFingerprint,
   });
 
   /// True when the tunnel is switched on. Missing fields are reported by the
-/// tunnel itself so a misconfigured profile fails with a clear message instead
-/// of silently connecting directly.
+  /// tunnel itself so a misconfigured profile fails with a clear message instead
+  /// of silently connecting directly.
   bool get isActive => enabled;
 
   /// True when the bastion host and username are filled in.
@@ -76,6 +87,7 @@ class SshTunnelConfig {
       username.trim().isEmpty &&
       password.isEmpty &&
       privateKeyPath.trim().isEmpty &&
+      privateKeyPem.trim().isEmpty &&
       privateKeyPassphrase.isEmpty;
 
   SshTunnelConfig copyWith({
@@ -86,6 +98,7 @@ class SshTunnelConfig {
     SshAuthMethod? authMethod,
     String? password,
     String? privateKeyPath,
+    String? privateKeyPem,
     String? privateKeyPassphrase,
     String? hostKeyFingerprint,
     bool clearHostKeyFingerprint = false,
@@ -98,6 +111,7 @@ class SshTunnelConfig {
       authMethod: authMethod ?? this.authMethod,
       password: password ?? this.password,
       privateKeyPath: privateKeyPath ?? this.privateKeyPath,
+      privateKeyPem: privateKeyPem ?? this.privateKeyPem,
       privateKeyPassphrase: privateKeyPassphrase ?? this.privateKeyPassphrase,
       hostKeyFingerprint: clearHostKeyFingerprint
           ? null
@@ -113,6 +127,7 @@ class SshTunnelConfig {
         'authMethod': authMethod.name,
         'password': password,
         'privateKeyPath': privateKeyPath,
+        'privateKeyPem': privateKeyPem,
         'privateKeyPassphrase': privateKeyPassphrase,
         'hostKeyFingerprint': hostKeyFingerprint,
       };
@@ -131,6 +146,7 @@ class SshTunnelConfig {
           : SshAuthMethod.password,
       password: json['password'] as String? ?? '',
       privateKeyPath: json['privateKeyPath'] as String? ?? '',
+      privateKeyPem: json['privateKeyPem'] as String? ?? '',
       privateKeyPassphrase: json['privateKeyPassphrase'] as String? ?? '',
       hostKeyFingerprint: _asFingerprint(json['hostKeyFingerprint']),
     );
